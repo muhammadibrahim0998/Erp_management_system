@@ -278,10 +278,10 @@ export default function App() {
               <span className="font-black text-amber-400 text-sm tracking-tighter">YAF</span>
             </div>
             <div className="min-w-0">
-              <h1 className="font-extrabold text-xs tracking-tight text-white uppercase truncate">
+              <h1 className="font-extrabold text-sm tracking-tight text-white uppercase truncate">
                 Yousafzai Agri Foods
               </h1>
-              <p className="text-[10px] text-[#8CAAA0] truncate">Head office - Mardan · FY 2026-27</p>
+              <p className="text-xs text-white font-bold truncate">Head office - Mardan · FY 2026-27</p>
             </div>
           </div>
 
@@ -289,7 +289,7 @@ export default function App() {
           <div className="p-3 space-y-4">
             {navSections.map((section, sIdx) => (
               <div key={sIdx} className="space-y-1">
-                <div className="px-3 text-[10px] font-bold text-[#6A947F] tracking-wider">
+                <div className="px-3 text-xs font-bold text-white tracking-wider">
                   {section.title}
                 </div>
                 {section.items.map((item) => {
@@ -299,18 +299,18 @@ export default function App() {
                     <button
                       key={item.id}
                       onClick={() => setActiveTab(item.id)}
-                      className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium transition ${
+                      className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm font-bold text-white transition ${
                         isActive
-                          ? 'bg-[#18392A] text-white border border-[#27533E] shadow-sm font-bold'
-                          : 'text-[#9ABDB0] hover:text-white hover:bg-[#142F23]'
+                          ? 'bg-[#18392A] border border-[#27533E] shadow-sm'
+                          : 'hover:bg-[#142F23]'
                       }`}
                     >
                       <div className="flex items-center gap-2.5">
-                        <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-white' : 'text-[#8CAAA0]'}`} />
+                        <Icon className="w-3.5 h-3.5 text-white" />
                         <span>{item.label}</span>
                       </div>
                       {item.badge !== undefined && item.badge > 0 && (
-                        <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-rose-600 text-white">
+                        <span className="px-1.5 py-0.2 rounded-full text-[11px] font-bold bg-rose-600 text-white">
                           {item.badge}
                         </span>
                       )}
@@ -330,15 +330,15 @@ export default function App() {
             className="w-full p-2.5 rounded-xl bg-[#132C20] hover:bg-[#193B2B] border border-[#1D4433] flex items-center justify-between text-left transition"
           >
             <div className="flex items-center gap-2.5 min-w-0">
-              <div className="w-7 h-7 rounded-lg bg-[#0E2118] border border-[#1D4433] flex items-center justify-center font-bold text-[10px] text-white shrink-0">
+              <div className="w-7 h-7 rounded-lg bg-[#0E2118] border border-[#1D4433] flex items-center justify-center font-bold text-xs text-white shrink-0">
                 {currentUser?.avatar || 'SU'}
               </div>
               <div className="min-w-0">
-                <div className="text-xs font-bold text-white truncate">{currentUser?.name || 'Sana Ullah'}</div>
-                <div className="text-[10px] text-[#8CAAA0] truncate">{currentUser?.role || 'Chairman & CEO'}</div>
+                <div className="text-sm font-bold text-white truncate">{currentUser?.name || 'Sana Ullah'}</div>
+                <div className="text-xs text-white font-bold truncate">{currentUser?.role || 'Chairman & CEO'}</div>
               </div>
             </div>
-            <span className="text-[10px] text-amber-400 font-semibold shrink-0">Switch</span>
+            <span className="text-xs text-amber-400 font-semibold shrink-0">Switch</span>
           </button>
         </div>
       </aside>
@@ -348,28 +348,28 @@ export default function App() {
         {/* Dark Green Top Navbar (#0E2118) */}
         <header className="h-16 border-b border-[#1B3A2C] px-8 flex items-center justify-between bg-[#0E2118] sticky top-0 z-10 shrink-0">
           <div className="relative w-96">
-            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[#6A947F]" />
+            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-white font-bold" />
             <input
               type="text"
               placeholder="Search documents, items, customers, suppliers..."
-              className="w-full bg-[#132C20] border border-[#1D4433] rounded-lg pl-9 pr-4 py-1.5 text-xs text-white placeholder:text-[#6A947F] focus:outline-none focus:border-[#2E684E] focus:ring-1 focus:ring-[#2E684E] transition"
+              className="w-full bg-[#132C20] border border-[#1D4433] rounded-lg pl-9 pr-4 py-1.5 text-sm text-white font-bold placeholder:text-white placeholder:font-bold focus:outline-none focus:border-[#2E684E] focus:ring-1 focus:ring-[#2E684E] transition"
             />
           </div>
 
           <div className="flex items-center gap-4">
-            <span className="text-xs font-mono font-medium text-[#9ABDB0] bg-[#132C20] px-2.5 py-1 rounded-md border border-[#1D4433]">
+            <span className="text-sm font-mono font-bold text-white bg-[#132C20] px-2.5 py-1 rounded-md border border-[#1D4433]">
               29 Sep 2026
             </span>
 
             <button
               onClick={fetchAllData}
-              className="p-2 rounded-lg bg-[#132C20] hover:bg-[#193B2B] text-[#9ABDB0] border border-[#1D4433] transition"
+              className="p-2 rounded-lg bg-[#132C20] hover:bg-[#193B2B] text-white font-bold border border-[#1D4433] transition"
               title="Refresh All Real-time ERP Data"
             >
               <RefreshCw className="w-3.5 h-3.5" />
             </button>
 
-            <button className="relative p-2 rounded-lg bg-[#132C20] hover:bg-[#193B2B] border border-[#1D4433] text-[#9ABDB0] hover:text-white transition">
+            <button className="relative p-2 rounded-lg bg-[#132C20] hover:bg-[#193B2B] border border-[#1D4433] text-white font-bold transition">
               <Bell className="w-4 h-4" />
               <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-amber-400"></span>
             </button>
@@ -380,12 +380,12 @@ export default function App() {
               onClick={() => setIsRoleModalOpen(true)}
               className="flex items-center gap-2.5 cursor-pointer hover:opacity-80 transition"
             >
-              <div className="w-8 h-8 rounded-lg bg-[#132C20] border border-[#1D4433] flex items-center justify-center font-bold text-xs text-white">
+              <div className="w-8 h-8 rounded-lg bg-[#132C20] border border-[#1D4433] flex items-center justify-center font-bold text-sm text-white">
                 {currentUser?.avatar || 'SU'}
               </div>
               <div>
-                <div className="text-xs font-bold text-white">{currentUser?.name || 'Sana Ullah'}</div>
-                <div className="text-[10px] text-[#8CAAA0]">{currentUser?.role || 'Chairman & CEO'}</div>
+                <div className="text-sm font-bold text-white">{currentUser?.name || 'Sana Ullah'}</div>
+                <div className="text-xs text-white font-bold">{currentUser?.role || 'Chairman & CEO'}</div>
               </div>
             </div>
           </div>
