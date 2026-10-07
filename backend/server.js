@@ -356,6 +356,35 @@ app.get('/api/settings/matrix', (req, res) => {
   });
 });
 
+// Auth routes
+app.post('/api/auth/signup', async (req, res) => {
+  try {
+    const { name, email, password, role, department } = req.body;
+    const [existing] = await db.query('SELECT id FROM users WHERE email = ?', [email]);
+    if (existing.length > 0) return res.status(400).json({ error: 'Email already exists' });
+    
+    await db.query(
+      'INSERT INTO users (name, email, password, role, department, avatar) VALUES (?, ?, ?, ?, ?, ?)',
+      [name, email, password, role, department, name.substring(0, 2).toUpperCase()]
+    );
+    const [newUser] = await db.query('SELECT id, name, email, role, department, avatar FROM users WHERE email = ?', [email]);
+    res.json(newUser[0]);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/auth/login', async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    const [users] = await db.query('SELECT id, name, email, role, department, avatar FROM users WHERE email = ? AND password = ?', [email, password]);
+    if (users.length === 0) return res.status(401).json({ error: 'Invalid credentials' });
+    res.json(users[0]);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Start server
 app.listen(PORT, async () => {
   console.log(`🚀 AgenTech ERP Server is running on http://localhost:${PORT}`);

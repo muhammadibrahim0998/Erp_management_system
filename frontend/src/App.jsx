@@ -22,7 +22,8 @@ import {
   Building2,
   UserCheck,
   ChevronRight,
-  GitBranch
+  GitBranch,
+  LogOut
 } from 'lucide-react';
 
 import ChairmanDashboard from './components/views/ChairmanDashboard';
@@ -41,12 +42,14 @@ import ReportsView from './components/views/ReportsView';
 import SettingsMatrix from './components/views/SettingsMatrix';
 import RoleSwitcherModal from './components/RoleSwitcherModal';
 import ProcessMap from './components/views/ProcessMap';
+import Auth from './components/Auth';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isRoleModalOpen, setIsRoleModalOpen] = useState(false);
   const [users, setUsers] = useState([]);
   const [currentUser, setCurrentUser] = useState(null);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   // Live Server Data
   const [chairmanData, setChairmanData] = useState(null);
@@ -259,6 +262,10 @@ export default function App() {
     }
   ];
 
+  if (!isAuthenticated) {
+    return <Auth onLogin={(user) => { setCurrentUser(user); setIsAuthenticated(true); fetchAllData(); }} />;
+  }
+
   return (
     <div className="flex h-screen bg-[#0E2118] text-gray-900 overflow-hidden font-sans">
       {/* Toast Notification */}
@@ -322,23 +329,16 @@ export default function App() {
           </div>
         </div>
 
-        {/* Server & DB Status Badges in Sidebar */}
-        <div className="p-3 border-t border-[#1B3A2C] space-y-2">
-          {/* Active User Switcher Pill */}
+        {/* Logout Link in Sidebar */}
+        <div className="p-3 border-t border-[#1B3A2C]">
           <button
-            onClick={() => setIsRoleModalOpen(true)}
-            className="w-full p-2.5 rounded-xl bg-[#132C20] hover:bg-[#193B2B] border border-[#1D4433] flex items-center justify-between text-left transition"
+            onClick={() => { setIsAuthenticated(false); setCurrentUser(null); }}
+            className="w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm font-bold text-rose-500 hover:text-rose-400 hover:bg-rose-950/40 transition"
           >
-            <div className="flex items-center gap-2.5 min-w-0">
-              <div className="w-7 h-7 rounded-lg bg-[#0E2118] border border-[#1D4433] flex items-center justify-center font-bold text-xs text-white shrink-0">
-                {currentUser?.avatar || 'SU'}
-              </div>
-              <div className="min-w-0">
-                <div className="text-sm font-bold text-white truncate">{currentUser?.name || 'Sana Ullah'}</div>
-                <div className="text-xs text-white font-bold truncate">{currentUser?.role || 'Chairman & CEO'}</div>
-              </div>
+            <div className="flex items-center gap-2.5">
+              <LogOut className="w-3.5 h-3.5" />
+              <span>Logout</span>
             </div>
-            <span className="text-xs text-amber-400 font-semibold shrink-0">Switch</span>
           </button>
         </div>
       </aside>
@@ -376,10 +376,7 @@ export default function App() {
 
             <div className="h-5 w-px bg-[#1B3A2C] mx-1"></div>
 
-            <div
-              onClick={() => setIsRoleModalOpen(true)}
-              className="flex items-center gap-2.5 cursor-pointer hover:opacity-80 transition"
-            >
+            <div className="flex items-center gap-2.5 transition">
               <div className="w-8 h-8 rounded-lg bg-[#132C20] border border-[#1D4433] flex items-center justify-center font-bold text-sm text-white">
                 {currentUser?.avatar || 'SU'}
               </div>
