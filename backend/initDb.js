@@ -1,4 +1,5 @@
 const { db } = require('./config/db');
+const bcrypt = require('bcryptjs');
 
 async function initDatabase() {
   console.log('🔄 Initializing Yousafzai Agri Foods ERP Database Tables in MySQL...');
@@ -13,6 +14,7 @@ async function initDatabase() {
         department VARCHAR(100) NOT NULL,
         avatar VARCHAR(10) DEFAULT 'US',
         email VARCHAR(100),
+        password VARCHAR(255) DEFAULT 'password',
         status VARCHAR(20) DEFAULT 'active'
       )
     `);
@@ -156,6 +158,86 @@ async function initDatabase() {
       )
     `);
 
+    // 10. Central Audit Trail & Activity Logs
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS audit_logs (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        user_id INT NULL,
+        user_name VARCHAR(100) NOT NULL DEFAULT 'System',
+        role VARCHAR(100) NOT NULL DEFAULT 'System',
+        action VARCHAR(100) NOT NULL,
+        entity_type VARCHAR(50) NOT NULL DEFAULT 'SYSTEM',
+        entity_id VARCHAR(100) NULL,
+        details TEXT NULL,
+        ip_address VARCHAR(50) DEFAULT '127.0.0.1',
+        status VARCHAR(20) DEFAULT 'SUCCESS',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_audit_action (action),
+        INDEX idx_audit_user (user_id),
+        INDEX idx_audit_entity (entity_type),
+        INDEX idx_audit_created (created_at)
+      )
+    `);
+
+    // 11. POS Orders (Sales Invoices)
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS pos_orders (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        invoice_no VARCHAR(50) UNIQUE NOT NULL,
+        customer_name VARCHAR(150) DEFAULT 'Walk-in Customer',
+        customer_phone VARCHAR(50) DEFAULT '',
+        warehouse VARCHAR(100) DEFAULT 'Mardan Central Store',
+        subtotal DECIMAL(12, 2) NOT NULL,
+        tax_amount DECIMAL(12, 2) DEFAULT 0.00,
+        discount_amount DECIMAL(12, 2) DEFAULT 0.00,
+        total_amount DECIMAL(12, 2) NOT NULL,
+        paid_amount DECIMAL(12, 2) NOT NULL,
+        change_amount DECIMAL(12, 2) DEFAULT 0.00,
+        payment_method VARCHAR(50) DEFAULT 'Cash',
+        cashier_name VARCHAR(100) DEFAULT 'Cashier',
+        status VARCHAR(30) DEFAULT 'Completed',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_pos_invoice (invoice_no),
+        INDEX idx_pos_created (created_at)
+      ) ENGINE=InnoDB;
+    `);
+
+    // 12. POS Order Items (Invoice Lines)
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS pos_order_items (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        order_id INT NOT NULL,
+        item_id INT NOT NULL,
+        item_code VARCHAR(50),
+        item_name VARCHAR(150) NOT NULL,
+        quantity INT NOT NULL,
+        unit_price DECIMAL(10, 2) NOT NULL,
+        total_price DECIMAL(12, 2) NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_order_items_order (order_id),
+        FOREIGN KEY (order_id) REFERENCES pos_orders(id) ON DELETE CASCADE
+      ) ENGINE=InnoDB;
+    `);
+
+    // 13. Inventory Transactions Ledger
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS inventory_transactions (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        item_id INT NOT NULL,
+        ref_no VARCHAR(50) NOT NULL,
+        transaction_type VARCHAR(50) NOT NULL,
+        quantity_change INT NOT NULL,
+        prev_qty INT NOT NULL,
+        new_qty INT NOT NULL,
+        warehouse VARCHAR(100),
+        performed_by VARCHAR(100),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_inv_tx_item (item_id),
+        INDEX idx_inv_tx_ref (ref_no),
+        INDEX idx_inv_tx_created (created_at)
+      ) ENGINE=InnoDB;
+    `);
+
     console.log('✅ Tables created or verified.');
 
     // Seed Initial Data matching the PDF if empty
@@ -163,29 +245,33 @@ async function initDatabase() {
     if (userRows[0].count === 0) {
       console.log('🌱 Seeding 19 Yousafzai Agri Foods ERP users from PDF Page 4...');
       const usersData = [
-        ['Sana Ullah', 'Chairman & CEO', 'Executive', 'SU'],
-        ['Khalid Mehmood', 'General Manager', 'Executive', 'KM'],
-        ['Saeed ur Rehman', 'Director Operations', 'Operations', 'SR'],
-        ['Mujeeb Ullah', 'Director Finance', 'Finance', 'MU'],
-        ['Usama Tariq', 'Plant Manager', 'Plant', 'UT'],
-        ['Farhan Ali', 'Production Manager', 'Production', 'FA'],
-        ['Sher Zaman', 'Breaking Supervisor', 'Plant', 'SZ'],
-        ['Gul Rehman', 'Gate Officer', 'Security', 'GR'],
-        ['Dr. Asma Noor', 'QC Cell', 'Quality', 'AN'],
-        ['Usman Ali', 'Raw Material Store', 'Inventory', 'UA'],
-        ['Waqas Ahmed', 'Finish Store & Delivery', 'Logistics', 'WA'],
-        ['Waqar Ahmad', 'Procurement', 'Purchasing', 'WA'],
-        ['Imran Khattak', 'Sales Manager', 'Sales', 'IK'],
-        ['Bilal Yousafzai', 'Sales Officer', 'Sales', 'BY'],
-        ['Mahnoor Khan', 'Head of Marketing', 'Marketing', 'MK'],
-        ['Sana Gul', 'Social Media & Content', 'Marketing', 'SG'],
-        ['Hamza Khan', 'Accounts Officer', 'Finance', 'HK'],
-        ['Nadia Shah', 'HR Manager', 'HR', 'NS'],
-        ['Zahid Afridi', 'Poultry Farms', 'Farms', 'ZA'],
-        ['Kamran Ali', 'ERP Admin', 'IT', 'KA']
+        ['Sana Ullah', 'Chairman & CEO', 'Executive', 'SU', 'ceo@yaf.com', 'password'],
+        ['Khalid Mehmood', 'General Manager', 'Executive', 'KM', 'gm@yaf.com', 'password'],
+        ['Saeed ur Rehman', 'Director Operations', 'Operations', 'SR', 'operations@yaf.com', 'password'],
+        ['Mujeeb Ullah', 'Director Finance', 'Finance', 'MU', 'finance@yaf.com', 'password'],
+        ['Usama Tariq', 'Plant Manager', 'Plant', 'UT', 'plant@yaf.com', 'password'],
+        ['Farhan Ali', 'Production Manager', 'Production', 'FA', 'production@yaf.com', 'password'],
+        ['Sher Zaman', 'Breaking Supervisor', 'Plant', 'SZ', 'sher.zaman@yaf.com', 'password'],
+        ['Gul Rehman', 'Gate Officer', 'Security', 'GR', 'gate@yaf.com', 'password'],
+        ['Dr. Asma Noor', 'QC Cell', 'Quality', 'AN', 'qc@yaf.com', 'password'],
+        ['Usman Ali', 'Raw Material Store', 'Inventory', 'UA', 'usman.ali@yaf.com', 'password'],
+        ['Waqas Ahmed', 'Finish Store & Delivery', 'Logistics', 'WA', 'waqas.ahmed@yaf.com', 'password'],
+        ['Waqar Ahmad', 'Procurement', 'Purchasing', 'WA', 'procurement@yaf.com', 'password'],
+        ['Imran Khattak', 'Sales Manager', 'Sales', 'IK', 'sales@yaf.com', 'password'],
+        ['Bilal Yousafzai', 'Sales Officer', 'Sales', 'BY', 'bilal.yousafzai@yaf.com', 'password'],
+        ['Mahnoor Khan', 'Head of Marketing', 'Marketing', 'MK', 'marketing@yaf.com', 'password'],
+        ['Sana Gul', 'Social Media & Content', 'Marketing', 'SG', 'sana.gul@yaf.com', 'password'],
+        ['Hamza Khan', 'Accounts Officer', 'Finance', 'HK', 'hamza.khan@yaf.com', 'password'],
+        ['Nadia Shah', 'HR Manager', 'HR', 'NS', 'hr@yaf.com', 'password'],
+        ['Zahid Afridi', 'Poultry Farms', 'Farms', 'ZA', 'zahid.afridi@yaf.com', 'password'],
+        ['Kamran Ali', 'ERP Admin', 'IT', 'KA', 'admin@yaf.com', 'password']
       ];
+      const defaultPasswordHash = await bcrypt.hash('password', 10);
       for (const u of usersData) {
-        await db.query('INSERT INTO users (name, role, department, avatar) VALUES (?, ?, ?, ?)', u);
+        await db.query(
+          'INSERT INTO users (name, role, department, avatar, email, password) VALUES (?, ?, ?, ?, ?, ?)',
+          [u[0], u[1], u[2], u[3], u[4], defaultPasswordHash]
+        );
       }
     }
 
@@ -326,6 +412,62 @@ async function initDatabase() {
       for (const pr of payrolls) {
         await db.query('INSERT INTO payroll_runs (run_number, run_date, month, status, prepared_by, net_pay) VALUES (?, ?, ?, ?, ?, ?)', pr);
       }
+    }
+
+    // Seed Initial Audit Logs if empty
+    const [auditRows] = await db.query('SELECT COUNT(*) as count FROM audit_logs');
+    if (auditRows[0].count === 0) {
+      console.log('🌱 Seeding Enterprise Audit Trail Logs...');
+      const auditSeeds = [
+        [null, 'System Core', 'System', 'SYSTEM_INITIALIZED', 'SYSTEM', 'BOOT-001', 'AgenTech ERP system initialized for Yousafzai Agri Foods (Pvt) Ltd', '127.0.0.1', 'SUCCESS'],
+        [20, 'ERP Admin', 'ERP Admin', 'SECURITY_RULES_LOADED', 'SECURITY', 'SEC-01', 'Rate Limiting & Brute-Force protection active on authentication endpoints', '127.0.0.1', 'SUCCESS'],
+        [1, 'Sana Ullah', 'Chairman & CEO', 'LOGIN_SUCCESS', 'AUTH', '1', 'Chairman & CEO logged in from Executive Office', '192.168.1.10', 'SUCCESS'],
+        [13, 'Imran Khattak', 'Sales Manager', 'SO_CREDIT_FLAGGED', 'SALES_ORDER', 'SO-2026-0418', 'Credit limit exceeded for Swat Valley Egg Dealers. Sent to CEO approval line', '192.168.1.45', 'WARNING'],
+        [12, 'Waqar Ahmad', 'Procurement', 'CREATE_PO', 'PURCHASE_ORDER', 'PO-2026-0901', 'Issued purchase order to Frontier Poultry Feeds for PKR 11,119,140', '192.168.1.30', 'SUCCESS'],
+        [8, 'Gul Rehman', 'Gate Officer', 'CREATE_GATE_PASS', 'GATE_PASS', 'GPI-2026-0087', 'Vehicle KHY-8829 cleared at Rashakai Gate for Raw Material intake', '192.168.2.14', 'SUCCESS'],
+        [20, 'ERP Admin', 'ERP Admin', 'USER_STATUS_CHANGE', 'USER', '8', 'Gate Officer account role privileges verified & secured', '127.0.0.1', 'SUCCESS']
+      ];
+      for (const a of auditSeeds) {
+        await db.query(
+          'INSERT INTO audit_logs (user_id, user_name, role, action, entity_type, entity_id, details, ip_address, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+          a
+        );
+      }
+    }
+
+    // Seed Initial POS Orders & Inventory Transactions
+    const [posRows] = await db.query('SELECT COUNT(*) as count FROM pos_orders');
+    if (posRows[0].count === 0) {
+      console.log('🌱 Seeding Initial Point of Sale (POS) Invoices & Ledger...');
+      const [order1] = await db.query(
+        `INSERT INTO pos_orders (invoice_no, customer_name, customer_phone, warehouse, subtotal, tax_amount, discount_amount, total_amount, paid_amount, change_amount, payment_method, cashier_name, status)
+         VALUES ('YAF-INV-20260929-1001', 'Swat Valley Egg Dealers', '0300-9876543', 'Mardan Central Store', 28750.00, 0.00, 500.00, 28250.00, 30000.00, 1750.00, 'Cash', 'Bilal Yousafzai', 'Completed')`
+      );
+      await db.query(
+        `INSERT INTO pos_order_items (order_id, item_id, item_code, item_name, quantity, unit_price, total_price)
+         VALUES (?, 2, 'SE-01-01-02', 'White eggs Grade A – Large', 50, 575.00, 28750.00)`,
+        [order1.insertId]
+      );
+      await db.query(
+        `INSERT INTO inventory_transactions (item_id, ref_no, transaction_type, quantity_change, prev_qty, new_qty, warehouse, performed_by)
+         VALUES (2, 'YAF-INV-20260929-1001', 'POS_SALE', -50, 3397, 3347, 'Mardan Central Store', 'Bilal Yousafzai')`
+      );
+
+      const [order2] = await db.query(
+        `INSERT INTO pos_orders (invoice_no, customer_name, customer_phone, warehouse, subtotal, tax_amount, discount_amount, total_amount, paid_amount, change_amount, payment_method, cashier_name, status)
+         VALUES ('YAF-INV-20260929-1002', 'Walk-in Retail Customer', '0345-1234567', 'Mardan Central Store', 9450.00, 0.00, 0.00, 9450.00, 10000.00, 550.00, 'Cash', 'Bilal Yousafzai', 'Completed')`
+      );
+      await db.query(
+        `INSERT INTO pos_order_items (order_id, item_id, item_code, item_name, quantity, unit_price, total_price)
+         VALUES (?, 1, 'SE-01-01-01', 'White eggs Grade A – Extra large', 10, 610.00, 6100.00),
+                (?, 5, 'SE-02-01-01', 'Brown farm eggs – Large', 5, 670.00, 3350.00)`,
+        [order2.insertId, order2.insertId]
+      );
+      await db.query(
+        `INSERT INTO inventory_transactions (item_id, ref_no, transaction_type, quantity_change, prev_qty, new_qty, warehouse, performed_by)
+         VALUES (1, 'YAF-INV-20260929-1002', 'POS_SALE', -10, 550, 540, 'Mardan Central Store', 'Bilal Yousafzai'),
+                (5, 'YAF-INV-20260929-1002', 'POS_SALE', -5, 257, 252, 'Mardan Central Store', 'Bilal Yousafzai')`
+      );
     }
 
     console.log('✨ All Yousafzai Agri Foods ERP tables and sample data seeded successfully!');

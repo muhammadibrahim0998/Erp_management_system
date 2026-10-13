@@ -1,5 +1,47 @@
 import React, { useState } from 'react';
-import { Lock, Mail, User, Briefcase, Building } from 'lucide-react';
+import { Lock, Mail, User, Briefcase, Building, KeyRound, Sparkles, ShieldAlert } from 'lucide-react';
+import { authService } from '../services';
+
+const DEPARTMENTS = [
+  'Executive',
+  'Operations',
+  'Plant',
+  'Production',
+  'Security',
+  'Quality',
+  'Inventory',
+  'Logistics',
+  'Purchasing',
+  'Sales',
+  'Marketing',
+  'Finance',
+  'HR',
+  'Farms',
+  'IT'
+];
+
+const ROLES = [
+  { role: 'ERP Admin', department: 'IT' },
+  { role: 'Chairman & CEO', department: 'Executive' },
+  { role: 'General Manager', department: 'Executive' },
+  { role: 'Director Operations', department: 'Operations' },
+  { role: 'Director Finance', department: 'Finance' },
+  { role: 'Plant Manager', department: 'Plant' },
+  { role: 'Production Manager', department: 'Production' },
+  { role: 'Breaking Supervisor', department: 'Plant' },
+  { role: 'Gate Officer', department: 'Security' },
+  { role: 'QC Cell', department: 'Quality' },
+  { role: 'Raw Material Store', department: 'Inventory' },
+  { role: 'Finish Store & Delivery', department: 'Logistics' },
+  { role: 'Procurement', department: 'Purchasing' },
+  { role: 'Sales Manager', department: 'Sales' },
+  { role: 'Sales Officer', department: 'Sales' },
+  { role: 'Head of Marketing', department: 'Marketing' },
+  { role: 'Social Media & Content', department: 'Marketing' },
+  { role: 'Accounts Officer', department: 'Finance' },
+  { role: 'HR Manager', department: 'HR' },
+  { role: 'Poultry Farms', department: 'Farms' }
+];
 
 export default function Auth({ onLogin }) {
   const [isLogin, setIsLogin] = useState(true);
@@ -7,109 +49,170 @@ export default function Auth({ onLogin }) {
     name: '',
     email: '',
     password: '',
-    role: '',
-    department: ''
+    role: 'Sales Officer',
+    department: 'Sales'
   });
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handleRoleChange = (e) => {
+    const selectedRole = e.target.value;
+    const found = ROLES.find(r => r.role === selectedRole);
+    setFormData({
+      ...formData,
+      role: selectedRole,
+      department: found ? found.department : formData.department
+    });
+  };
+
+  const handleQuickFill = (email, pass) => {
+    setFormData(prev => ({
+      ...prev,
+      email,
+      password: pass
+    }));
+    setError('');
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
-    const endpoint = isLogin ? '/api/auth/login' : '/api/auth/signup';
-    
+    setLoading(true);
+
     try {
-      const res = await fetch(`http://localhost:7000${endpoint}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Authentication failed');
-      onLogin(data);
+      const data = isLogin
+        ? await authService.login(formData.email, formData.password)
+        : await authService.signup(formData);
+
+      onLogin(data.user, data.token);
     } catch (err) {
       setError(err.message);
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
     <div className="min-h-screen bg-[#0E2118] flex items-center justify-center p-4">
       <div className="w-full max-w-md bg-[#132C20] rounded-2xl border border-[#1D4433] shadow-2xl p-8">
-        <div className="text-center mb-8">
-          <div className="w-16 h-16 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center mx-auto mb-4">
+        <div className="text-center mb-6">
+          <div className="w-16 h-16 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center mx-auto mb-3">
             <span className="font-black text-amber-400 text-2xl tracking-tighter">YAF</span>
           </div>
-          <h1 className="text-2xl font-bold text-white mb-2">
-            {isLogin ? 'Welcome Back' : 'Create Account'}
+          <h1 className="text-2xl font-bold text-white mb-1">
+            {isLogin ? 'Sign In to AgenTech ERP' : 'Register New Account'}
           </h1>
-          <p className="text-[#8CAAA0] text-sm">
-            Yousafzai Agri Foods ERP System
+          <p className="text-[#8CAAA0] text-xs">
+            Yousafzai Agri Foods (Pvt) Ltd · Head Office Mardan
           </p>
         </div>
 
-        {error && (
-          <div className="mb-6 p-3 rounded-lg bg-rose-500/10 border border-rose-500/50 text-rose-400 text-sm font-medium text-center">
-            {error}
+        {/* Demo Quick Fill Buttons for ease of use */}
+        {isLogin && (
+          <div className="mb-5 p-3 rounded-xl bg-[#0E2118] border border-[#1D4433]">
+            <div className="flex items-center gap-1.5 text-[11px] font-bold text-amber-400 mb-2">
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>Quick Login Accounts (Click to autofill):</span>
+            </div>
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              <button
+                type="button"
+                onClick={() => handleQuickFill('admin@yaf.com', 'password')}
+                className="px-2.5 py-1.5 bg-[#173727] hover:bg-[#1f4834] text-white rounded-lg text-left transition border border-[#27533E]"
+              >
+                <div className="font-bold">Kamran Ali</div>
+                <div className="text-[10px] text-amber-300">ERP Admin</div>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleQuickFill('ceo@yaf.com', 'password')}
+                className="px-2.5 py-1.5 bg-[#173727] hover:bg-[#1f4834] text-white rounded-lg text-left transition border border-[#27533E]"
+              >
+                <div className="font-bold">Sana Ullah</div>
+                <div className="text-[10px] text-amber-300">Chairman & CEO</div>
+              </button>
+            </div>
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        {error && (
+          <div className={`mb-5 p-3 rounded-lg text-xs font-medium text-center flex items-center justify-center gap-2 ${
+            error.toLowerCase().includes('too many')
+              ? 'bg-amber-500/15 border border-amber-500/50 text-amber-300'
+              : 'bg-rose-500/10 border border-rose-500/50 text-rose-400'
+          }`}>
+            {error.toLowerCase().includes('too many') && <ShieldAlert className="w-4 h-4 shrink-0 text-amber-400" />}
+            <span>{error}</span>
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-3.5">
           {!isLogin && (
             <>
               <div className="relative">
-                <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-[#6A947F]" />
+                <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#6A947F]" />
                 <input
                   type="text"
                   placeholder="Full Name"
                   required
-                  className="w-full bg-[#0E2118] border border-[#1D4433] rounded-lg pl-10 pr-4 py-3 text-sm text-white placeholder-[#6A947F] focus:border-[#2E684E] focus:outline-none"
+                  className="w-full bg-[#0E2118] border border-[#1D4433] rounded-lg pl-9 pr-4 py-2.5 text-xs text-white placeholder-[#6A947F] focus:border-[#2E684E] focus:outline-none"
                   value={formData.name}
                   onChange={(e) => setFormData({...formData, name: e.target.value})}
                 />
               </div>
+
               <div className="relative">
-                <Briefcase className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-[#6A947F]" />
-                <input
-                  type="text"
-                  placeholder="Role (e.g., Sales Manager)"
-                  required
-                  className="w-full bg-[#0E2118] border border-[#1D4433] rounded-lg pl-10 pr-4 py-3 text-sm text-white placeholder-[#6A947F] focus:border-[#2E684E] focus:outline-none"
+                <Briefcase className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#6A947F]" />
+                <select
                   value={formData.role}
-                  onChange={(e) => setFormData({...formData, role: e.target.value})}
-                />
+                  onChange={handleRoleChange}
+                  className="w-full bg-[#0E2118] border border-[#1D4433] rounded-lg pl-9 pr-4 py-2.5 text-xs text-white focus:border-[#2E684E] focus:outline-none"
+                >
+                  {ROLES.map((r, idx) => (
+                    <option key={idx} value={r.role} className="bg-[#0E2118] text-white">
+                      {r.role} ({r.department})
+                    </option>
+                  ))}
+                </select>
               </div>
+
               <div className="relative">
-                <Building className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-[#6A947F]" />
-                <input
-                  type="text"
-                  placeholder="Department"
-                  required
-                  className="w-full bg-[#0E2118] border border-[#1D4433] rounded-lg pl-10 pr-4 py-3 text-sm text-white placeholder-[#6A947F] focus:border-[#2E684E] focus:outline-none"
+                <Building className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#6A947F]" />
+                <select
                   value={formData.department}
                   onChange={(e) => setFormData({...formData, department: e.target.value})}
-                />
+                  className="w-full bg-[#0E2118] border border-[#1D4433] rounded-lg pl-9 pr-4 py-2.5 text-xs text-white focus:border-[#2E684E] focus:outline-none"
+                >
+                  {DEPARTMENTS.map((dept, idx) => (
+                    <option key={idx} value={dept} className="bg-[#0E2118] text-white">
+                      {dept}
+                    </option>
+                  ))}
+                </select>
               </div>
             </>
           )}
 
           <div className="relative">
-            <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-[#6A947F]" />
+            <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#6A947F]" />
             <input
               type="email"
               placeholder="Email Address"
               required
-              className="w-full bg-[#0E2118] border border-[#1D4433] rounded-lg pl-10 pr-4 py-3 text-sm text-white placeholder-[#6A947F] focus:border-[#2E684E] focus:outline-none"
+              className="w-full bg-[#0E2118] border border-[#1D4433] rounded-lg pl-9 pr-4 py-2.5 text-xs text-white placeholder-[#6A947F] focus:border-[#2E684E] focus:outline-none"
               value={formData.email}
               onChange={(e) => setFormData({...formData, email: e.target.value})}
             />
           </div>
 
           <div className="relative">
-            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-[#6A947F]" />
+            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#6A947F]" />
             <input
               type="password"
-              placeholder="Password"
+              placeholder="Password (minimum 6 characters)"
               required
-              className="w-full bg-[#0E2118] border border-[#1D4433] rounded-lg pl-10 pr-4 py-3 text-sm text-white placeholder-[#6A947F] focus:border-[#2E684E] focus:outline-none"
+              minLength={6}
+              className="w-full bg-[#0E2118] border border-[#1D4433] rounded-lg pl-9 pr-4 py-2.5 text-xs text-white placeholder-[#6A947F] focus:border-[#2E684E] focus:outline-none"
               value={formData.password}
               onChange={(e) => setFormData({...formData, password: e.target.value})}
             />
@@ -117,19 +220,20 @@ export default function Auth({ onLogin }) {
 
           <button
             type="submit"
-            className="w-full py-3 px-4 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-lg transition"
+            disabled={loading}
+            className="w-full py-2.5 px-4 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-bold text-xs rounded-lg transition shadow-md"
           >
-            {isLogin ? 'Sign In' : 'Create Account'}
+            {loading ? 'Processing...' : (isLogin ? 'Sign In' : 'Create Account')}
           </button>
         </form>
 
-        <div className="mt-6 text-center">
+        <div className="mt-5 text-center">
           <button
             onClick={() => {
               setIsLogin(!isLogin);
               setError('');
             }}
-            className="text-[#8CAAA0] hover:text-white text-sm transition"
+            className="text-[#8CAAA0] hover:text-white text-xs transition"
           >
             {isLogin ? "Don't have an account? Sign up" : 'Already have an account? Sign in'}
           </button>
