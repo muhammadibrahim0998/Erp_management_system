@@ -22,7 +22,7 @@ export default function InventoryView({ inventoryItems, onAdjustStock }) {
         <div>
           <h2 className="text-xl font-bold text-gray-900 tracking-tight">Stock on hand</h2>
           <p className="text-xs text-gray-500 mt-1">
-            Eggs by grade, feed, ingredients and packing at Mardan, Attock, both farms and the plant cold store — in trays of 30.
+            Finished goods, raw materials, packaging and inventory across all warehouses and regional stores.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -47,15 +47,15 @@ export default function InventoryView({ inventoryItems, onAdjustStock }) {
         <div className="bg-white p-4 rounded-xl border border-rose-200 shadow-sm bg-rose-50/30">
           <span className="text-[10px] font-bold text-rose-500 uppercase tracking-wider">Below reorder level</span>
           <div className="text-2xl font-black text-rose-600 mt-1">4</div>
-          <span className="text-[11px] text-rose-700">Organic eggs, Breaking-grade</span>
+          <span className="text-[11px] text-rose-700">Critical Raw Materials & Products</span>
         </div>
         <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
-          <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Eggs & egg products</span>
+          <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Finished Products & Goods</span>
           <div className="text-2xl font-black text-gray-900 mt-1">PKR 4.7M</div>
           <span className="text-[11px] text-gray-500">13 items</span>
         </div>
         <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
-          <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Feed & farm inputs</span>
+          <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Raw Materials & Supplies</span>
           <div className="text-2xl font-black text-gray-900 mt-1">PKR 4.8M</div>
           <span className="text-[11px] text-gray-500">8 items</span>
         </div>
@@ -121,7 +121,7 @@ export default function InventoryView({ inventoryItems, onAdjustStock }) {
                   <td className="py-3.5 px-2 text-center text-gray-600 font-mono">{item.ccf_qty}</td>
                   <td className="py-3.5 px-2 text-center text-gray-600 font-mono">{item.phf_qty}</td>
                   <td className="py-3.5 px-3 text-right font-bold text-gray-900 font-mono">
-                    {item.total_qty} tray
+                    {item.total_qty} units
                   </td>
                   <td className="py-3.5 px-3 text-right text-gray-500 font-mono">{item.reorder_at}</td>
                   <td className="py-3.5 px-3 text-right text-gray-600 font-mono">{item.avg_cost}</td>

@@ -74,11 +74,11 @@ export default function FinanceView({ financeData, onNavigate }) {
             <h4 className="text-xs font-bold text-gray-800 mb-2">Top Debtors</h4>
             <div className="space-y-2 text-xs font-medium">
               {[
-                { customer: 'Karachi Egg Wholesalers', amount: '12,386,999' },
+                { customer: 'Karachi General Wholesalers', amount: '12,386,999' },
                 { customer: 'Peek Freans', amount: '7,093,583' },
                 { customer: 'Barkat Frisian (value-added)', amount: '5,486,933' },
                 { customer: 'Dawn Foods', amount: '3,942,893' },
-                { customer: 'Swat Valley Egg Dealers', amount: '3,877,654' }
+                { customer: 'Swat Valley Trading Co.', amount: '3,877,654' }
               ].map((d, i) => (
                 <div key={i} className="flex justify-between items-center py-1 border-b border-gray-50">
                   <span className="text-gray-700">{d.customer}</span>
@@ -118,11 +118,11 @@ export default function FinanceView({ financeData, onNavigate }) {
             <h4 className="text-xs font-bold text-gray-800 mb-2">Top Creditors</h4>
             <div className="space-y-2 text-xs font-medium">
               {[
-                { supplier: 'Frontier Poultry Feeds', amount: '11,119,140' },
-                { supplier: 'Swabi Layer Farms', amount: '2,646,840' },
-                { supplier: 'Haripur Egg Farm', amount: '2,646,330' },
+                { supplier: 'Frontier Raw Materials & Supplies', amount: '11,119,140' },
+                { supplier: 'Swabi Manufacturing & Logistics', amount: '2,646,840' },
+                { supplier: 'Haripur Production Partners', amount: '2,646,330' },
                 { supplier: 'Khyber Cold Chain Logistics', amount: '2,062,160' },
-                { supplier: 'Charsadda Poultry Farm', amount: '1,940,905' }
+                { supplier: 'Charsadda Supply Partners', amount: '1,940,905' }
               ].map((c, i) => (
                 <div key={i} className="flex justify-between items-center py-1 border-b border-gray-50">
                   <span className="text-gray-700">{c.supplier}</span>

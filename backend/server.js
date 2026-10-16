@@ -51,8 +51,10 @@ app.get('/api/dashboard/chairman', async (req, res) => {
         cashAccounts: '4 accounts',
         receivables: 'PKR 45.7M',
         receivablesOverdue: 'PKR 3.2M over 30 days',
+        productsSold: '572K',
+        productsSoldUnits: '19,077 units',
         eggsSold: '572K',
-        eggsSoldTrays: '19,077 trays',
+        eggsSoldTrays: '19,077 units',
         eggsSoldChange: '+28.8%'
       },
       revenueChart: [
@@ -78,12 +80,12 @@ app.get('/api/dashboard/chairman', async (req, res) => {
         d61_90: '0.0M'
       },
       budgetVsActual: [
-        { dept: 'Poultry Farms', actual: '28.3M', budget: '31.1M', pct: 91 },
+        { dept: 'Production & Manufacturing', actual: '28.3M', budget: '31.1M', pct: 91 },
         { dept: 'HR & Administration', actual: '3.8M', budget: '4.2M', pct: 90 },
         { dept: 'Procurement & Supply Chain', actual: '74.1M', budget: '90.3M', pct: 82 }
       ],
       exceptions: [
-        { title: 'Credit limit exceeded', desc: 'Swat Valley Egg Dealers · SO-2026-0418 on hold', type: 'danger' }
+        { title: 'Credit limit exceeded', desc: 'Swat Valley Trading Co. · SO-2026-0418 on hold', type: 'danger' }
       ]
     });
   } catch (err) {
@@ -301,11 +303,11 @@ app.get('/api/finance/overview', (req, res) => {
       d1_30: '11.4M',
       d31_60: '3.2M',
       topDebtors: [
-        { customer: 'Karachi Egg Wholesalers', amount: '12,386,999' },
+        { customer: 'Karachi General Wholesalers', amount: '12,386,999' },
         { customer: 'Peek Freans', amount: '7,093,583' },
         { customer: 'Barkat Frisian (value-added)', amount: '5,486,933' },
         { customer: 'Dawn Foods', amount: '3,942,893' },
-        { customer: 'Swat Valley Egg Dealers', amount: '3,877,654' }
+        { customer: 'Swat Valley Trading Co.', amount: '3,877,654' }
       ]
     },
     payables: {
@@ -313,11 +315,11 @@ app.get('/api/finance/overview', (req, res) => {
       current: '23.2M',
       d1_30: '4.0M',
       topCreditors: [
-        { supplier: 'Frontier Poultry Feeds', amount: '11,119,140' },
-        { supplier: 'Swabi Layer Farms', amount: '2,646,840' },
-        { supplier: 'Haripur Egg Farm', amount: '2,646,330' },
+        { supplier: 'Frontier Raw Materials & Supplies', amount: '11,119,140' },
+        { supplier: 'Swabi Manufacturing & Logistics', amount: '2,646,840' },
+        { supplier: 'Haripur Production Partners', amount: '2,646,330' },
         { supplier: 'Khyber Cold Chain Logistics', amount: '2,062,160' },
-        { supplier: 'Charsadda Poultry Farm', amount: '1,940,905' }
+        { supplier: 'Charsadda Supply Partners', amount: '1,940,905' }
       ]
     }
   });
@@ -333,11 +335,11 @@ app.get('/api/reports/pnl', (req, res) => {
     netProfit: 'PKR 1.4M (1.1%)',
     breakdown: [
       { code: '4000', name: 'Sales revenue', amount: '136,824,763', type: 'revenue' },
-      { code: '5000', name: 'Cost of eggs sold', amount: '106,954,414', type: 'cogs' },
+      { code: '5000', name: 'Cost of goods sold (COGS)', amount: '106,954,414', type: 'cogs' },
       { code: '6000', name: 'Salaries & wages', amount: '11,391,970', type: 'expense' },
       { code: '6100', name: 'Rent & utilities', amount: '2,250,000', type: 'expense' },
       { code: '6200', name: 'Admin & office expenses', amount: '7,615,068', type: 'expense' },
-      { code: '6300', name: 'Cold-chain transport & fuel', amount: '4,572,895', type: 'expense' },
+      { code: '6300', name: 'Logistics, transport & fuel', amount: '4,572,895', type: 'expense' },
       { code: '6400', name: 'Marketing & advertising', amount: '2,367,707', type: 'expense' },
       { code: '6500', name: 'Lab testing & quality', amount: '231,753', type: 'expense' }
     ]

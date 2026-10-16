@@ -27,14 +27,14 @@ export default function ProductionBoard({ productionOrders, onMoveOrder }) {
       {/* Top Banner */}
       <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl font-bold text-gray-900 tracking-tight">Production — liquid egg plant</h2>
+          <h2 className="text-xl font-bold text-gray-900 tracking-tight">Production & Assembly Board</h2>
           <p className="text-xs text-gray-500 mt-1">
-            Sales → GM → Plant Manager → Production Manager → raw material store → breaking → finish store.
+            Sales → GM → Plant Manager → Production Manager → raw material store → processing → finish store.
           </p>
         </div>
         <div className="flex items-center gap-2">
           <span className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-gray-100 text-gray-700">
-            Rashakai Plant Active
+            Main Facility Active
           </span>
         </div>
       </div>
@@ -73,7 +73,7 @@ export default function ProductionBoard({ productionOrders, onMoveOrder }) {
                         {wo.quantity_kg} kg {wo.product_name}
                       </div>
                       <div className="text-[10px] text-gray-400 font-mono mt-2">
-                        {wo.eggs_to_break.toLocaleString()} eggs · {wo.trays_count} trays
+                        {wo.eggs_to_break.toLocaleString()} input units · {wo.trays_count} cartons/packs
                       </div>
                     </div>
                     <div className="mt-3 pt-2 border-t border-gray-100 flex items-center justify-between text-[10px] text-gray-400">
@@ -119,7 +119,7 @@ export default function ProductionBoard({ productionOrders, onMoveOrder }) {
               <ArrowRight className="w-3 h-3 text-gray-400" />
               <span className="font-bold text-amber-700">● Raw store issues</span>
               <ArrowRight className="w-3 h-3 text-gray-400" />
-              <span className="text-gray-400">Breaking</span>
+              <span className="text-gray-400">Processing</span>
               <ArrowRight className="w-3 h-3 text-gray-400" />
               <span className="text-gray-400">Finish store</span>
             </div>
@@ -132,14 +132,14 @@ export default function ProductionBoard({ productionOrders, onMoveOrder }) {
                 <span className="text-[10px] text-gray-500">{selectedOrder.product_name}</span>
               </div>
               <div className="p-3 bg-gray-50 rounded-xl border border-gray-200">
-                <span className="text-[10px] text-gray-400 font-bold uppercase">Eggs to break</span>
+                <span className="text-[10px] text-gray-400 font-bold uppercase">Units to process</span>
                 <div className="text-lg font-black text-gray-900">{selectedOrder.eggs_to_break.toLocaleString()}</div>
-                <span className="text-[10px] text-gray-500">{selectedOrder.trays_count} trays of 30</span>
+                <span className="text-[10px] text-gray-500">{selectedOrder.trays_count} cartons/packs</span>
               </div>
               <div className="p-3 bg-gray-50 rounded-xl border border-gray-200">
-                <span className="text-[10px] text-gray-400 font-bold uppercase">Breaking time</span>
+                <span className="text-[10px] text-gray-400 font-bold uppercase">Processing time</span>
                 <div className="text-lg font-black text-gray-900">{selectedOrder.duration_hours} h</div>
-                <span className="text-[10px] text-gray-500">at 45,000 eggs/hour</span>
+                <span className="text-[10px] text-gray-500">at 45,000 units/hour</span>
               </div>
               <div className="p-3 bg-gray-50 rounded-xl border border-gray-200">
                 <span className="text-[10px] text-gray-400 font-bold uppercase">Material cost / kg</span>
@@ -148,12 +148,12 @@ export default function ProductionBoard({ productionOrders, onMoveOrder }) {
               </div>
             </div>
 
-            {/* Raw Material Requirement Calculation (Page 12 Formula) */}
+            {/* Raw Material Requirement Calculation */}
             <div className="p-4 bg-gray-50 rounded-xl border border-gray-200 text-xs font-mono space-y-2 text-gray-800">
               <div className="font-bold text-gray-900">Raw material requirement calculation:</div>
-              <div>1. Liquid per egg = 57 g × (1 - 11.5% shell) × (1 - 2% breaking loss) = <strong>49.44 g</strong></div>
-              <div>2. Whole-egg liquid needed 2,270 kg ÷ 49.44 g = <strong>45,915 eggs</strong></div>
-              <div>3. Total 45,915 eggs ÷ 30 = <strong>1,531 trays</strong> of breaking-grade eggs.</div>
+              <div>1. Finished yield per unit = Standard output after process & trimming loss (2.5% loss) = <strong>49.44 g</strong></div>
+              <div>2. Standard batch material required 2,270 kg ÷ 49.44 g = <strong>45,915 input units</strong></div>
+              <div>3. Total 45,915 units ÷ 30 = <strong>1,531 cartons/packs</strong> of production materials.</div>
             </div>
 
             {/* Advance Stage Button */}

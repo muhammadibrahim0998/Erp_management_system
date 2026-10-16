@@ -23,7 +23,8 @@ import {
   UserCheck,
   ChevronRight,
   GitBranch,
-  LogOut
+  LogOut,
+  Menu
 } from 'lucide-react';
 
 import ChairmanDashboard from './components/views/ChairmanDashboard';
@@ -46,6 +47,7 @@ import Auth from './components/Auth';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isRoleModalOpen, setIsRoleModalOpen] = useState(false);
   const [users, setUsers] = useState([]);
   const [currentUser, setCurrentUser] = useState(null);
@@ -185,7 +187,7 @@ export default function App() {
       });
       showNotification(`Order moved to ${stage}`);
       fetchAllData();
-    } catch (e) {}
+    } catch (e) { }
   };
 
   const handleApproveSales = async (soNumber) => {
@@ -197,7 +199,7 @@ export default function App() {
       });
       showNotification('Sales order approved by CEO exception');
       fetchAllData();
-    } catch (e) {}
+    } catch (e) { }
   };
 
   const handleGeneratePayroll = async (month) => {
@@ -209,7 +211,7 @@ export default function App() {
       });
       showNotification(`Payroll generated for ${month} in MySQL`);
       fetchAllData();
-    } catch (e) {}
+    } catch (e) { }
   };
 
   // Nav Groups matching PDF
@@ -267,36 +269,133 @@ export default function App() {
   }
 
   return (
-    <div className="flex h-screen bg-[#0E2118] text-gray-900 overflow-hidden font-sans">
+    <div className="flex flex-col h-screen bg-[#0c8547] text-gray-900 overflow-hidden font-sans">
       {/* Toast Notification */}
       {notification && (
-        <div className="fixed top-5 right-5 z-50 bg-[#0E2118] text-white px-4 py-2.5 rounded-xl border border-[#27533E] shadow-2xl flex items-center gap-2 text-xs font-semibold animate-bounce">
+        <div className="fixed top-5 right-5 z-50 bg-[#07361c] text-white px-4 py-2.5 rounded-xl border border-emerald-400 shadow-2xl flex items-center gap-2 text-xs font-semibold animate-bounce">
           <CheckCircle2 className="w-4 h-4 text-emerald-400" />
           <span>{notification}</span>
         </div>
       )}
 
-      {/* Dark Green Sidebar (#0E2118) */}
-      <aside className="w-64 border-r border-[#1B3A2C] bg-[#0E2118] flex flex-col justify-between shrink-0">
-        <div className="overflow-y-auto">
-          {/* Brand Header */}
-          <div className="h-20 flex items-center px-6 gap-3 border-b border-[#1B3A2C]">
-            <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center shrink-0">
-              <span className="font-black text-amber-400 text-sm tracking-tighter">YAF</span>
+      {/* Full-Width Vibrant Green Top Navbar matching image (#0c8547) */}
+      <header className="h-16 border-b border-[#086634] px-0 flex items-center justify-between bg-gradient-to-r from-[#0a7a40] via-[#0c8748] to-[#0a7a40] shadow-[0_4px_16px_rgba(0,0,0,0.25)] z-20 shrink-0">
+        {/* Left: 3D Brand Logo Div on Left, 3D Toggle Button on Right */}
+        <div
+          className={`h-full flex items-center justify-between transition-all duration-300 ease-in-out shrink-0 px-3 ${
+            isSidebarOpen ? 'w-56 border-r border-[#086634] shadow-[1px_0_0_rgba(255,255,255,0.08)]' : 'w-auto gap-4'
+          }`}
+        >
+          {/* Brand Header / Logo in 3D Div with Yellow Hover & Glow */}
+          <div className="flex items-center gap-2 min-w-0 px-2 py-1 rounded-xl bg-gradient-to-b from-[#0d4f2b] to-[#07361c] border-t border-emerald-300/40 border-x border-[#094223] border-b-[2.5px] border-b-[#032412] shadow-[0_3px_6px_rgba(0,0,0,0.35)] hover:border-amber-400/80 hover:shadow-[0_4px_16px_rgba(245,158,11,0.4)] hover:-translate-y-0.5 transition-all duration-200 group cursor-pointer">
+            {/* 3D YAF Badge */}
+            <div className="w-8 h-8 rounded-xl bg-gradient-to-b from-[#2a200e] via-[#1b1509] to-[#0f0b04] border-t border-amber-400/60 border-x border-amber-600/30 border-b-[2.5px] border-b-[#0a0702] flex items-center justify-center shrink-0 shadow-[0_2px_5px_rgba(0,0,0,0.5),inset_0_1px_1px_rgba(255,255,255,0.25)] group-hover:border-amber-300 group-hover:scale-105 group-hover:shadow-[0_0_10px_rgba(245,158,11,0.5)] transition-all duration-200">
+              <span className="font-black text-amber-400 text-[11px] tracking-tighter drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)] group-hover:text-amber-300">YAF</span>
             </div>
-            <div className="min-w-0">
-              <h1 className="font-extrabold text-sm tracking-tight text-white uppercase truncate">
-                Yousafzai Agri Foods
+            {/* Brand Title & Subtitle */}
+            <div className="hidden sm:block min-w-0">
+              <h1 className="font-black text-[11px] tracking-tight text-white uppercase truncate drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)] group-hover:text-amber-300 transition-colors duration-200">
+                Yousafzai Foods
               </h1>
-              <p className="text-xs text-white font-bold truncate">Head office - Mardan · FY 2026-27</p>
+              <div className="flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-300 group-hover:bg-amber-400 transition-colors animate-pulse"></span>
+                <p className="text-[9px] text-emerald-100 group-hover:text-amber-200/90 font-bold truncate transition-colors duration-200">Head office - Mardan</p>
+              </div>
             </div>
           </div>
 
-          {/* Navigation Sections */}
-          <div className="p-3 space-y-4">
+          {/* 3D Sidebar Toggle Button on the Right Side (Where Sidebar Ends) */}
+          <button
+            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+            className="w-9 h-9 rounded-xl bg-gradient-to-b from-[#0d4f2b] to-[#07361c] border-t border-emerald-300/60 border-x border-[#094223] border-b-[3px] border-b-[#032412] text-emerald-100 shadow-[0_3px_0_0_#02180c,0_5px_12px_rgba(0,0,0,0.35)] hover:from-amber-400 hover:via-amber-500 hover:to-amber-600 hover:text-amber-950 hover:border-t-amber-200 hover:border-x-amber-400 hover:border-b-[#78350f] hover:shadow-[0_4px_0_0_#78350f,0_8px_20px_rgba(245,158,11,0.65)] hover:-translate-y-0.5 active:translate-y-[2px] active:border-b-2 active:shadow-none transition-all duration-150 cursor-pointer shrink-0 flex items-center justify-center"
+            title={isSidebarOpen ? "Collapse sidebar" : "Expand sidebar"}
+          >
+            <Menu className="w-5 h-5 transition-transform duration-200 hover:scale-105" />
+          </button>
+        </div>
+
+        {/* Center: Modern Professional White 3D Search Bar */}
+        <div className="relative flex-1 max-w-lg mx-6 group">
+          <div className="relative flex items-center bg-white rounded-xl border-t border-t-white border-x border-gray-200 border-b-[3px] border-b-gray-300 shadow-[0_3px_8px_rgba(0,0,0,0.25),inset_0_1px_1px_rgba(255,255,255,0.9)] hover:-translate-y-0.5 hover:border-b-gray-400 hover:shadow-[0_5px_14px_rgba(0,0,0,0.3)] focus-within:-translate-y-0.5 focus-within:ring-2 focus-within:ring-emerald-500/40 focus-within:border-emerald-600 focus-within:border-b-[3px] focus-within:border-b-emerald-700 transition-all duration-200">
+            <Search className="w-4 h-4 absolute left-3.5 text-emerald-700 pointer-events-none transition-colors group-focus-within:text-emerald-800" />
+            <input
+              type="text"
+              placeholder="Search documents, items, customers, suppliers..."
+              className="w-full bg-transparent pl-10 pr-20 py-2 text-xs md:text-sm text-gray-800 font-bold placeholder:text-gray-400 placeholder:font-normal focus:outline-none"
+            />
+            <div className="absolute right-2.5 flex items-center gap-1">
+              <span className="hidden sm:inline-flex items-center px-1.5 py-0.5 rounded-md bg-gray-100 border border-gray-200 text-[10px] font-mono font-bold text-gray-500 shadow-xs">
+                ⌘K
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Right Section: 3D Action Buttons & Profile Card */}
+        <div className="flex items-center gap-3 pr-6">
+          {/* Date Tag with 3D Pill Design */}
+          <span className="hidden md:flex items-center gap-1.5 text-xs font-mono font-bold text-white bg-gradient-to-b from-[#0d4f2b] to-[#07361c] px-3 py-1.5 rounded-xl border-t border-emerald-300/40 border-x border-[#094223] border-b-[2.5px] border-b-[#032412] shadow-[0_2px_5px_rgba(0,0,0,0.3)] hover:-translate-y-0.5 transition-all duration-150">
+            {new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+          </span>
+
+          {/* Refresh Real-time Data 3D Button */}
+          <button
+            onClick={fetchAllData}
+            className="group p-2 rounded-xl bg-gradient-to-b from-[#0d4f2b] to-[#07361c] border-t border-emerald-300/40 border-x border-[#094223] border-b-[3px] border-b-[#032412] text-white hover:text-white hover:from-[#115f34] hover:to-[#0a4223] hover:border-t-emerald-300/70 hover:-translate-y-0.5 hover:shadow-[0_4px_12px_rgba(0,0,0,0.35)] active:translate-y-[2px] active:border-b-2 transition-all duration-150 cursor-pointer shadow-[0_2px_4px_rgba(0,0,0,0.3)]"
+            title="Refresh All Real-time ERP Data"
+          >
+            <RefreshCw className="w-3.5 h-3.5 group-hover:rotate-180 transition-transform duration-500" />
+          </button>
+
+          {/* Notifications 3D Button with Glowing Alert */}
+          <button
+            className="relative p-2 rounded-xl bg-gradient-to-b from-[#0d4f2b] to-[#07361c] border-t border-emerald-300/40 border-x border-[#094223] border-b-[3px] border-b-[#032412] text-white hover:text-white hover:from-[#115f34] hover:to-[#0a4223] hover:border-t-emerald-300/70 hover:-translate-y-0.5 hover:shadow-[0_4px_12px_rgba(0,0,0,0.35)] active:translate-y-[2px] active:border-b-2 transition-all duration-150 cursor-pointer shadow-[0_2px_4px_rgba(0,0,0,0.3)]"
+            title="Notifications"
+          >
+            <Bell className="w-4 h-4" />
+            <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-amber-400 border border-[#0c8547] shadow-[0_0_8px_#f59e0b] animate-ping"></span>
+            <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-amber-400 border border-[#0c8547]"></span>
+          </button>
+
+          <div className="h-6 w-px bg-[#086634] mx-1"></div>
+
+          {/* User Profile 3D Card with Hover Elevation */}
+          <div
+            onClick={() => setIsRoleModalOpen(true)}
+            className="flex items-center gap-2.5 bg-gradient-to-b from-[#0d4f2b] to-[#07361c] pl-2 pr-3.5 py-1.5 rounded-xl border-t border-emerald-300/40 border-x border-[#094223] border-b-[3px] border-b-[#032412] shadow-[0_2px_5px_rgba(0,0,0,0.3)] hover:-translate-y-0.5 hover:shadow-[0_5px_15px_rgba(0,0,0,0.45)] hover:border-t-emerald-300/70 transition-all duration-150 cursor-pointer group"
+            title="Click to Switch Role"
+          >
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-b from-emerald-500 to-emerald-700 border-t border-emerald-200 border-b-2 border-b-emerald-900 flex items-center justify-center font-black text-xs text-white shadow-[0_2px_4px_rgba(0,0,0,0.3)] group-hover:scale-105 transition-transform">
+              {currentUser?.avatar || 'SU'}
+            </div>
+            <div className="hidden lg:block text-left">
+              <div className="text-xs font-black text-white leading-tight group-hover:text-emerald-200 transition-colors">
+                {currentUser?.name || 'Sana Ullah'}
+              </div>
+              <div className="text-[10px] text-emerald-200 font-bold leading-tight">
+                {currentUser?.role || 'Chairman & CEO'}
+              </div>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      {/* Main Container Under Navbar */}
+      <div className="flex flex-1 min-h-0 overflow-hidden">
+        {/* Vibrant Green Sidebar matching image (#0c8547) */}
+        <aside
+          className={`${
+            isSidebarOpen ? 'w-56 border-r border-[#086634]' : 'w-0 border-r-0'
+          } bg-gradient-to-b from-[#0c8748] via-[#0b8445] to-[#09783c] flex flex-col justify-between shrink-0 transition-all duration-300 ease-in-out overflow-hidden`}
+        >
+          {/* Scrollable Navigation with Enhanced Spacing and Green 3D Shadow */}
+          <div
+            style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+            className="overflow-y-auto no-scrollbar [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden [&::-webkit-scrollbar]:w-0 flex-1 w-56 px-2.5 py-3 space-y-4"
+          >
             {navSections.map((section, sIdx) => (
-              <div key={sIdx} className="space-y-1">
-                <div className="px-3 text-xs font-bold text-white tracking-wider">
+              <div key={sIdx} className="space-y-2">
+                <div className="px-2 text-[10.5px] font-black uppercase tracking-wider text-emerald-100 drop-shadow-sm mb-1">
                   {section.title}
                 </div>
                 {section.items.map((item) => {
@@ -306,18 +405,28 @@ export default function App() {
                     <button
                       key={item.id}
                       onClick={() => setActiveTab(item.id)}
-                      className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm font-bold text-white transition ${
+                      className={`w-full group relative flex items-center justify-between px-2.5 py-2 rounded-xl text-[13px] font-black transition-all duration-200 transform cursor-pointer ${
                         isActive
-                          ? 'bg-[#18392A] border border-[#27533E] shadow-sm'
-                          : 'hover:bg-[#142F23]'
+                          ? 'bg-gradient-to-b from-[#18683c] via-[#10522f] to-[#0a3d22] text-white border-t border-t-emerald-200 border-x border-x-emerald-500/50 border-b-[3.5px] border-b-[#022110] shadow-[0_4px_0_0_#022110,0_8px_18px_rgba(4,45,23,0.65),inset_0_1px_1px_rgba(255,255,255,0.3)] translate-y-[-0.5px]'
+                          : 'bg-gradient-to-b from-[#0f4d2b] via-[#0a3f23] to-[#07321c] text-white border-t border-t-emerald-300/40 border-x border-[#094124] border-b-[3.5px] border-b-[#032613] shadow-[0_4px_0_0_#021d0f,0_6px_14px_rgba(4,45,23,0.55)] hover:-translate-y-1 hover:scale-[1.02] hover:from-[#135a34] hover:to-[#0a3c21] hover:border-t-amber-300 hover:border-x-amber-400/40 hover:shadow-[0_5px_0_0_#021d0f,0_10px_22px_rgba(245,158,11,0.35)] active:translate-y-[1px] active:border-b-[1.5px] active:shadow-none'
                       }`}
                     >
-                      <div className="flex items-center gap-2.5">
-                        <Icon className="w-3.5 h-3.5 text-white" />
-                        <span>{item.label}</span>
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div
+                          className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 transition-all duration-200 ${
+                            isActive
+                              ? 'bg-[#082e18] border border-emerald-300/70 shadow-[inset_0_1px_1px_rgba(255,255,255,0.4)] text-white'
+                              : 'bg-[#062413] border border-emerald-400/40 shadow-[inset_0_1.5px_3px_rgba(0,0,0,0.5)] text-emerald-200 group-hover:border-amber-400 group-hover:text-amber-300 group-hover:bg-[#09351d] group-hover:shadow-[0_0_10px_rgba(245,158,11,0.6)] group-hover:scale-105'
+                          }`}
+                        >
+                          <Icon className="w-3.5 h-3.5 transition-transform duration-200 group-hover:rotate-6" />
+                        </div>
+                        <span className="tracking-tight truncate transition-colors duration-200 group-hover:text-amber-300">
+                          {item.label}
+                        </span>
                       </div>
                       {item.badge !== undefined && item.badge > 0 && (
-                        <span className="px-1.5 py-0.2 rounded-full text-[11px] font-bold bg-rose-600 text-white">
+                        <span className="px-1.5 py-0.2 rounded-full text-[9px] font-black bg-gradient-to-b from-rose-500 to-rose-700 text-white border-t border-rose-300 border-b border-b-rose-950 shadow-xs shrink-0 group-hover:scale-105 transition-transform">
                           {item.badge}
                         </span>
                       )}
@@ -327,66 +436,22 @@ export default function App() {
               </div>
             ))}
           </div>
-        </div>
 
-        {/* Logout Link in Sidebar */}
-        <div className="p-3 border-t border-[#1B3A2C]">
-          <button
-            onClick={() => { setIsAuthenticated(false); setCurrentUser(null); }}
-            className="w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm font-bold text-rose-500 hover:text-rose-400 hover:bg-rose-950/40 transition"
-          >
-            <div className="flex items-center gap-2.5">
-              <LogOut className="w-3.5 h-3.5" />
-              <span>Logout</span>
-            </div>
-          </button>
-        </div>
-      </aside>
-
-      {/* Main Container */}
-      <div className="flex-1 flex flex-col min-w-0">
-        {/* Dark Green Top Navbar (#0E2118) */}
-        <header className="h-16 border-b border-[#1B3A2C] px-8 flex items-center justify-between bg-[#0E2118] sticky top-0 z-10 shrink-0">
-          <div className="relative w-96">
-            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-white font-bold" />
-            <input
-              type="text"
-              placeholder="Search documents, items, customers, suppliers..."
-              className="w-full bg-[#132C20] border border-[#1D4433] rounded-lg pl-9 pr-4 py-1.5 text-sm text-white font-bold placeholder:text-white placeholder:font-bold focus:outline-none focus:border-[#2E684E] focus:ring-1 focus:ring-[#2E684E] transition"
-            />
-          </div>
-
-          <div className="flex items-center gap-4">
-            <span className="text-sm font-mono font-bold text-white bg-[#132C20] px-2.5 py-1 rounded-md border border-[#1D4433]">
-              29 Sep 2026
-            </span>
-
+          {/* Logout Link in Sidebar with Spacing, Green 3D Shadow and Yellow Hover */}
+          <div className="w-56 px-2.5 py-3 border-t border-[#086634] shrink-0">
             <button
-              onClick={fetchAllData}
-              className="p-2 rounded-lg bg-[#132C20] hover:bg-[#193B2B] text-white font-bold border border-[#1D4433] transition"
-              title="Refresh All Real-time ERP Data"
+              onClick={() => { setIsAuthenticated(false); setCurrentUser(null); }}
+              className="w-full group flex items-center justify-between px-2.5 py-2 rounded-xl text-[13px] font-black text-rose-200 bg-gradient-to-b from-[#381116] to-[#22070a] border-t border-t-rose-500/40 border-x border-[#2c090e] border-b-[3.5px] border-b-[#120305] shadow-[0_4px_0_0_#0a0103,0_6px_14px_rgba(30,5,8,0.5)] hover:-translate-y-1 hover:scale-[1.02] hover:from-[#44161c] hover:to-[#2c090e] hover:border-t-amber-400 hover:border-x-amber-400/40 hover:shadow-[0_5px_0_0_#0a0103,0_10px_22px_rgba(245,158,11,0.35)] active:translate-y-[1px] active:border-b-[1.5px] active:shadow-none transition-all duration-200 transform cursor-pointer"
             >
-              <RefreshCw className="w-3.5 h-3.5" />
-            </button>
-
-            <button className="relative p-2 rounded-lg bg-[#132C20] hover:bg-[#193B2B] border border-[#1D4433] text-white font-bold transition">
-              <Bell className="w-4 h-4" />
-              <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-amber-400"></span>
-            </button>
-
-            <div className="h-5 w-px bg-[#1B3A2C] mx-1"></div>
-
-            <div className="flex items-center gap-2.5 transition">
-              <div className="w-8 h-8 rounded-lg bg-[#132C20] border border-[#1D4433] flex items-center justify-center font-bold text-sm text-white">
-                {currentUser?.avatar || 'SU'}
+              <div className="flex items-center gap-2">
+                <div className="w-6 h-6 rounded-lg flex items-center justify-center shrink-0 bg-[#160406] border border-rose-800/70 shadow-[inset_0_1.5px_3px_rgba(0,0,0,0.7)] text-rose-300 group-hover:border-amber-400 group-hover:text-amber-300 group-hover:bg-[#200508] group-hover:shadow-[0_0_10px_rgba(245,158,11,0.6)] group-hover:scale-105 transition-all duration-200">
+                  <LogOut className="w-3.5 h-3.5 transition-transform duration-200 group-hover:-translate-x-0.5" />
+                </div>
+                <span className="group-hover:text-amber-300 transition-colors duration-200">Logout</span>
               </div>
-              <div>
-                <div className="text-sm font-bold text-white">{currentUser?.name || 'Sana Ullah'}</div>
-                <div className="text-xs text-white font-bold">{currentUser?.role || 'Chairman & CEO'}</div>
-              </div>
-            </div>
+            </button>
           </div>
-        </header>
+        </aside>
 
         {/* Gray Dashboard Background with Full White Content Views */}
         <main className="flex-1 bg-gray-100 overflow-y-auto p-8">
@@ -394,6 +459,7 @@ export default function App() {
             {activeTab === 'dashboard' && (
               <ChairmanDashboard
                 data={chairmanData}
+                currentUser={currentUser}
                 onNavigate={(t) => setActiveTab(t)}
                 onApproveTask={handleApproveTask}
               />

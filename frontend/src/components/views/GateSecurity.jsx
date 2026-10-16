@@ -21,8 +21,8 @@ export default function GateSecurity({ gatePasses, onAddGatePass }) {
   };
 
   const inboundVehicles = gatePasses || [
-    { pass_number: 'GPI-2026-0003', vehicle_number: 'CSD-2298', supplier_customer: 'Charsadda Poultry Farm', since_time: '2 h ago', status: 'QC done — unloading' },
-    { pass_number: 'GPI-2026-0002', vehicle_number: 'MRD-4471', supplier_customer: 'Swabi Layer Farms', since_time: '35 min ago', status: 'At gate — waiting for QC' }
+    { pass_number: 'GPI-2026-0003', vehicle_number: 'CSD-2298', supplier_customer: 'Charsadda Supply Partners', since_time: '2 h ago', status: 'QC done — unloading' },
+    { pass_number: 'GPI-2026-0002', vehicle_number: 'MRD-4471', supplier_customer: 'Swabi Manufacturing & Logistics', since_time: '35 min ago', status: 'At gate — waiting for QC' }
   ];
 
   return (
@@ -126,10 +126,10 @@ export default function GateSecurity({ gatePasses, onAddGatePass }) {
                 />
               </div>
               <div>
-                <label className="font-semibold text-gray-700 block mb-1">Supplier or Farm Name</label>
+                <label className="font-semibold text-gray-700 block mb-1">Supplier or Vendor Name</label>
                 <input
                   type="text"
-                  placeholder="e.g. Charsadda Poultry Farm"
+                  placeholder="e.g. Charsadda Supply Partners"
                   value={supplier}
                   onChange={(e) => setSupplier(e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-black"

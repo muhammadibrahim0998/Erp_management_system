@@ -194,14 +194,14 @@ async function initDatabase() {
     if (taskRows[0].count === 0) {
       console.log('🌱 Seeding Workflow Tasks from PDF Page 6...');
       const tasks = [
-        ['WO-2026-0002', 'Production order', 'Peek Freans · 2,000 kg Liquid Whole Egg', 'Peek Freans', 836000, 'high', 'Record production output', 'waiting 1 d ago', 'pending', 'Farhan Ali'],
-        ['WO-2026-0005', 'Production order', 'Dawn Foods · 400 kg Salted Liquid Whole Egg', 'Dawn Foods', 145000, 'normal', 'Assign to Production Manager', 'waiting 5 h ago', 'pending', 'Usama Tariq'],
-        ['WO-2026-0004', 'Production order', 'Master Baker · 500 kg Liquid Whole Egg', 'Master Baker', 182000, 'normal', 'Prepare raw material requirement', 'waiting 4 h ago', 'pending', 'Farhan Ali'],
-        ['GRN-2026-0611', 'Goods receipt (GRN)', 'Charsadda Poultry Farm · 800 Trays Medium Eggs', 'Charsadda Poultry Farm', 426600, 'normal', 'Receive into store', 'waiting 1 h ago', 'pending', 'Usman Ali'],
-        ['RMR-2026-0003', 'Raw material requirement', 'Liquid Egg Plant – Rashakai', 'Rashakai Plant', 340000, 'normal', 'Issue to breaking supervisor', 'waiting 1 h ago', 'pending', 'Usman Ali'],
-        ['WO-2026-0006', 'Production order', 'Salman Sweets & Bakers · 250 kg Whole Egg', 'Salman Sweets', 92000, 'normal', 'Assign to Plant Manager', 'waiting 55 min ago', 'pending', 'Khalid Mehmood'],
-        ['GPI-2026-0002', 'Gate pass — inward', 'Swabi Layer Farms · Vehicle MRD-4471', 'Swabi Layer Farms', 1250000, 'normal', 'Start QC inspection', 'waiting 35 min ago', 'pending', 'Dr. Asma Noor'],
-        ['PO-2026-0929', 'Purchase order', 'Peshawar Pulp Trays · 3-ply egg trays', 'Peshawar Pulp Trays', 2943392, 'high', 'Approve purchase order', 'waiting 3 d ago', 'pending', 'Sana Ullah']
+        ['WO-2026-0002', 'Production order', 'Peek Freans · 2,000 units Finished Goods', 'Peek Freans', 836000, 'high', 'Record production output', 'waiting 1 d ago', 'pending', 'Farhan Ali'],
+        ['WO-2026-0005', 'Production order', 'Dawn Foods · 400 units Standard Batch', 'Dawn Foods', 145000, 'normal', 'Assign to Production Manager', 'waiting 5 h ago', 'pending', 'Usama Tariq'],
+        ['WO-2026-0004', 'Production order', 'Master Baker · 500 units Standard Product', 'Master Baker', 182000, 'normal', 'Prepare raw material requirement', 'waiting 4 h ago', 'pending', 'Farhan Ali'],
+        ['GRN-2026-0611', 'Goods receipt (GRN)', 'Charsadda Supply Partners · 800 Units Medium Products', 'Charsadda Supply Partners', 426600, 'normal', 'Receive into store', 'waiting 1 h ago', 'pending', 'Usman Ali'],
+        ['RMR-2026-0003', 'Raw material requirement', 'Main Processing Facility – Rashakai', 'Rashakai Plant', 340000, 'normal', 'Issue to shift supervisor', 'waiting 1 h ago', 'pending', 'Usman Ali'],
+        ['WO-2026-0006', 'Production order', 'Salman Sweets & Bakers · 250 units Finished Goods', 'Salman Sweets', 92000, 'normal', 'Assign to Plant Manager', 'waiting 55 min ago', 'pending', 'Khalid Mehmood'],
+        ['GPI-2026-0002', 'Gate pass — inward', 'Swabi Manufacturing & Logistics · Vehicle MRD-4471', 'Swabi Manufacturing & Logistics', 1250000, 'normal', 'Start QC inspection', 'waiting 35 min ago', 'pending', 'Dr. Asma Noor'],
+        ['PO-2026-0929', 'Purchase order', 'Premier Packaging Co. · Standard Packaging Units', 'Premier Packaging Co.', 2943392, 'high', 'Approve purchase order', 'waiting 3 d ago', 'pending', 'Sana Ullah']
       ];
       for (const t of tasks) {
         await db.query(
@@ -217,12 +217,12 @@ async function initDatabase() {
       console.log('🌱 Seeding Purchase Orders from PDF Page 10...');
       const pos = [
         ['PO-2026-0935', '28 Sep 2026', 'Rashakai Engineering Works', 'Draft', 'Waqar Ahmad', 808300, 2],
-        ['PO-2026-0931', '28 Sep 2026', 'Charsadda Poultry Farm', 'Approved', 'Waqar Ahmad', 432000, 1],
+        ['PO-2026-0931', '28 Sep 2026', 'Charsadda Supply Partners', 'Approved', 'Waqar Ahmad', 432000, 1],
         ['PO-2026-0934', '27 Sep 2026', 'Mardan Office Supplies', 'Approved', 'Waqar Ahmad', 76110, 3],
-        ['PO-2026-0929', '26 Sep 2026', 'Peshawar Pulp Trays', 'Pending approval CEO', 'Waqar Ahmad', 2943392, 1],
-        ['PO-2026-0930', '24 Sep 2026', 'Swabi Layer Farms', 'Partly done', 'Waqar Ahmad', 2335000, 2],
+        ['PO-2026-0929', '26 Sep 2026', 'Premier Packaging Co.', 'Pending approval CEO', 'Waqar Ahmad', 2943392, 1],
+        ['PO-2026-0930', '24 Sep 2026', 'Swabi Manufacturing & Logistics', 'Partly done', 'Waqar Ahmad', 2335000, 2],
         ['PO-2026-0933', '7 Sep 2026', 'Rashakai Engineering Works', 'Received', 'Waqar Ahmad', 513300, 1],
-        ['PO-2026-0932', '30 Aug 2026', 'Frontier Poultry Feeds', 'Received', 'Waqar Ahmad', 1534000, 4]
+        ['PO-2026-0932', '30 Aug 2026', 'Frontier Raw Materials & Supplies', 'Received', 'Waqar Ahmad', 1534000, 4]
       ];
       for (const p of pos) {
         await db.query('INSERT INTO purchase_orders (po_number, po_date, supplier, status, created_by, amount, items_count) VALUES (?, ?, ?, ?, ?, ?, ?)', p);
@@ -234,12 +234,12 @@ async function initDatabase() {
     if (prodRows[0].count === 0) {
       console.log('🌱 Seeding Production Orders from PDF Page 11 & 12...');
       const prod = [
-        ['WO-2026-0006', 'With GM', 'Salman Sweets & Bakers', 'Liquid whole egg', 250.00, 5057, 169, '5 Oct 2026', 0.1, 'normal', 363.00],
-        ['WO-2026-0005', 'With Plant Manager', 'Dawn Foods', 'Salted liquid whole egg (10% salt)', 400.00, 7282, 243, '4 Oct 2026', 0.2, 'normal', 363.00],
-        ['WO-2026-0004', 'With Production Manager', 'Master Baker', 'Liquid whole egg', 500.00, 10114, 337, '3 Oct 2026', 0.2, 'normal', 363.00],
-        ['WO-2026-0003', 'Materials requested', 'Tehzeeb Bakers', 'Liquid egg yolk & white', 500.00, 10527, 351, '3 Oct 2026', 0.2, 'normal', 363.00],
-        ['WO-2026-0002', 'In production', 'Peek Freans', 'Pasteurised liquid whole egg & sugared egg', 2300.00, 45915, 1531, '1 Oct 2026', 1.02, 'high', 363.00],
-        ['WO-2026-0001', 'Completed', 'Barkat Frisian', 'Liquid whole egg', 1000.00, 20227, 674, '25 Sep 2026', 0.5, 'normal', 363.00]
+        ['WO-2026-0006', 'With GM', 'Salman Sweets & Bakers', 'Standard Processed Pack', 250.00, 5057, 169, '5 Oct 2026', 0.1, 'normal', 363.00],
+        ['WO-2026-0005', 'With Plant Manager', 'Dawn Foods', 'Custom Pack (Batch #10)', 400.00, 7282, 243, '4 Oct 2026', 0.2, 'normal', 363.00],
+        ['WO-2026-0004', 'With Production Manager', 'Master Baker', 'Standard Finished Goods', 500.00, 10114, 337, '3 Oct 2026', 0.2, 'normal', 363.00],
+        ['WO-2026-0003', 'Materials requested', 'Tehzeeb Bakers', 'Premium Pack Goods', 500.00, 10527, 351, '3 Oct 2026', 0.2, 'normal', 363.00],
+        ['WO-2026-0002', 'In production', 'Peek Freans', 'Bulk Industrial Finished Goods', 2300.00, 45915, 1531, '1 Oct 2026', 1.02, 'high', 363.00],
+        ['WO-2026-0001', 'Completed', 'Barkat Frisian', 'Standard Industrial Product', 1000.00, 20227, 674, '25 Sep 2026', 0.5, 'normal', 363.00]
       ];
       for (const pr of prod) {
         await db.query(
@@ -254,14 +254,14 @@ async function initDatabase() {
     if (invRows[0].count === 0) {
       console.log('🌱 Seeding Inventory Stock from PDF Page 13...');
       const inv = [
-        ['SE-01-01-01', 'White eggs Grade A – Extra large', 'Eggs', 540, 225, 90, 45, 0, 0, 900, 800, 610.00, 549000, '2 d', 'Watch'],
-        ['SE-01-01-02', 'White eggs Grade A – Large', 'Eggs', 3347, 650, 260, 130, 0, 0, 4387, 3000, 575.00, 2522525, '3 d', 'OK'],
-        ['SE-01-02-01', 'White eggs – Medium', 'Eggs', 840, 350, 140, 70, 0, 0, 1400, 1200, 540.00, 756000, '2 d', 'Watch'],
-        ['SE-01-02-02', 'White eggs – Small', 'Eggs', 300, 125, 50, 25, 0, 0, 500, 400, 495.00, 247500, '3 d', 'Watch'],
-        ['SE-02-01-01', 'Brown farm eggs – Large', 'Eggs', 252, 105, 42, 21, 0, 0, 420, 400, 670.00, 281400, '2 d', 'Watch'],
-        ['SE-02-01-02', 'Brown farm eggs – Medium', 'Eggs', 180, 75, 30, 15, 0, 0, 300, 250, 635.00, 190500, '3 d', 'Watch'],
-        ['SE-03-01-01', 'Organic eggs – Large', 'Eggs', 36, 15, 6, 3, 0, 0, 60, 80, 950.00, 57000, '1 d', 'Reorder'],
-        ['SE-03-02-01', 'Omega-3 eggs – Large', 'Eggs', 54, 23, 9, 4, 0, 0, 90, 60, 900.00, 81000, '3 d', 'OK']
+        ['PRD-01-01-01', 'Premium Product Grade A – Pack Extra Large', 'Products', 540, 225, 90, 45, 0, 0, 900, 800, 610.00, 549000, '2 d', 'Watch'],
+        ['PRD-01-01-02', 'Standard Product Grade A – Pack Large', 'Products', 3347, 650, 260, 130, 0, 0, 4387, 3000, 575.00, 2522525, '3 d', 'OK'],
+        ['PRD-01-02-01', 'Standard Product Item – Medium', 'Products', 840, 350, 140, 70, 0, 0, 1400, 1200, 540.00, 756000, '2 d', 'Watch'],
+        ['PRD-01-02-02', 'Standard Product Item – Small', 'Products', 300, 125, 50, 25, 0, 0, 500, 400, 495.00, 247500, '3 d', 'Watch'],
+        ['PRD-02-01-01', 'Specialty Product – Large', 'Products', 252, 105, 42, 21, 0, 0, 420, 400, 670.00, 281400, '2 d', 'Watch'],
+        ['PRD-02-01-02', 'Specialty Product – Medium', 'Products', 180, 75, 30, 15, 0, 0, 300, 250, 635.00, 190500, '3 d', 'Watch'],
+        ['PRD-03-01-01', 'Organic Product Batch – Large', 'Products', 36, 15, 6, 3, 0, 0, 60, 80, 950.00, 57000, '1 d', 'Reorder'],
+        ['PRD-03-02-01', 'Custom Formulation Product – Large', 'Products', 54, 23, 9, 4, 0, 0, 90, 60, 900.00, 81000, '3 d', 'OK']
       ];
       for (const i of inv) {
         await db.query(
@@ -276,8 +276,8 @@ async function initDatabase() {
     if (gateRows[0].count === 0) {
       console.log('🌱 Seeding Gate Passes from PDF Page 8...');
       const gates = [
-        ['GPI-2026-0003', 'CSD-2298', 'Charsadda Poultry Farm', 'inward', '2 h ago', 'QC done — unloading'],
-        ['GPI-2026-0002', 'MRD-4471', 'Swabi Layer Farms', 'inward', '35 min ago', 'At gate — waiting for QC'],
+        ['GPI-2026-0003', 'CSD-2298', 'Charsadda Supply Partners', 'inward', '2 h ago', 'QC done — unloading'],
+        ['GPI-2026-0002', 'MRD-4471', 'Swabi Manufacturing & Logistics', 'inward', '35 min ago', 'At gate — waiting for QC'],
         ['GPO-2026-0001', 'Peshawar Dispatch #12', 'Mardan Sales Point', 'outward', '10 min ago', 'Cleared by Store']
       ];
       for (const g of gates) {
@@ -293,7 +293,7 @@ async function initDatabase() {
         INSERT INTO sales_orders 
         (so_number, order_date, delivery_date, customer, warehouse, total_amount, credit_limit, current_exposure, credit_breach, status, approval_step)
         VALUES 
-        ('SO-2026-0418', '28 Sep 2026', '1 Oct 2026', 'Swat Valley Egg Dealers', 'Mardan sales point & store', 1583850.00, 4500000.00, 5461504.00, 961504.00, 'Pending approval', 'CEO Waiting')
+        ('SO-2026-0418', '28 Sep 2026', '1 Oct 2026', 'Swat Valley Trading Co.', 'Mardan sales point & store', 1583850.00, 4500000.00, 5461504.00, 961504.00, 'Pending approval', 'CEO Waiting')
       `);
     }
 
@@ -305,9 +305,9 @@ async function initDatabase() {
         INSERT INTO marketing_campaigns
         (code, title, dates, status, budget, spent, reach, engagement, leads, creatives, posts)
         VALUES
-        ('MKB-2026-0002', 'Always-on social — farm fresh since 1960', '16 Jul 2026 – 14 Oct 2026', 'Live', 1781000.00, 1319000.00, '873k', '6.3%', 498, '36/51', 26),
+        ('MKB-2026-0002', 'Always-on social — premium quality since 1960', '16 Jul 2026 – 14 Oct 2026', 'Live', 1781000.00, 1319000.00, '873k', '6.3%', 498, '36/51', 26),
         ('MKB-2026-0004', 'Winter demand push — dealers & retail', '29 Oct 2026 – 17 Jan 2027', 'In Approval Line', 2100000.00, 0.00, '500k', '5.0%', 0, '12/30', 0),
-        ('MKB-2026-0003', 'Liquid egg launch — bakeries & food industry', '11 Oct 2026 – 9 Jan 2027', 'In Approval Line', 4300000.00, 0.00, '1.2M', '7.2%', 0, '20/45', 0)
+        ('MKB-2026-0003', 'New product line launch — retail & wholesale', '11 Oct 2026 – 9 Jan 2027', 'In Approval Line', 4300000.00, 0.00, '1.2M', '7.2%', 0, '20/45', 0)
       `);
     }
 

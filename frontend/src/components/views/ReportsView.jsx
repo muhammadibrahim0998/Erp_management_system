@@ -12,12 +12,12 @@ export default function ReportsView() {
     netProfit: 'PKR 1.4M',
     items: [
       { code: '4000', name: 'Sales revenue', amount: '136,824,763', isHeader: false, bold: true },
-      { code: '5000', name: 'Cost of eggs sold', amount: '106,954,414', isHeader: false },
+      { code: '5000', name: 'Cost of goods sold (COGS)', amount: '106,954,414', isHeader: false },
       { code: '', name: 'Gross profit', amount: '29,870,348', isHeader: true, highlight: true },
       { code: '6000', name: 'Salaries & wages', amount: '11,391,970', isHeader: false },
       { code: '6100', name: 'Rent & utilities', amount: '2,250,000', isHeader: false },
       { code: '6200', name: 'Admin & office expenses', amount: '7,615,068', isHeader: false },
-      { code: '6300', name: 'Cold-chain transport & fuel', amount: '4,572,895', isHeader: false },
+      { code: '6300', name: 'Logistics, transport & fuel', amount: '4,572,895', isHeader: false },
       { code: '6400', name: 'Marketing & advertising', amount: '2,367,707', isHeader: false },
       { code: '6500', name: 'Lab testing & quality', amount: '231,753', isHeader: false },
       { code: '', name: 'Net profit before tax', amount: '1,440,955', isHeader: true, highlight: true }
@@ -31,7 +31,7 @@ export default function ReportsView() {
         <div>
           <h2 className="text-xl font-bold text-gray-900 tracking-tight">Profit & loss statement</h2>
           <p className="text-xs text-gray-500 mt-1">
-            Period: 1 Jul 2026 to 29 Sep 2026 · Yousafzai Agri Foods (Pvt) Ltd · Head office Mardan
+            Period: 1 Jul 2026 to 29 Sep 2026 · Yousafzai Enterprises (Pvt) Ltd · Head office Mardan
           </p>
         </div>
         <div className="flex items-center gap-2">

@@ -33,7 +33,7 @@ export default function SalesCreditView({ salesOrder, onApproveOrder }) {
             </span>
           </div>
           <h2 className="text-xl font-bold text-gray-900 tracking-tight mt-1">
-            Sales order with credit control · Swat Valley Egg Dealers
+            Sales order with credit control · Swat Valley Trading Co.
           </h2>
           <p className="text-xs text-gray-500">
             Dealer credit limits, partner-tier discounts and sales tax rules are checked as the order is typed. Breaches route to approval.
@@ -80,7 +80,7 @@ export default function SalesCreditView({ salesOrder, onApproveOrder }) {
               </div>
               <div>
                 <span className="text-gray-400">Customer</span>
-                <div className="font-bold text-gray-900 mt-0.5">Swat Valley Egg Dealers</div>
+                <div className="font-bold text-gray-900 mt-0.5">Swat Valley Trading Co.</div>
               </div>
               <div>
                 <span className="text-gray-400">Warehouse</span>
@@ -105,20 +105,20 @@ export default function SalesCreditView({ salesOrder, onApproveOrder }) {
               <tbody className="divide-y divide-gray-100 font-medium">
                 <tr>
                   <td className="py-3.5">
-                    <div className="font-bold text-gray-900">White eggs Grade A – Large</div>
-                    <div className="text-[10px] text-gray-400 font-mono">SE-01-01-02</div>
+                    <div className="font-bold text-gray-900">Standard Product Grade A – Large</div>
+                    <div className="text-[10px] text-gray-400 font-mono">PRD-01-01-02</div>
                   </td>
-                  <td className="py-3.5 text-right font-mono">1,800 tray</td>
+                  <td className="py-3.5 text-right font-mono">1,800 units</td>
                   <td className="py-3.5 text-right font-mono">700.00</td>
                   <td className="py-3.5 text-right text-rose-600 font-bold font-mono">8.0%</td>
                   <td className="py-3.5 text-right font-bold font-mono text-gray-900">1,159,200</td>
                 </tr>
                 <tr>
                   <td className="py-3.5">
-                    <div className="font-bold text-gray-900">White eggs Grade A – Extra large</div>
-                    <div className="text-[10px] text-gray-400 font-mono">SE-01-01-01</div>
+                    <div className="font-bold text-gray-900">Premium Product Grade A – Extra Large</div>
+                    <div className="text-[10px] text-gray-400 font-mono">PRD-01-01-01</div>
                   </td>
-                  <td className="py-3.5 text-right font-mono">600 tray</td>
+                  <td className="py-3.5 text-right font-mono">600 units</td>
                   <td className="py-3.5 text-right font-mono">745.00</td>
                   <td className="py-3.5 text-right font-mono text-gray-600">5.0%</td>
                   <td className="py-3.5 text-right font-bold font-mono text-gray-900">424,650</td>
@@ -153,7 +153,7 @@ export default function SalesCreditView({ salesOrder, onApproveOrder }) {
               </div>
               <div className="p-2.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-[11px] font-semibold flex items-center gap-2">
                 <AlertTriangle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-                <span>Discount above 5% on White eggs Grade A – Large</span>
+                <span>Discount above 5% on Standard Product Grade A – Large</span>
               </div>
             </div>
 

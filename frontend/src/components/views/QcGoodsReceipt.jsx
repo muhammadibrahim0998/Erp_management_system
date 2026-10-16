@@ -25,10 +25,10 @@ export default function QcGoodsReceipt({ onReceiveStore }) {
             </span>
           </div>
           <h2 className="text-xl font-bold text-gray-900 tracking-tight mt-1">
-            Goods receipt (GRN) · Charsadda Poultry Farm
+            Goods receipt (GRN) · Charsadda Supply Partners
           </h2>
           <p className="text-xs text-gray-500">
-            Egg weight, cracked and dirty %, Haugh unit, temperature, vehicle hygiene and pests — checked against limits.
+            Product quality, weight, defect rate, packaging integrity, temperature, and vehicle hygiene — checked against limits.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -86,7 +86,7 @@ export default function QcGoodsReceipt({ onReceiveStore }) {
         <div>
           <span className="font-bold">QC result: Passed with deductions</span>
           <p className="text-amber-800 mt-0.5">
-            Inspected by <strong>Dr. Asma Noor</strong> · 29 Sept, 22:41 · vehicle CSD-2298 (GPI-2026-0003) — <strong>10 trays of cracked eggs rejected</strong> and returned with the driver.
+            Inspected by <strong>Dr. Asma Noor</strong> · 29 Sept, 22:41 · vehicle CSD-2298 (GPI-2026-0003) — <strong>10 units of damaged goods rejected</strong> and returned with the driver.
           </p>
         </div>
       </div>
@@ -129,13 +129,13 @@ export default function QcGoodsReceipt({ onReceiveStore }) {
           <tbody className="divide-y divide-gray-100 font-medium">
             <tr>
               <td className="py-4">
-                <div className="font-bold text-gray-900">White eggs – Medium</div>
-                <div className="text-[11px] text-gray-500 font-mono">SE-01-02-01 · Shell eggs · Standard Medium (53-58 g)</div>
+                <div className="font-bold text-gray-900">Standard Product Item – Medium</div>
+                <div className="text-[11px] text-gray-500 font-mono">PRD-01-02-01 · Finished Goods · Standard Medium Pack</div>
               </td>
-              <td className="py-4 text-gray-600">800 trays</td>
-              <td className="py-4 text-gray-600">800 trays</td>
-              <td className="py-4 font-bold text-emerald-700">790 trays</td>
-              <td className="py-4 font-bold text-rose-600">10 trays</td>
+              <td className="py-4 text-gray-600">800 units</td>
+              <td className="py-4 text-gray-600">800 units</td>
+              <td className="py-4 font-bold text-emerald-700">790 units</td>
+              <td className="py-4 font-bold text-rose-600">10 units</td>
               <td className="py-4 font-black text-gray-900 font-mono">426,600</td>
             </tr>
           </tbody>

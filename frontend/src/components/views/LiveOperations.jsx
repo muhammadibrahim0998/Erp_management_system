@@ -15,7 +15,7 @@ export default function LiveOperations() {
   const [selectedNode, setSelectedNode] = useState(null);
 
   const receivingSteps = [
-    { id: 'supp', name: 'Suppliers', count: 2, status: 'normal', desc: 'Charsadda & Swabi farms' },
+    { id: 'supp', name: 'Suppliers', count: 2, status: 'normal', desc: 'Regional supply partners' },
     { id: 'gate_in', name: 'Gate in', count: 1, time: '35 min', status: 'active', desc: 'Vehicle MRD-4471 waiting' },
     { id: 'qc', name: 'QC cell', count: 0, status: 'clear', desc: 'Inspection station idle' },
     { id: 'store', name: 'Store', count: 1, time: '1 h 35 m', status: 'waiting', desc: 'Unloading into Mardan bay' },
@@ -28,11 +28,11 @@ export default function LiveOperations() {
     { id: 'gm', name: 'GM', count: 1, status: 'done', desc: 'Work order approved' },
     { id: 'plant', name: 'Plant', count: 1, time: '5 h', status: 'waiting', desc: 'Rashakai plant scheduling' },
     { id: 'planning', name: 'Planning', count: 1, status: 'done', desc: 'Batch requirement calculated' },
-    { id: 'raw_store', name: 'Raw store', count: 1, status: 'done', desc: 'Shell eggs released' },
-    { id: 'breaking', name: 'Breaking', count: 1, time: '1 d 14 h', status: 'bottleneck', desc: 'Breaking machine #2 backlog' },
-    { id: 'finish_store', name: 'Finish store', count: 1, status: 'done', desc: 'Pasteurised cold tanks' },
-    { id: 'dispatch', name: 'Dispatch', count: 0, status: 'clear', desc: 'Insulated tankers' },
-    { id: 'cust', name: 'Customers', count: 1, status: 'done', desc: 'Peek Freans, Dawn Foods' }
+    { id: 'raw_store', name: 'Raw store', count: 1, status: 'done', desc: 'Raw materials released' },
+    { id: 'breaking', name: 'Processing', count: 1, time: '1 d 14 h', status: 'bottleneck', desc: 'Assembly line #2 backlog' },
+    { id: 'finish_store', name: 'Finish store', count: 1, status: 'done', desc: 'Finished goods storage' },
+    { id: 'dispatch', name: 'Dispatch', count: 0, status: 'clear', desc: 'Fleet & logistics transport' },
+    { id: 'cust', name: 'Customers', count: 1, status: 'done', desc: 'Dawn Foods, FMCG Partners' }
   ];
 
   return (
@@ -61,9 +61,9 @@ export default function LiveOperations() {
       {/* Control Room Telemetry Metric Cards */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3.5">
         <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
-          <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Eggs traded · 7 days</span>
+          <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Products traded · 7 days</span>
           <div className="text-xl font-black text-gray-900 mt-1">572K</div>
-          <span className="text-[10px] text-gray-500">19,077 trays</span>
+          <span className="text-[10px] text-gray-500">19,077 units</span>
         </div>
         <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
           <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Gate → Store</span>
@@ -83,7 +83,7 @@ export default function LiveOperations() {
         <div className="bg-white p-4 rounded-xl border border-rose-300 shadow-sm bg-rose-50/20">
           <span className="text-[10px] font-bold text-rose-500 uppercase tracking-wider">Bottleneck</span>
           <div className="text-xl font-black text-rose-600 mt-1 flex items-center gap-1">
-            <span>Breaking</span>
+            <span>Processing</span>
             <span className="w-2.5 h-2.5 rounded-full bg-rose-600 animate-ping"></span>
           </div>
           <span className="text-[10px] text-rose-700 font-semibold">1 d 14 h waiting</span>
@@ -138,13 +138,13 @@ export default function LiveOperations() {
         </div>
       </div>
 
-      {/* Visual Pipeline 2: Liquid Egg Plant Flow (Page 7) */}
+      {/* Visual Pipeline 2: Manufacturing & Assembly Flow */}
       <div className="bg-black text-white p-6 rounded-2xl border border-zinc-800 shadow-sm space-y-4">
         <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
           <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-400">
-            2. Liquid Egg Plant Process (Sales Order to Customer Dispatch)
+            2. Production & Manufacturing Process (Sales Order to Customer Dispatch)
           </h3>
-          <span className="text-[11px] text-zinc-500">Rashakai Special Economic Zone Plant</span>
+          <span className="text-[11px] text-zinc-500">Main Facility Economic Zone Plant</span>
         </div>
 
         <div className="flex flex-wrap items-center justify-between gap-3 py-6 px-2 overflow-x-auto">

@@ -29,7 +29,7 @@ export default function ProcurementView({ purchaseOrders, onAddPo }) {
         <div>
           <h2 className="text-xl font-bold text-gray-900 tracking-tight">Procurement</h2>
           <p className="text-xs text-gray-500 mt-1">
-            Egg purchases from partner farms, feed, vet supplies and packing — with quotation comparison to approved order.
+            Raw material & inventory purchases, packaging, equipment and supplies — with quotation comparison to approved order.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -128,7 +128,7 @@ export default function ProcurementView({ purchaseOrders, onAddPo }) {
                 <label className="font-semibold text-gray-700 block mb-1">Supplier</label>
                 <input
                   type="text"
-                  placeholder="e.g. Peshawar Pulp Trays or Haripur Egg Farm"
+                  placeholder="e.g. Premier Packaging or National Supply Co."
                   value={supplier}
                   onChange={(e) => setSupplier(e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-black"

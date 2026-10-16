@@ -13,7 +13,7 @@ import {
   ShieldAlert
 } from 'lucide-react';
 
-export default function ChairmanDashboard({ data, onNavigate, onApproveTask }) {
+export default function ChairmanDashboard({ data, currentUser, onNavigate, onApproveTask }) {
   const kpis = data?.kpis || {};
   const tasks = data?.waitingApprovals || [];
 
@@ -22,9 +22,11 @@ export default function ChairmanDashboard({ data, onNavigate, onApproveTask }) {
       {/* Top Welcome Bar */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-2xl border border-gray-200 shadow-sm">
         <div>
-          <h2 className="text-xl font-bold text-gray-900 tracking-tight">Good morning, Sana</h2>
+          <h2 className="text-xl font-bold text-gray-900 tracking-tight">
+            Good morning, {currentUser?.name?.split(' ')[0] || 'User'}
+          </h2>
           <p className="text-xs text-gray-500 mt-0.5">
-            6 items waiting for your approval · 29 Sep 2026
+            {tasks.length} items waiting for your approval · {new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -98,16 +100,16 @@ export default function ChairmanDashboard({ data, onNavigate, onApproveTask }) {
           <div className="text-[11px] text-amber-700 font-semibold">PKR 3.2M over 30 days</div>
         </div>
 
-        {/* Eggs sold */}
+        {/* Products sold */}
         <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex flex-col justify-between">
-          <span className="text-[11px] font-medium text-gray-500 uppercase tracking-wider">Eggs sold · last 7 days</span>
+          <span className="text-[11px] font-medium text-gray-500 uppercase tracking-wider">Products sold · last 7 days</span>
           <div className="my-2">
-            <div className="text-2xl font-black text-gray-900">{kpis.eggsSold || '572K'}</div>
+            <div className="text-2xl font-black text-gray-900">{kpis.productsSold || kpis.eggsSold || '572K'}</div>
           </div>
           <div className="flex items-center gap-1 text-[11px] text-emerald-700 font-semibold">
             <ArrowUpRight className="w-3.5 h-3.5" />
             <span>▲ 28.8%</span>
-            <span className="text-gray-400 font-normal ml-1">19,077 trays</span>
+            <span className="text-gray-400 font-normal ml-1">19,077 units</span>
           </div>
         </div>
       </div>
@@ -272,7 +274,7 @@ export default function ChairmanDashboard({ data, onNavigate, onApproveTask }) {
           <div className="space-y-3 text-xs">
             <div>
               <div className="flex justify-between text-gray-600 mb-1">
-                <span>Poultry Farms</span>
+                <span>Production & Manufacturing</span>
                 <span className="font-bold text-gray-900">28.3M / 31.1M · 91%</span>
               </div>
               <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
@@ -312,7 +314,7 @@ export default function ChairmanDashboard({ data, onNavigate, onApproveTask }) {
                 <span>Credit limit exceeded</span>
               </div>
               <p className="text-[11px] text-rose-800 mt-1">
-                Swat Valley Egg Dealers · SO-2026-0418 on hold (121% credit exposure)
+                Swat Valley Trading Co. · SO-2026-0418 on hold (121% credit exposure)
               </p>
               <button
                 onClick={() => onNavigate('sales')}
