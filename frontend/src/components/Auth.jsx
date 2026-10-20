@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
-import { Lock, Mail, User, Briefcase, Building, KeyRound, Sparkles, ShieldAlert } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Lock, Mail, User, Briefcase, Building, Sparkles, ShieldAlert } from 'lucide-react';
 import { authService } from '../services';
+import { apiClient } from '../services/apiClient';
 
 const DEPARTMENTS = [
   'Executive',
@@ -54,6 +55,22 @@ export default function Auth({ onLogin }) {
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [devUsers, setDevUsers] = useState([]);
+  const [selectedEmail, setSelectedEmail] = useState('');
+
+  useEffect(() => {
+    if (import.meta.env.DEV && isLogin) {
+      let isMounted = true;
+      apiClient.get('/api/users')
+        .then(users => {
+          if (isMounted && Array.isArray(users) && users.length > 0) {
+            setDevUsers(users);
+          }
+        })
+        .catch(() => {});
+      return () => { isMounted = false; };
+    }
+  }, [isLogin]);
 
   const handleRoleChange = (e) => {
     const selectedRole = e.target.value;
@@ -107,30 +124,54 @@ export default function Auth({ onLogin }) {
           </p>
         </div>
 
-        {/* Demo Quick Fill Buttons for ease of use */}
-        {isLogin && (
+        {/* Development-Only Role Shortcuts (UI-LOGIN-001) */}
+        {import.meta.env.DEV && isLogin && (
           <div className="mb-5 p-3 rounded-xl bg-[#0E2118] border border-[#1D4433]">
-            <div className="flex items-center gap-1.5 text-[11px] font-bold text-amber-400 mb-2">
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>Quick Login Accounts (Click to autofill):</span>
+            <div className="flex items-center justify-between text-[11px] font-bold text-amber-400 mb-2">
+              <div className="flex items-center gap-1.5">
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>Dev Role Shortcuts ({devUsers.length} Roles):</span>
+              </div>
+              <span className="text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-300 border border-amber-500/20 font-mono">
+                Dev Only
+              </span>
             </div>
-            <div className="grid grid-cols-2 gap-2 text-xs">
-              <button
-                type="button"
-                onClick={() => handleQuickFill('admin@yaf.com', 'password')}
-                className="px-2.5 py-1.5 bg-[#173727] hover:bg-[#1f4834] text-white rounded-lg text-left transition border border-[#27533E]"
-              >
-                <div className="font-bold">Kamran Ali</div>
-                <div className="text-[10px] text-amber-300">ERP Admin</div>
-              </button>
-              <button
-                type="button"
-                onClick={() => handleQuickFill('ceo@yaf.com', 'password')}
-                className="px-2.5 py-1.5 bg-[#173727] hover:bg-[#1f4834] text-white rounded-lg text-left transition border border-[#27533E]"
-              >
-                <div className="font-bold">Sana Ullah</div>
-                <div className="text-[10px] text-amber-300">Chairman & CEO</div>
-              </button>
+
+            <div className="grid grid-cols-2 gap-1.5 max-h-48 overflow-y-auto pr-1">
+              {devUsers.map((u, idx) => {
+                const hasLogin = Boolean(u.email);
+                const isSelected = selectedEmail === u.email;
+                return (
+                  <button
+                    key={u.id || u.email || idx}
+                    type="button"
+                    disabled={!hasLogin}
+                    onClick={() => {
+                      if (hasLogin) {
+                        handleQuickFill(u.email, 'password');
+                        setSelectedEmail(u.email);
+                      }
+                    }}
+                    className={`px-2 py-1.5 rounded-lg text-left transition border ${
+                      !hasLogin
+                        ? 'opacity-40 cursor-not-allowed bg-[#173727]/40 border-gray-700 text-gray-500'
+                        : isSelected
+                        ? 'bg-[#1F4834] border-amber-400 text-white shadow-sm ring-1 ring-amber-400/50'
+                        : 'bg-[#173727] hover:bg-[#1f4834] text-white border-[#27533E]'
+                    }`}
+                  >
+                    <div className="font-bold text-[11px] leading-tight text-amber-300 truncate">
+                      {u.role}
+                    </div>
+                    <div className="text-[10px] text-gray-300 truncate mt-0.5">
+                      {hasLogin ? (u.name || u.email) : 'no login set'}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+            <div className="text-[10px] text-[#6A947F] mt-2 text-center">
+              Click any post to autofill Email & Password (password: <code className="text-amber-300/80 font-mono">password</code>)
             </div>
           </div>
         )}
