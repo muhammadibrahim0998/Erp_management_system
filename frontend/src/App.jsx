@@ -422,21 +422,25 @@ export default function App() {
                       onClick={() => setActiveTab(item.id)}
                       className={`w-full group relative flex items-center justify-between px-2.5 py-2 rounded-xl text-[13px] font-black transition-all duration-200 transform cursor-pointer ${
                         isActive
-                          ? 'bg-gradient-to-b from-[#18683c] via-[#10522f] to-[#0a3d22] text-white border-t border-t-emerald-200 border-x border-x-emerald-500/50 border-b-[3.5px] border-b-[#022110] shadow-[0_4px_0_0_#022110,0_8px_18px_rgba(4,45,23,0.65),inset_0_1px_1px_rgba(255,255,255,0.3)] translate-y-[-0.5px]'
-                          : 'bg-gradient-to-b from-[#0f4d2b] via-[#0a3f23] to-[#07321c] text-white border-t border-t-emerald-300/40 border-x border-[#094124] border-b-[3.5px] border-b-[#032613] shadow-[0_4px_0_0_#021d0f,0_6px_14px_rgba(4,45,23,0.55)] hover:-translate-y-1 hover:scale-[1.02] hover:from-[#135a34] hover:to-[#0a3c21] hover:border-t-amber-300 hover:border-x-amber-400/40 hover:shadow-[0_5px_0_0_#021d0f,0_10px_22px_rgba(245,158,11,0.35)] active:translate-y-[1px] active:border-b-[1.5px] active:shadow-none'
+                          ? 'bg-gradient-to-b from-[#fbbf24] via-[#f59e0b] to-[#d97706] text-emerald-950 border-t border-t-amber-100 border-x border-x-amber-400 border-b-[3.5px] border-b-[#78350f] shadow-[0_4px_0_0_#78350f,0_8px_18px_rgba(245,158,11,0.55),inset_0_1px_2px_rgba(255,255,255,0.7)] translate-y-[-0.5px]'
+                          : 'bg-gradient-to-b from-[#0f4d2b] via-[#0a3f23] to-[#07321c] text-white border-t border-t-emerald-300/40 border-x border-[#094124] border-b-[3.5px] border-b-[#032613] shadow-[0_4px_0_0_#021d0f,0_6px_14px_rgba(4,45,23,0.55)] hover:-translate-y-1 hover:scale-[1.02] hover:from-[#135a34] hover:to-[#0a3c21] hover:text-amber-300 hover:border-t-amber-300 hover:border-x-amber-400/40 hover:shadow-[0_5px_0_0_#021d0f,0_10px_22px_rgba(245,158,11,0.35)] active:translate-y-[1px] active:border-b-[1.5px] active:shadow-none'
                       }`}
                     >
                       <div className="flex items-center gap-2 min-w-0">
                         <div
                           className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 transition-all duration-200 ${
                             isActive
-                              ? 'bg-[#082e18] border border-emerald-300/70 shadow-[inset_0_1px_1px_rgba(255,255,255,0.4)] text-white'
+                              ? 'bg-[#062e16] border border-emerald-900 text-amber-300 shadow-[inset_0_1.5px_3px_rgba(0,0,0,0.6)] scale-105'
                               : 'bg-[#062413] border border-emerald-400/40 shadow-[inset_0_1.5px_3px_rgba(0,0,0,0.5)] text-emerald-200 group-hover:border-amber-400 group-hover:text-amber-300 group-hover:bg-[#09351d] group-hover:shadow-[0_0_10px_rgba(245,158,11,0.6)] group-hover:scale-105'
                           }`}
                         >
                           <Icon className="w-3.5 h-3.5 transition-transform duration-200 group-hover:rotate-6" />
                         </div>
-                        <span className="tracking-tight truncate transition-colors duration-200 group-hover:text-amber-300">
+                        <span
+                          className={`tracking-tight truncate transition-colors duration-200 ${
+                            isActive ? 'text-emerald-950 font-black drop-shadow-xs' : 'group-hover:text-amber-300'
+                          }`}
+                        >
                           {item.label}
                         </span>
                       </div>
