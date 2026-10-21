@@ -222,6 +222,59 @@ export default function LiveOperations() {
           </button>
         </div>
       )}
+
+      {/* Real-Time Operations Stations Table */}
+      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+        <div className="p-4 border-b border-gray-100 flex items-center justify-between">
+          <h3 className="text-xs font-bold text-gray-900 uppercase tracking-wider">
+            Workstations & Operations Queue Telemetry Table
+          </h3>
+          <span className="text-xs text-gray-500 font-medium">Refreshed live from control sensors</span>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs">
+            <thead>
+              <tr className="border-b border-gray-200 text-gray-400 font-semibold bg-gray-50/70">
+                <th className="py-3.5 px-4">WORKSTATION / STEP</th>
+                <th className="py-3.5 px-4">FACILITY DIVISION</th>
+                <th className="py-3.5 px-4">ACTIVE QUEUE</th>
+                <th className="py-3.5 px-4">CYCLE TIME</th>
+                <th className="py-3.5 px-4">CURRENT OPERATOR</th>
+                <th className="py-3.5 px-4 text-right">OPERATIONAL STATUS</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100 font-medium">
+              {[
+                { station: 'Inward Gate Security', dept: 'Security & Logistics', queue: '1 Vehicle (MRD-4471)', time: '35 min', operator: 'Gul Rehman', status: 'Active Queue' },
+                { station: 'QC Inspection Bay', dept: 'Quality Assurance', queue: '0 Batches', time: 'Clear', operator: 'Dr. Asma Noor', status: 'Optimal' },
+                { station: 'Raw Material Cold Store', dept: 'Store & Inventory', queue: '1 Delivery Unloading', time: '1 h 35 m', operator: 'Usman Ali', status: 'Work Waiting' },
+                { station: 'Plant Floor & Assembly', dept: 'Processing Plant', queue: '1 Production Batch', time: '5 h', operator: 'Usama Tariq', status: 'Work Waiting' },
+                { station: 'Main Processing Line #2', dept: 'Liquid Egg Plant', queue: 'Bulk Batch (2,000 kg)', time: '1 d 14 h', operator: 'Sher Zaman', status: 'Bottleneck' },
+                { station: 'Finished Store & Logistics', dept: 'Dispatch Bay', queue: '0 Pending Vehicles', time: 'Clear', operator: 'Waqas Ahmed', status: 'Optimal' }
+              ].map((row, idx) => (
+                <tr key={idx} className="hover:bg-gray-50/80 transition">
+                  <td className="py-3.5 px-4 font-bold text-gray-900">{row.station}</td>
+                  <td className="py-3.5 px-4 text-gray-500">{row.dept}</td>
+                  <td className="py-3.5 px-4 font-semibold text-gray-800">{row.queue}</td>
+                  <td className="py-3.5 px-4 font-mono text-gray-700">{row.time}</td>
+                  <td className="py-3.5 px-4 text-gray-600">{row.operator}</td>
+                  <td className="py-3.5 px-4 text-right">
+                    <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold border ${
+                      row.status === 'Optimal'
+                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                        : row.status === 'Bottleneck'
+                        ? 'bg-rose-50 text-rose-700 border-rose-200 animate-pulse'
+                        : 'bg-amber-50 text-amber-700 border-amber-200'
+                    }`}>
+                      {row.status}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
   );
 }

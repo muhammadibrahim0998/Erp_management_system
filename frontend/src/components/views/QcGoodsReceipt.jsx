@@ -123,7 +123,7 @@ export default function QcGoodsReceipt({ onReceiveStore }) {
               <th className="pb-3">RECEIVED</th>
               <th className="pb-3">ACCEPTED</th>
               <th className="pb-3">REJECTED</th>
-              <th className="pb-3">AMOUNT (PKR)</th>
+              <th className="pb-3 text-right">AMOUNT (PKR)</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100 font-medium">
@@ -136,10 +136,75 @@ export default function QcGoodsReceipt({ onReceiveStore }) {
               <td className="py-4 text-gray-600">800 units</td>
               <td className="py-4 font-bold text-emerald-700">790 units</td>
               <td className="py-4 font-bold text-rose-600">10 units</td>
-              <td className="py-4 font-black text-gray-900 font-mono">426,600</td>
+              <td className="py-4 font-black text-gray-900 font-mono text-right">426,600</td>
             </tr>
           </tbody>
         </table>
+      </div>
+
+      {/* Complete QC Inspection Logs Table */}
+      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+        <div className="p-4 border-b border-gray-100 flex items-center justify-between">
+          <h3 className="text-xs font-bold text-gray-900 uppercase tracking-wider">
+            QC Inspection & Goods Receipt Logs (GRN History)
+          </h3>
+          <span className="text-xs text-gray-500 font-medium">Verified by Dr. Asma Noor (QC Cell)</span>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs">
+            <thead>
+              <tr className="border-b border-gray-200 text-gray-400 font-semibold bg-gray-50/70">
+                <th className="py-3.5 px-4">GRN NUMBER</th>
+                <th className="py-3.5 px-4">SUPPLIER</th>
+                <th className="py-3.5 px-4">VEHICLE #</th>
+                <th className="py-3.5 px-4">TEMP</th>
+                <th className="py-3.5 px-4">HYGIENE</th>
+                <th className="py-3.5 px-4">ACCEPTED</th>
+                <th className="py-3.5 px-4">REJECTED</th>
+                <th className="py-3.5 px-4">QC STATUS</th>
+                <th className="py-3.5 px-4 text-right">ACTION</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100 font-medium">
+              {[
+                { grn: 'GRN-2026-0611', supplier: 'Charsadda Supply Partners', vehicle: 'CSD-2298', temp: '24 °C', hygiene: 'Clean', accepted: '790 units', rejected: '10 units', status: received ? 'In Store' : 'Awaiting Store', isCurrent: true },
+                { grn: 'GRN-2026-0610', supplier: 'Swabi Manufacturing & Logistics', vehicle: 'MRD-4471', temp: '22 °C', hygiene: 'Clean', accepted: '1,200 units', rejected: '0 units', status: 'In Store', isCurrent: false },
+                { grn: 'GRN-2026-0609', supplier: 'Frontier Raw Materials', vehicle: 'PSW-9912', temp: '25 °C', hygiene: 'Acceptable', accepted: '500 units', rejected: '5 units', status: 'In Store', isCurrent: false }
+              ].map((row, idx) => (
+                <tr key={idx} className="hover:bg-gray-50/80 transition">
+                  <td className="py-3.5 px-4 font-mono font-bold text-gray-900">{row.grn}</td>
+                  <td className="py-3.5 px-4 font-semibold text-gray-800">{row.supplier}</td>
+                  <td className="py-3.5 px-4 font-mono text-gray-600">{row.vehicle}</td>
+                  <td className="py-3.5 px-4 font-mono text-gray-700">{row.temp}</td>
+                  <td className="py-3.5 px-4 text-emerald-700 font-semibold">{row.hygiene}</td>
+                  <td className="py-3.5 px-4 font-bold text-emerald-700">{row.accepted}</td>
+                  <td className="py-3.5 px-4 font-bold text-rose-600">{row.rejected}</td>
+                  <td className="py-3.5 px-4">
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${
+                      row.status === 'In Store'
+                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                        : 'bg-amber-50 text-amber-700 border-amber-200'
+                    }`}>
+                      {row.status}
+                    </span>
+                  </td>
+                  <td className="py-3.5 px-4 text-right">
+                    {row.isCurrent && !received ? (
+                      <button
+                        onClick={() => { setReceived(true); if (onReceiveStore) onReceiveStore(); }}
+                        className="px-2.5 py-1 text-[11px] font-bold text-white bg-black hover:bg-zinc-800 rounded-md transition shadow-xs"
+                      >
+                        Receive →
+                      </button>
+                    ) : (
+                      <span className="text-emerald-700 font-semibold text-[11px]">✓ Verified</span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );

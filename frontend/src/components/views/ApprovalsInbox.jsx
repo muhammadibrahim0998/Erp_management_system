@@ -90,80 +90,107 @@ export default function ApprovalsInbox({ tasks, onApproveTask }) {
         </button>
       </div>
 
-      {/* Task List */}
-      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm divide-y divide-gray-100 overflow-hidden">
+      {/* Task Table View */}
+      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
         {filteredTasks.length === 0 ? (
           <div className="p-12 text-center text-gray-500 text-sm">
             No pending tasks found for this filter.
           </div>
         ) : (
-          filteredTasks.map((task) => (
-            <div
-              key={task.id}
-              className="p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:bg-gray-50/80 transition"
-            >
-              <div className="flex items-start gap-4">
-                <div className="w-9 h-9 rounded-xl bg-gray-100 border border-gray-200 flex items-center justify-center shrink-0 text-gray-700">
-                  <ArrowRight className="w-4 h-4" />
-                </div>
-                <div>
-                  <div className="flex items-center gap-2.5">
-                    <span className="font-mono font-bold text-xs text-gray-900">{task.doc_number}</span>
-                    <span className="text-xs text-gray-500">{task.doc_type}</span>
-                    {task.priority === 'high' && (
-                      <span className="text-[10px] font-bold text-rose-700 bg-rose-50 px-2 py-0.5 rounded-md border border-rose-200">
-                        High
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead>
+                <tr className="border-b border-gray-200 text-gray-400 font-semibold bg-gray-50/70">
+                  <th className="py-3.5 px-4">DOCUMENT #</th>
+                  <th className="py-3.5 px-4">TYPE</th>
+                  <th className="py-3.5 px-4">PARTY / DETAILS</th>
+                  <th className="py-3.5 px-4">ASSIGNED TO</th>
+                  <th className="py-3.5 px-4">WAITING</th>
+                  <th className="py-3.5 px-4">PRIORITY</th>
+                  <th className="py-3.5 px-4">STATUS</th>
+                  <th className="py-3.5 px-4 text-right">ACTION</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100 font-medium">
+                {filteredTasks.map((task) => (
+                  <tr key={task.id} className="hover:bg-gray-50/80 transition">
+                    <td className="py-3.5 px-4 font-mono font-bold text-gray-900">
+                      {task.doc_number}
+                    </td>
+                    <td className="py-3.5 px-4 text-gray-600">
+                      <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-gray-100 text-gray-700">
+                        {task.doc_type}
                       </span>
-                    )}
-                    {task.status !== 'pending' && (
-                      <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
-                        {task.status}
-                      </span>
-                    )}
-                  </div>
-                  <div className="text-xs font-semibold text-gray-800 mt-1">{task.title}</div>
-                  <div className="text-[11px] text-gray-400 mt-0.5 flex items-center gap-2">
-                    <span>Assigned to: {task.assigned_role || 'General Manager'}</span>
-                    <span>•</span>
-                    <span className="flex items-center gap-1">
-                      <Clock className="w-3 h-3" />
+                    </td>
+                    <td className="py-3.5 px-4">
+                      <div className="font-bold text-gray-900">{task.action_label}</div>
+                      <div className="text-[11px] text-gray-500 mt-0.5">{task.title}</div>
+                    </td>
+                    <td className="py-3.5 px-4 text-gray-600 font-medium">
+                      {task.assigned_role || 'General Manager'}
+                    </td>
+                    <td className="py-3.5 px-4 text-gray-400 font-mono text-[11px]">
                       {task.waiting_since}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2 shrink-0">
-                {task.status === 'pending' ? (
-                  <>
-                    <button
-                      onClick={() => handleAction(task, 'rejected')}
-                      className="px-3 py-1.5 text-xs font-semibold text-rose-700 hover:bg-rose-50 border border-rose-200 rounded-lg transition"
-                    >
-                      Reject
-                    </button>
-                    <button
-                      onClick={() => handleAction(task, 'returned')}
-                      className="px-3 py-1.5 text-xs font-semibold text-amber-700 hover:bg-amber-50 border border-amber-200 rounded-lg transition"
-                    >
-                      Return
-                    </button>
-                    <button
-                      onClick={() => handleAction(task, 'approved')}
-                      className="px-4 py-1.5 text-xs font-bold text-white bg-black hover:bg-zinc-800 rounded-lg transition shadow-sm flex items-center gap-1.5"
-                    >
-                      <Check className="w-3.5 h-3.5" />
-                      <span>{task.action_label}</span>
-                    </button>
-                  </>
-                ) : (
-                  <span className="text-xs font-semibold text-emerald-700 flex items-center gap-1">
-                    <CheckCircle className="w-4 h-4" /> Completed
-                  </span>
-                )}
-              </div>
-            </div>
-          ))
+                    </td>
+                    <td className="py-3.5 px-4">
+                      {task.priority === 'high' ? (
+                        <span className="text-[10px] font-bold text-rose-700 bg-rose-50 px-2 py-0.5 rounded-md border border-rose-200">
+                          High
+                        </span>
+                      ) : (
+                        <span className="text-[10px] font-medium text-gray-500 bg-gray-50 px-2 py-0.5 rounded-md border border-gray-200">
+                          Normal
+                        </span>
+                      )}
+                    </td>
+                    <td className="py-3.5 px-4">
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                        task.status === 'pending'
+                          ? 'bg-amber-50 text-amber-700 border-amber-200'
+                          : task.status === 'approved'
+                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                          : 'bg-rose-50 text-rose-700 border-rose-200'
+                      }`}>
+                        {task.status.toUpperCase()}
+                      </span>
+                    </td>
+                    <td className="py-3.5 px-4 text-right">
+                      {task.status === 'pending' ? (
+                        <div className="flex items-center justify-end gap-1.5">
+                          <button
+                            onClick={() => handleAction(task, 'rejected')}
+                            className="px-2 py-1 text-[11px] font-semibold text-rose-700 hover:bg-rose-50 border border-rose-200 rounded-md transition"
+                            title="Reject"
+                          >
+                            Reject
+                          </button>
+                          <button
+                            onClick={() => handleAction(task, 'returned')}
+                            className="px-2 py-1 text-[11px] font-semibold text-amber-700 hover:bg-amber-50 border border-amber-200 rounded-md transition"
+                            title="Return with note"
+                          >
+                            Return
+                          </button>
+                          <button
+                            onClick={() => handleAction(task, 'approved')}
+                            className="px-3 py-1 text-[11px] font-bold text-white bg-black hover:bg-zinc-800 rounded-md transition shadow-sm flex items-center gap-1"
+                            title="Approve"
+                          >
+                            <Check className="w-3 h-3" />
+                            <span>Approve</span>
+                          </button>
+                        </div>
+                      ) : (
+                        <span className="text-xs font-semibold text-emerald-700 inline-flex items-center gap-1">
+                          <CheckCircle className="w-3.5 h-3.5" /> Processed
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
     </div>

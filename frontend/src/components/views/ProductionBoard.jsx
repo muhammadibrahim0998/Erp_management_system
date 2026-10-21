@@ -12,6 +12,7 @@ import {
 
 export default function ProductionBoard({ productionOrders, onMoveOrder }) {
   const [selectedOrder, setSelectedOrder] = useState(null);
+  const [viewMode, setViewMode] = useState('both'); // 'board' | 'table' | 'both'
 
   const columns = [
     'With GM',
@@ -33,60 +34,166 @@ export default function ProductionBoard({ productionOrders, onMoveOrder }) {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-gray-100 text-gray-700">
-            Main Facility Active
-          </span>
+          <div className="bg-gray-100 p-1 rounded-xl flex items-center gap-1 text-xs">
+            <button
+              onClick={() => setViewMode('both')}
+              className={`px-3 py-1 rounded-lg font-bold transition ${viewMode === 'both' ? 'bg-white text-black shadow-xs' : 'text-gray-500 hover:text-black'}`}
+            >
+              All Views
+            </button>
+            <button
+              onClick={() => setViewMode('board')}
+              className={`px-3 py-1 rounded-lg font-bold transition ${viewMode === 'board' ? 'bg-white text-black shadow-xs' : 'text-gray-500 hover:text-black'}`}
+            >
+              Kanban Board
+            </button>
+            <button
+              onClick={() => setViewMode('table')}
+              className={`px-3 py-1 rounded-lg font-bold transition ${viewMode === 'table' ? 'bg-white text-black shadow-xs' : 'text-gray-500 hover:text-black'}`}
+            >
+              Data Table
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* Kanban Board (Page 11) */}
-      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-3.5">
-        {columns.map((col, idx) => {
-          const ordersInCol = (productionOrders || []).filter(o => o.stage === col);
-          return (
-            <div key={idx} className="bg-gray-50/80 rounded-2xl border border-gray-200 p-3 flex flex-col min-h-[500px]">
-              <div className="flex items-center justify-between pb-3 border-b border-gray-200 mb-3">
-                <span className="text-xs font-bold text-gray-800">{col}</span>
-                <span className="w-5 h-5 rounded-full bg-white border border-gray-200 text-gray-700 text-[10px] font-bold flex items-center justify-center shadow-xs">
-                  {ordersInCol.length}
-                </span>
-              </div>
+      {/* Kanban Board */}
+      {(viewMode === 'board' || viewMode === 'both') && (
+        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-3.5">
+          {columns.map((col, idx) => {
+            const ordersInCol = (productionOrders || []).filter(o => o.stage === col);
+            return (
+              <div key={idx} className="bg-gray-50/80 rounded-2xl border border-gray-200 p-3 flex flex-col min-h-[440px]">
+                <div className="flex items-center justify-between pb-3 border-b border-gray-200 mb-3">
+                  <span className="text-xs font-bold text-gray-800">{col}</span>
+                  <span className="w-5 h-5 rounded-full bg-white border border-gray-200 text-gray-700 text-[10px] font-bold flex items-center justify-center shadow-xs">
+                    {ordersInCol.length}
+                  </span>
+                </div>
 
-              <div className="space-y-2.5 flex-1 overflow-y-auto">
-                {ordersInCol.map((wo) => (
-                  <div
-                    key={wo.id}
-                    onClick={() => setSelectedOrder(wo)}
-                    className="p-3 bg-white rounded-xl border border-gray-200 hover:border-black hover:shadow-md transition cursor-pointer flex flex-col justify-between"
-                  >
-                    <div>
-                      <div className="flex items-center justify-between">
-                        <span className="font-mono font-bold text-[11px] text-gray-900">{wo.wo_number}</span>
-                        {wo.priority === 'high' && (
-                          <span className="text-[9px] font-bold text-rose-700 bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200">
-                            High
-                          </span>
-                        )}
+                <div className="space-y-2.5 flex-1 overflow-y-auto">
+                  {ordersInCol.map((wo) => (
+                    <div
+                      key={wo.id}
+                      onClick={() => setSelectedOrder(wo)}
+                      className="p-3 bg-white rounded-xl border border-gray-200 hover:border-black hover:shadow-md transition cursor-pointer flex flex-col justify-between"
+                    >
+                      <div>
+                        <div className="flex items-center justify-between">
+                          <span className="font-mono font-bold text-[11px] text-gray-900">{wo.wo_number}</span>
+                          {wo.priority === 'high' && (
+                            <span className="text-[9px] font-bold text-rose-700 bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200">
+                              High
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-xs font-bold text-gray-800 mt-1">{wo.customer}</div>
+                        <div className="text-[11px] text-gray-500 mt-0.5">
+                          {wo.quantity_kg} kg {wo.product_name}
+                        </div>
+                        <div className="text-[10px] text-gray-400 font-mono mt-2">
+                          {wo.eggs_to_break.toLocaleString()} input units · {wo.trays_count} cartons/packs
+                        </div>
                       </div>
-                      <div className="text-xs font-bold text-gray-800 mt-1">{wo.customer}</div>
-                      <div className="text-[11px] text-gray-500 mt-0.5">
-                        {wo.quantity_kg} kg {wo.product_name}
-                      </div>
-                      <div className="text-[10px] text-gray-400 font-mono mt-2">
-                        {wo.eggs_to_break.toLocaleString()} input units · {wo.trays_count} cartons/packs
+                      <div className="mt-3 pt-2 border-t border-gray-100 flex items-center justify-between text-[10px] text-gray-400">
+                        <span>Due {wo.due_date}</span>
+                        <ChevronRight className="w-3.5 h-3.5 text-gray-400" />
                       </div>
                     </div>
-                    <div className="mt-3 pt-2 border-t border-gray-100 flex items-center justify-between text-[10px] text-gray-400">
-                      <span>Due {wo.due_date}</span>
-                      <ChevronRight className="w-3.5 h-3.5 text-gray-400" />
-                    </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Production Orders Data Table */}
+      {(viewMode === 'table' || viewMode === 'both') && (
+        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+          <div className="p-4 border-b border-gray-100 flex items-center justify-between">
+            <h3 className="text-xs font-bold text-gray-900 uppercase tracking-wider">
+              Production Work Orders Table
+            </h3>
+            <span className="text-xs text-gray-500 font-medium">
+              {productionOrders?.length || 0} active work orders
+            </span>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead>
+                <tr className="border-b border-gray-200 text-gray-400 font-semibold bg-gray-50/70">
+                  <th className="py-3.5 px-4">WORK ORDER #</th>
+                  <th className="py-3.5 px-4">CUSTOMER</th>
+                  <th className="py-3.5 px-4">PRODUCT SPECIFICATION</th>
+                  <th className="py-3.5 px-4">OUTPUT QTY</th>
+                  <th className="py-3.5 px-4">INPUT UNITS</th>
+                  <th className="py-3.5 px-4">DUE DATE</th>
+                  <th className="py-3.5 px-4">CURRENT STAGE</th>
+                  <th className="py-3.5 px-4 text-right">ACTION</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100 font-medium">
+                {(productionOrders || []).map((wo) => {
+                  const currentIdx = columns.indexOf(wo.stage);
+                  const nextStage = currentIdx < columns.length - 1 ? columns[currentIdx + 1] : null;
+                  return (
+                    <tr key={wo.id} className="hover:bg-gray-50/80 transition">
+                      <td className="py-3.5 px-4 font-mono font-bold text-gray-900">
+                        {wo.wo_number}
+                      </td>
+                      <td className="py-3.5 px-4 font-bold text-gray-800">
+                        {wo.customer}
+                      </td>
+                      <td className="py-3.5 px-4 text-gray-600">
+                        {wo.product_name}
+                      </td>
+                      <td className="py-3.5 px-4 font-bold text-emerald-700 font-mono">
+                        {wo.quantity_kg} kg
+                      </td>
+                      <td className="py-3.5 px-4 text-gray-500 font-mono text-[11px]">
+                        {Number(wo.eggs_to_break).toLocaleString()} units ({wo.trays_count} cartons)
+                      </td>
+                      <td className="py-3.5 px-4 text-gray-500">
+                        {wo.due_date}
+                      </td>
+                      <td className="py-3.5 px-4">
+                        <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold border ${
+                          wo.stage === 'Completed'
+                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                            : wo.stage === 'In production'
+                            ? 'bg-blue-50 text-blue-700 border-blue-200'
+                            : 'bg-amber-50 text-amber-700 border-amber-200'
+                        }`}>
+                          {wo.stage}
+                        </span>
+                      </td>
+                      <td className="py-3.5 px-4 text-right">
+                        <div className="flex items-center justify-end gap-1.5">
+                          <button
+                            onClick={() => setSelectedOrder(wo)}
+                            className="px-2.5 py-1 text-[11px] font-semibold text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md transition"
+                          >
+                            Recipe
+                          </button>
+                          {nextStage && (
+                            <button
+                              onClick={() => onMoveOrder && onMoveOrder(wo.id, nextStage)}
+                              className="px-2.5 py-1 text-[11px] font-bold text-white bg-black hover:bg-zinc-800 rounded-md transition shadow-xs"
+                            >
+                              Advance →
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* Production Order Detail & Recipe Calculation Modal (Page 12) */}
       {selectedOrder && (

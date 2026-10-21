@@ -113,22 +113,122 @@ export default function FinanceView({ financeData, onNavigate }) {
               <span className="font-bold text-gray-800">0.0M</span>
             </div>
           </div>
+        </div>
+      </div>
 
-          <div>
-            <h4 className="text-xs font-bold text-gray-800 mb-2">Top Creditors</h4>
-            <div className="space-y-2 text-xs font-medium">
-              {[
-                { supplier: 'Frontier Raw Materials & Supplies', amount: '11,119,140' },
-                { supplier: 'Swabi Manufacturing & Logistics', amount: '2,646,840' },
-                { supplier: 'Haripur Production Partners', amount: '2,646,330' },
-                { supplier: 'Khyber Cold Chain Logistics', amount: '2,062,160' },
-                { supplier: 'Charsadda Supply Partners', amount: '1,940,905' }
-              ].map((c, i) => (
-                <div key={i} className="flex justify-between items-center py-1 border-b border-gray-50">
-                  <span className="text-gray-700">{c.supplier}</span>
-                  <span className="font-mono font-bold text-gray-900">PKR {c.amount}</span>
-                </div>
-              ))}
+      {/* Accounts & Finance Comprehensive Data Tables */}
+      <div className="space-y-6">
+        {/* Bank Accounts Table */}
+        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+          <div className="p-4 border-b border-gray-100 flex items-center justify-between">
+            <h3 className="text-xs font-bold text-gray-900 uppercase tracking-wider">
+              Bank Accounts & Cash Holdings Table
+            </h3>
+            <span className="text-xs text-gray-500 font-medium">Verified by Hamza Khan (Accounts)</span>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead>
+                <tr className="border-b border-gray-200 text-gray-400 font-semibold bg-gray-50/70">
+                  <th className="py-3 px-4">ACCOUNT NAME</th>
+                  <th className="py-3 px-4">BANK / INSTITUTION</th>
+                  <th className="py-3 px-4">ACCOUNT #</th>
+                  <th className="py-3 px-4">TYPE</th>
+                  <th className="py-3 px-4 text-right">BALANCE (PKR)</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100 font-medium">
+                {cashAccounts.map((acc, idx) => (
+                  <tr key={idx} className="hover:bg-gray-50/80 transition">
+                    <td className="py-3 px-4 font-bold text-gray-900">{acc.name}</td>
+                    <td className="py-3 px-4 text-gray-700">{acc.account}</td>
+                    <td className="py-3 px-4 font-mono text-gray-500">{acc.name.includes('••') ? acc.name.split('••')[1] : 'Safe-01'}</td>
+                    <td className="py-3 px-4">
+                      <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-gray-100 text-gray-700">
+                        {acc.account === 'Cash' ? 'Cash Safe' : 'Commercial Bank'}
+                      </span>
+                    </td>
+                    <td className="py-3 px-4 text-right font-mono font-bold text-gray-900">
+                      PKR {acc.balance}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Debtors vs Creditors Split Tables */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Debtors Table */}
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+            <div className="p-4 border-b border-gray-100 flex items-center justify-between">
+              <h3 className="text-xs font-bold text-gray-900 uppercase tracking-wider">
+                Debtors & Customer Receivables Table
+              </h3>
+              <span className="text-xs text-rose-600 font-bold font-mono">Total PKR 45.6M</span>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="border-b border-gray-200 text-gray-400 font-semibold bg-gray-50/70">
+                    <th className="py-3 px-4">CUSTOMER NAME</th>
+                    <th className="py-3 px-4">CATEGORY</th>
+                    <th className="py-3 px-4 text-right">OUTSTANDING (PKR)</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100 font-medium">
+                  {[
+                    { customer: 'Karachi General Wholesalers', category: 'Distributor', amount: '12,386,999' },
+                    { customer: 'Peek Freans Food Industries', category: 'B2B Client', amount: '7,093,583' },
+                    { customer: 'Barkat Frisian (Value Added)', category: 'Industrial', amount: '5,486,933' },
+                    { customer: 'Dawn Foods Karachi', category: 'Bakery Chain', amount: '3,942,893' },
+                    { customer: 'Swat Valley Trading Co.', category: 'Dealer', amount: '3,877,654' }
+                  ].map((d, i) => (
+                    <tr key={i} className="hover:bg-gray-50/80 transition">
+                      <td className="py-3 px-4 font-bold text-gray-800">{d.customer}</td>
+                      <td className="py-3 px-4 text-gray-500">{d.category}</td>
+                      <td className="py-3 px-4 text-right font-mono font-bold text-gray-900">{d.amount}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Creditors Table */}
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+            <div className="p-4 border-b border-gray-100 flex items-center justify-between">
+              <h3 className="text-xs font-bold text-gray-900 uppercase tracking-wider">
+                Creditors & Supplier Payables Table
+              </h3>
+              <span className="text-xs text-gray-600 font-bold font-mono">Total PKR 27.1M</span>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="border-b border-gray-200 text-gray-400 font-semibold bg-gray-50/70">
+                    <th className="py-3 px-4">SUPPLIER NAME</th>
+                    <th className="py-3 px-4">SUPPLY TYPE</th>
+                    <th className="py-3 px-4 text-right">PAYABLE (PKR)</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100 font-medium">
+                  {[
+                    { supplier: 'Frontier Raw Materials & Supplies', category: 'Feed & Raw', amount: '11,119,140' },
+                    { supplier: 'Swabi Manufacturing & Logistics', category: 'Layer Farm', amount: '2,646,840' },
+                    { supplier: 'Haripur Production Partners', category: 'Egg Farm', amount: '2,646,330' },
+                    { supplier: 'Khyber Cold Chain Logistics', category: 'Cold Transport', amount: '2,062,160' },
+                    { supplier: 'Charsadda Supply Partners', category: 'Egg Farm', amount: '1,940,905' }
+                  ].map((c, i) => (
+                    <tr key={i} className="hover:bg-gray-50/80 transition">
+                      <td className="py-3 px-4 font-bold text-gray-800">{c.supplier}</td>
+                      <td className="py-3 px-4 text-gray-500">{c.category}</td>
+                      <td className="py-3 px-4 text-right font-mono font-bold text-gray-900">{c.amount}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
         </div>

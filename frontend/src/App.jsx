@@ -37,6 +37,7 @@ import ProductionBoard from './components/views/ProductionBoard';
 import InventoryView from './components/views/InventoryView';
 import SalesCreditView from './components/views/SalesCreditView';
 import MarketingView from './components/views/MarketingView';
+import HrAdminView from './components/views/HrAdminView';
 import PayrollView from './components/views/PayrollView';
 import FinanceView from './components/views/FinanceView';
 import ReportsView from './components/views/ReportsView';
@@ -211,6 +212,20 @@ export default function App() {
       });
       showNotification(`Payroll generated for ${month} in MySQL`);
       fetchAllData();
+    } catch (e) { }
+  };
+
+  const handleAddUser = async (userData) => {
+    try {
+      const res = await fetch('http://localhost:7000/api/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(userData)
+      });
+      if (res.ok) {
+        showNotification('New staff member added successfully in MySQL');
+        fetchAllData();
+      }
     } catch (e) { }
   };
 
@@ -524,9 +539,9 @@ export default function App() {
             )}
 
             {activeTab === 'hr' && (
-              <ApprovalsInbox
-                tasks={tasks.filter(t => t.doc_type.includes('Production') || t.assigned_role?.includes('HR'))}
-                onApproveTask={handleApproveTask}
+              <HrAdminView
+                users={users}
+                onAddUser={handleAddUser}
               />
             )}
 

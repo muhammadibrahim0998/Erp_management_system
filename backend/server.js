@@ -33,6 +33,19 @@ app.get('/api/users', async (req, res) => {
   }
 });
 
+app.post('/api/users', async (req, res) => {
+  const { name, role, department, email, avatar } = req.body;
+  try {
+    const [result] = await db.query(
+      'INSERT INTO users (name, role, department, email, avatar, status) VALUES (?, ?, ?, ?, ?, "active")',
+      [name, role, department || 'Operations', email, avatar || 'EM']
+    );
+    res.json({ success: true, id: result.insertId });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // 2. Chairman's Dashboard API (Dynamic from Database)
 app.get('/api/dashboard/chairman', async (req, res) => {
   try {

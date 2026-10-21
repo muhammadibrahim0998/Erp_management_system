@@ -216,6 +216,105 @@ export default function SalesCreditView({ salesOrder, onApproveOrder }) {
           </div>
         </div>
       </div>
+
+      {/* Sales Orders & Customer Credit Table */}
+      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+        <div className="p-4 border-b border-gray-100 flex items-center justify-between">
+          <h3 className="text-xs font-bold text-gray-900 uppercase tracking-wider">
+            All Sales Orders & Credit Exposure Table
+          </h3>
+          <span className="text-xs text-gray-500 font-medium">Auto credit limit verification</span>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs">
+            <thead>
+              <tr className="border-b border-gray-200 text-gray-400 font-semibold bg-gray-50/70">
+                <th className="py-3.5 px-4">ORDER NUMBER</th>
+                <th className="py-3.5 px-4">ORDER DATE</th>
+                <th className="py-3.5 px-4">CUSTOMER NAME</th>
+                <th className="py-3.5 px-4 text-right">ORDER AMOUNT</th>
+                <th className="py-3.5 px-4 text-right">CREDIT LIMIT</th>
+                <th className="py-3.5 px-4 text-right">CURRENT EXPOSURE</th>
+                <th className="py-3.5 px-4">CREDIT STATUS</th>
+                <th className="py-3.5 px-4 text-right">ACTION</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100 font-medium">
+              {[
+                {
+                  so_number: salesOrder?.so_number || 'SO-2026-0418',
+                  order_date: '28 Sep 2026',
+                  customer: 'Swat Valley Trading Co.',
+                  amount: '1,583,850',
+                  credit_limit: '4,500,000',
+                  exposure: '5,461,504',
+                  breach: '961,504',
+                  status: isApproved ? 'Approved by CEO' : 'Pending Approval',
+                  canApprove: !isApproved
+                },
+                {
+                  so_number: 'SO-2026-0417',
+                  order_date: '25 Sep 2026',
+                  customer: 'Peek Freans Food Industries',
+                  amount: '4,250,000',
+                  credit_limit: '15,000,000',
+                  exposure: '7,093,583',
+                  breach: '0',
+                  status: 'Approved',
+                  canApprove: false
+                },
+                {
+                  so_number: 'SO-2026-0416',
+                  order_date: '22 Sep 2026',
+                  customer: 'Dawn Foods Karachi',
+                  amount: '2,100,000',
+                  credit_limit: '8,000,000',
+                  exposure: '3,942,893',
+                  breach: '0',
+                  status: 'Approved',
+                  canApprove: false
+                }
+              ].map((order, idx) => (
+                <tr key={idx} className="hover:bg-gray-50/80 transition">
+                  <td className="py-3.5 px-4 font-mono font-bold text-gray-900">{order.so_number}</td>
+                  <td className="py-3.5 px-4 text-gray-500">{order.order_date}</td>
+                  <td className="py-3.5 px-4 font-bold text-gray-800">{order.customer}</td>
+                  <td className="py-3.5 px-4 text-right font-bold text-gray-900 font-mono">
+                    PKR {order.amount}
+                  </td>
+                  <td className="py-3.5 px-4 text-right text-gray-500 font-mono">
+                    PKR {order.credit_limit}
+                  </td>
+                  <td className="py-3.5 px-4 text-right font-mono font-bold text-rose-600">
+                    PKR {order.exposure}
+                  </td>
+                  <td className="py-3.5 px-4">
+                    <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold border ${
+                      order.status.includes('Approved')
+                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                        : 'bg-amber-50 text-amber-700 border-amber-200'
+                    }`}>
+                      {order.status}
+                    </span>
+                  </td>
+                  <td className="py-3.5 px-4 text-right">
+                    {order.canApprove ? (
+                      <button
+                        onClick={handleApprove}
+                        className="px-2.5 py-1 text-[11px] font-bold text-white bg-black hover:bg-zinc-800 rounded-md transition shadow-xs"
+                      >
+                        Approve →
+                      </button>
+                    ) : (
+                      <span className="text-emerald-700 font-semibold text-[11px]">✓ Cleared</span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
   );
 }

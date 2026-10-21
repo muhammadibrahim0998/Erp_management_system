@@ -144,6 +144,62 @@ export default function MarketingView({ campaigns }) {
           </div>
         </div>
       </div>
+
+      {/* Campaigns Data Table */}
+      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+        <div className="p-4 border-b border-gray-100 flex items-center justify-between">
+          <h3 className="text-xs font-bold text-gray-900 uppercase tracking-wider">
+            All Marketing Campaigns & Performance Table
+          </h3>
+          <span className="text-xs text-gray-500 font-medium">{campaigns?.length || 3} campaigns</span>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs">
+            <thead>
+              <tr className="border-b border-gray-200 text-gray-400 font-semibold bg-gray-50/70">
+                <th className="py-3.5 px-4">CAMPAIGN CODE</th>
+                <th className="py-3.5 px-4">CAMPAIGN TITLE</th>
+                <th className="py-3.5 px-4">ACTIVE DATES</th>
+                <th className="py-3.5 px-4 text-right">BUDGET (PKR)</th>
+                <th className="py-3.5 px-4 text-right">SPENT</th>
+                <th className="py-3.5 px-4 text-center">REACH</th>
+                <th className="py-3.5 px-4 text-center">LEADS</th>
+                <th className="py-3.5 px-4 text-right">STATUS</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100 font-medium">
+              {(campaigns || [
+                { code: 'MKB-2026-0002', title: 'Always-on social — premium quality since 1960', dates: '16 Jul 2026 – 14 Oct 2026', budget: '1,781,000', spent: '1,319,000', reach: '873k', leads: 498, status: 'Live' },
+                { code: 'MKB-2026-0004', title: 'Winter demand push — dealers & retail', dates: '29 Oct 2026 – 17 Jan 2027', budget: '2,100,000', spent: '0', reach: '500k', leads: 0, status: 'In Approval' },
+                { code: 'MKB-2026-0003', title: 'New product line launch — retail & wholesale', dates: '11 Oct 2026 – 9 Jan 2027', budget: '4,300,000', spent: '0', reach: '1.2M', leads: 0, status: 'In Approval' }
+              ]).map((c, idx) => (
+                <tr key={idx} className="hover:bg-gray-50/80 transition">
+                  <td className="py-3.5 px-4 font-mono font-bold text-gray-900">{c.code}</td>
+                  <td className="py-3.5 px-4 font-bold text-gray-800">{c.title}</td>
+                  <td className="py-3.5 px-4 text-gray-500">{c.dates}</td>
+                  <td className="py-3.5 px-4 text-right font-mono font-bold text-gray-900">
+                    {Number(c.budget).toLocaleString()}
+                  </td>
+                  <td className="py-3.5 px-4 text-right font-mono text-gray-600">
+                    {Number(c.spent).toLocaleString()}
+                  </td>
+                  <td className="py-3.5 px-4 text-center font-bold text-blue-600">{c.reach || 'N/A'}</td>
+                  <td className="py-3.5 px-4 text-center font-bold text-emerald-600">{c.leads || 0}</td>
+                  <td className="py-3.5 px-4 text-right">
+                    <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold border ${
+                      c.status === 'Live'
+                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                        : 'bg-amber-50 text-amber-700 border-amber-200'
+                    }`}>
+                      {c.status}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
   );
 }

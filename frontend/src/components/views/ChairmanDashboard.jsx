@@ -394,6 +394,88 @@ export default function ChairmanDashboard({ data, currentUser, onNavigate, onApp
           </div>
         </div>
       </div>
+
+      {/* Executive Quick Documents & Approvals Table */}
+      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+        <div className="p-4 border-b border-gray-100 flex items-center justify-between">
+          <div>
+            <h3 className="text-xs font-bold text-gray-900 uppercase tracking-wider">
+              Executive Documents & Workflow Queue Table
+            </h3>
+            <p className="text-[11px] text-gray-400">Live operational documents awaiting executive review</p>
+          </div>
+          <button
+            onClick={() => onNavigate('approvals')}
+            className="text-xs font-bold text-[#086634] hover:underline"
+          >
+            View Full Approvals Inbox →
+          </button>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs">
+            <thead>
+              <tr className="border-b border-gray-200 text-gray-400 font-semibold bg-gray-50/70">
+                <th className="py-3.5 px-4">DOCUMENT #</th>
+                <th className="py-3.5 px-4">DOCUMENT TYPE</th>
+                <th className="py-3.5 px-4">PARTY / SUMMARY</th>
+                <th className="py-3.5 px-4">WAITING TIME</th>
+                <th className="py-3.5 px-4">PRIORITY</th>
+                <th className="py-3.5 px-4">STATUS</th>
+                <th className="py-3.5 px-4 text-right">ACTION</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100 font-medium">
+              {tasks.length === 0 ? (
+                <tr>
+                  <td colSpan="7" className="py-8 text-center text-gray-400">
+                    All caught up! No pending documents requiring action.
+                  </td>
+                </tr>
+              ) : (
+                tasks.slice(0, 6).map((t) => (
+                  <tr key={t.id} className="hover:bg-gray-50/80 transition">
+                    <td className="py-3.5 px-4 font-mono font-bold text-gray-900">{t.doc_number}</td>
+                    <td className="py-3.5 px-4 text-gray-600">
+                      <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-gray-100 text-gray-700">
+                        {t.doc_type}
+                      </span>
+                    </td>
+                    <td className="py-3.5 px-4 font-semibold text-gray-800">
+                      <div>{t.action_label}</div>
+                      <div className="text-[11px] text-gray-400 font-normal">{t.party}</div>
+                    </td>
+                    <td className="py-3.5 px-4 text-gray-500 font-mono text-[11px]">{t.waiting_since}</td>
+                    <td className="py-3.5 px-4">
+                      {t.priority === 'high' ? (
+                        <span className="text-[10px] font-bold text-rose-700 bg-rose-50 px-2 py-0.5 rounded-md border border-rose-200">
+                          High
+                        </span>
+                      ) : (
+                        <span className="text-[10px] font-medium text-gray-500 bg-gray-50 px-2 py-0.5 rounded-md border border-gray-200">
+                          Normal
+                        </span>
+                      )}
+                    </td>
+                    <td className="py-3.5 px-4">
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                        PENDING
+                      </span>
+                    </td>
+                    <td className="py-3.5 px-4 text-right">
+                      <button
+                        onClick={() => onApproveTask && onApproveTask(t.id)}
+                        className="px-2.5 py-1 text-[11px] font-bold text-white bg-[#0d4a2b] hover:bg-[#086634] rounded-md transition shadow-xs"
+                      >
+                        Quick Approve
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
   );
 }
