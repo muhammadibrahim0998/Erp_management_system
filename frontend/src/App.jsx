@@ -297,9 +297,8 @@ export default function App() {
       <header className="h-16 border-b border-[#086634] px-0 flex items-center justify-between bg-gradient-to-r from-[#0a7a40] via-[#0c8748] to-[#0a7a40] shadow-[0_4px_16px_rgba(0,0,0,0.25)] z-20 shrink-0">
         {/* Left: 3D Brand Logo Div on Left, 3D Toggle Button on Right */}
         <div
-          className={`h-full flex items-center justify-between transition-all duration-300 ease-in-out shrink-0 px-3 ${
-            isSidebarOpen ? 'w-56 border-r border-[#086634] shadow-[1px_0_0_rgba(255,255,255,0.08)]' : 'w-auto gap-4'
-          }`}
+          className={`h-full flex items-center justify-between transition-all duration-300 ease-in-out shrink-0 px-3 ${isSidebarOpen ? 'w-56 border-r border-[#086634] shadow-[1px_0_0_rgba(255,255,255,0.08)]' : 'w-auto gap-4'
+            }`}
         >
           {/* Brand Header / Logo in 3D Div with Yellow Hover & Glow */}
           <div className="flex items-center gap-2 min-w-0 px-2 py-1 rounded-xl bg-gradient-to-b from-[#0d4f2b] to-[#07361c] border-t border-emerald-300/40 border-x border-[#094223] border-b-[2.5px] border-b-[#032412] shadow-[0_3px_6px_rgba(0,0,0,0.35)] hover:border-amber-400/80 hover:shadow-[0_4px_16px_rgba(245,158,11,0.4)] hover:-translate-y-0.5 transition-all duration-200 group cursor-pointer">
@@ -400,8 +399,10 @@ export default function App() {
         {/* Vibrant Green Sidebar matching image (#0c8547) */}
         <aside
           className={`${
-            isSidebarOpen ? 'w-56 border-r border-[#086634]' : 'w-0 border-r-0'
-          } bg-gradient-to-b from-[#0c8748] via-[#0b8445] to-[#09783c] flex flex-col justify-between shrink-0 transition-all duration-300 ease-in-out overflow-hidden`}
+            isSidebarOpen
+              ? 'w-56 border-r-2 border-r-[#032612] shadow-[6px_0_18px_-2px_rgba(0,0,0,0.35),14px_0_32px_-4px_rgba(0,0,0,0.28),2px_0_5px_rgba(0,0,0,0.2)]'
+              : 'w-0 border-r-0 shadow-none pointer-events-none'
+          } overflow-hidden relative z-20 bg-gradient-to-b from-[#0c8748] via-[#0b8445] to-[#09783c] flex flex-col justify-between shrink-0 transition-all duration-300 ease-in-out`}
         >
           {/* Scrollable Navigation with Enhanced Spacing and Green 3D Shadow */}
           <div
@@ -420,26 +421,23 @@ export default function App() {
                     <button
                       key={item.id}
                       onClick={() => setActiveTab(item.id)}
-                      className={`w-full group relative flex items-center justify-between px-2.5 py-2 rounded-xl text-[13px] font-black transition-all duration-200 transform cursor-pointer ${
-                        isActive
+                      className={`w-full group relative flex items-center justify-between px-2.5 py-2 rounded-xl text-[13px] font-black transition-all duration-200 transform cursor-pointer ${isActive
                           ? 'bg-gradient-to-b from-[#fbbf24] via-[#f59e0b] to-[#d97706] text-emerald-950 border-t border-t-amber-100 border-x border-x-amber-400 border-b-[3.5px] border-b-[#78350f] shadow-[0_4px_0_0_#78350f,0_8px_18px_rgba(245,158,11,0.55),inset_0_1px_2px_rgba(255,255,255,0.7)] translate-y-[-0.5px]'
                           : 'bg-gradient-to-b from-[#0f4d2b] via-[#0a3f23] to-[#07321c] text-white border-t border-t-emerald-300/40 border-x border-[#094124] border-b-[3.5px] border-b-[#032613] shadow-[0_4px_0_0_#021d0f,0_6px_14px_rgba(4,45,23,0.55)] hover:-translate-y-1 hover:scale-[1.02] hover:from-[#135a34] hover:to-[#0a3c21] hover:text-amber-300 hover:border-t-amber-300 hover:border-x-amber-400/40 hover:shadow-[0_5px_0_0_#021d0f,0_10px_22px_rgba(245,158,11,0.35)] active:translate-y-[1px] active:border-b-[1.5px] active:shadow-none'
-                      }`}
+                        }`}
                     >
                       <div className="flex items-center gap-2 min-w-0">
                         <div
-                          className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 transition-all duration-200 ${
-                            isActive
+                          className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 transition-all duration-200 ${isActive
                               ? 'bg-[#062e16] border border-emerald-900 text-amber-300 shadow-[inset_0_1.5px_3px_rgba(0,0,0,0.6)] scale-105'
                               : 'bg-[#062413] border border-emerald-400/40 shadow-[inset_0_1.5px_3px_rgba(0,0,0,0.5)] text-emerald-200 group-hover:border-amber-400 group-hover:text-amber-300 group-hover:bg-[#09351d] group-hover:shadow-[0_0_10px_rgba(245,158,11,0.6)] group-hover:scale-105'
-                          }`}
+                            }`}
                         >
                           <Icon className="w-3.5 h-3.5 transition-transform duration-200 group-hover:rotate-6" />
                         </div>
                         <span
-                          className={`tracking-tight truncate transition-colors duration-200 ${
-                            isActive ? 'text-emerald-950 font-black drop-shadow-xs' : 'group-hover:text-amber-300'
-                          }`}
+                          className={`tracking-tight truncate transition-colors duration-200 ${isActive ? 'text-emerald-950 font-black drop-shadow-xs' : 'group-hover:text-amber-300'
+                            }`}
                         >
                           {item.label}
                         </span>
@@ -473,8 +471,8 @@ export default function App() {
         </aside>
 
         {/* Gray Dashboard Background with Full White Content Views */}
-        <main className="flex-1 bg-gray-100 overflow-y-auto p-8">
-          <div className="max-w-7xl mx-auto">
+        <main className="flex-1 bg-gray-100 overflow-y-auto overflow-x-hidden p-8">
+          <div key={activeTab} className="max-w-7xl mx-auto animate-page-slide-left">
             {activeTab === 'dashboard' && (
               <ChairmanDashboard
                 data={chairmanData}

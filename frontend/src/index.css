@@ -27,3 +27,20 @@
   -ms-overflow-style: none !important;
   scrollbar-width: none !important;
 }
+
+/* Smooth Slow Motion Slide from Left */
+@keyframes pageSlideFromLeft {
+  0% {
+    opacity: 0;
+    transform: translateX(-60px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.animate-page-slide-left {
+  animation: pageSlideFromLeft 0.52s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  will-change: opacity, transform;
+}
