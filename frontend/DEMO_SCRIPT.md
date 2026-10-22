@@ -181,7 +181,7 @@ The following accounts are pre-seeded in the database (demo accounts use the see
   - Detail modal displays formula box clearly labeled with badge: `"Example calculation (fixed recipe, not from live records)"`.
 - **Action & Verification Checks**:
   1. Click any work order card to open the Detail & Recipe Calculation modal.
-  2. Verify stage advancement enforcement: non-adjacent stage buttons are disabled with tooltip `"Can only advance one stage at a time"` (e.g., cannot skip from "With GM" directly to "Completed").
+  2. Verify stage movement enforcement: allows advancing strictly one stage forward, or returning one stage for rework; non-adjacent stage buttons are disabled with tooltip `"Can only move one stage forward, or return one stage for rework"`.
   3. Click the next sequential stage button: verify button is disabled and shows a spinner while the request processes, with inline error banner (`moveError`) keeping modal open if the backend rejects.
 - **Backend Verification**:
   - `GET /api/production/board` — **VERIFIED** (HTTP 200, reads `production_orders`).
@@ -216,7 +216,7 @@ The following accounts are pre-seeded in the database (demo accounts use the see
 | **Gate Security** | `GET /api/gate`, `POST /api/gate` | **VERIFIED** | Inward pass creation live; outward pass queue NOT VERIFIED. |
 | **QC & Goods Receipt** | None (`/api/qc`) | **NOT VERIFIED** | Demo data screen marked with `<DemoBadge />`. |
 | **Inventory** | `GET /api/inventory`, `POST /api/inventory/adjust`, `POST /api/inventory/transfer` | **VERIFIED** | Multi-warehouse balances, ACID stock transfer, client validation & inline error banners, movement ledger. |
-| **Production Board** | `GET /api/production/board`, `POST /api/production/move` | **VERIFIED** | Live Kanban moves across stages. Client enforces sequential stage advancement. Recipe labeled as example. |
+| **Production Board** | `GET /api/production/board`, `POST /api/production/move` | **VERIFIED** | Live Kanban moves across stages. Client enforces forward advance and one-step rework return. Recipe labeled as example. |
 | **POS & Retail** | `POST /api/pos/checkout`, `GET /api/pos/orders` | **VERIFIED** | Real checkout & stock deduction. Customer list NOT VERIFIED (demo). |
 | **Sales & Credit** | `GET /api/sales/orders`, `POST /api/sales/approve` | **BLOCKED** | Orders list verified. POST /api/sales/approve returns 401 until authenticateToken is wired on operations routes (see BACKEND_REQUESTS.md item 1). |
 | **Finance** | `GET /api/finance/overview` | **VERIFIED** | Live finance summary. |
