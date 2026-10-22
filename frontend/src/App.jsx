@@ -152,6 +152,7 @@ export default function App() {
       fetchAllData();
     } catch (e) {
       showNotification(e.message || 'Error processing task', 'error');
+      throw e;
     }
   };
 
@@ -162,6 +163,7 @@ export default function App() {
       fetchAllData();
     } catch (e) {
       showNotification(e.message || 'Error issuing gate pass', 'error');
+      throw e;
     }
   };
 
@@ -172,6 +174,7 @@ export default function App() {
       fetchAllData();
     } catch (e) {
       showNotification(e.message || 'Error creating PO', 'error');
+      throw e;
     }
   };
 
@@ -435,6 +438,8 @@ export default function App() {
               <ApprovalsInbox
                 tasks={tasks}
                 onApproveTask={handleApproveTask}
+                isLoading={isLoading}
+                onRefetch={fetchAllData}
               />
             )}
 
@@ -446,6 +451,8 @@ export default function App() {
               <ProcurementView
                 purchaseOrders={purchaseOrders}
                 onAddPo={handleAddPo}
+                isLoading={isLoading}
+                onRefetch={fetchAllData}
               />
             )}
 
@@ -453,6 +460,8 @@ export default function App() {
               <GateSecurity
                 gatePasses={gatePasses}
                 onAddGatePass={handleAddGatePass}
+                isLoading={isLoading}
+                onRefetch={fetchAllData}
               />
             )}
 
@@ -504,8 +513,10 @@ export default function App() {
 
             {activeTab === 'hr' && (
               <ApprovalsInbox
-                tasks={tasks.filter(t => t.doc_type.includes('Production') || t.assigned_role?.includes('HR'))}
+                tasks={tasks.filter(t => t.doc_type?.includes('Production') || t.assigned_role?.includes('HR'))}
                 onApproveTask={handleApproveTask}
+                isLoading={isLoading}
+                onRefetch={fetchAllData}
               />
             )}
 

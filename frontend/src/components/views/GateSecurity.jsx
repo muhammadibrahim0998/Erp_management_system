@@ -1,23 +1,51 @@
 import React, { useState } from 'react';
-import { Truck, Plus, CheckCircle2, Clock, ShieldCheck, ArrowDownLeft, ArrowUpRight } from 'lucide-react';
+import { Truck, Plus, CheckCircle2, Clock, ShieldCheck, ArrowDownLeft, ArrowUpRight, Loader2, AlertCircle } from 'lucide-react';
 
-export default function GateSecurity({ gatePasses, onAddGatePass }) {
+export default function GateSecurity({ gatePasses, onAddGatePass, isLoading, onRefetch }) {
   const [activeTab, setActiveTab] = useState('on_site');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formError, setFormError] = useState('');
+
+  // Form Fields
   const [vehicleNo, setVehicleNo] = useState('');
   const [supplier, setSupplier] = useState('');
+  const [passType, setPassType] = useState('inward');
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!vehicleNo || !supplier) return;
-    await onAddGatePass({
-      vehicle_number: vehicleNo,
-      supplier_customer: supplier,
-      pass_type: 'inward'
-    });
-    setVehicleNo('');
-    setSupplier('');
-    setIsModalOpen(false);
+    setFormError('');
+
+    if (!vehicleNo.trim()) {
+      setFormError('Vehicle registration number is required');
+      return;
+    }
+    if (!supplier.trim()) {
+      setFormError('Supplier or customer name is required');
+      return;
+    }
+    if (!passType) {
+      setFormError('Pass type must be chosen');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      await onAddGatePass({
+        vehicle_number: vehicleNo.trim(),
+        supplier_customer: supplier.trim(),
+        pass_type: passType
+      });
+      setVehicleNo('');
+      setSupplier('');
+      setPassType('inward');
+      setIsModalOpen(false);
+      if (onRefetch) onRefetch();
+    } catch (err) {
+      setFormError(err.message || 'Error issuing gate pass');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const inboundVehicles = Array.isArray(gatePasses) ? gatePasses : [];
@@ -33,7 +61,7 @@ export default function GateSecurity({ gatePasses, onAddGatePass }) {
           </p>
         </div>
         <button
-          onClick={() => setIsModalOpen(true)}
+          onClick={() => { setFormError(''); setIsModalOpen(true); }}
           className="flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-black hover:bg-zinc-800 rounded-lg transition shadow-sm"
         >
           <Plus className="w-4 h-4" />
@@ -61,7 +89,12 @@ export default function GateSecurity({ gatePasses, onAddGatePass }) {
         <div className="lg:col-span-2 bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
           <h3 className="text-sm font-bold text-gray-900 mb-4">Inbound vehicles on site</h3>
           <div className="overflow-x-auto">
-            {inboundVehicles.length === 0 ? (
+            {isLoading ? (
+              <div className="p-8 text-center text-xs text-gray-500 font-medium flex items-center justify-center gap-2">
+                <Loader2 className="w-4 h-4 animate-spin text-gray-400" />
+                <span>Loading gate passes...</span>
+              </div>
+            ) : inboundVehicles.length === 0 ? (
               <div className="p-8 text-center text-xs text-gray-500 font-medium border border-dashed border-gray-200 rounded-xl">
                 No gate passes yet
               </div>
@@ -71,7 +104,7 @@ export default function GateSecurity({ gatePasses, onAddGatePass }) {
                   <tr className="border-b border-gray-200 text-gray-400 font-medium">
                     <th className="pb-3">GATE PASS</th>
                     <th className="pb-3">VEHICLE</th>
-                    <th className="pb-3">SUPPLIER</th>
+                    <th className="pb-3">SUPPLIER / PARTY</th>
                     <th className="pb-3">SINCE</th>
                     <th className="pb-3">STATUS</th>
                   </tr>
@@ -116,42 +149,65 @@ export default function GateSecurity({ gatePasses, onAddGatePass }) {
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl border border-gray-200 shadow-xl max-w-md w-full p-6 space-y-4">
             <h3 className="text-base font-bold text-gray-900">Issue Inward Gate Pass</h3>
+            {formError && (
+              <div className="p-3 bg-rose-50 border border-rose-200 rounded-lg text-rose-700 text-xs flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
+                <span>{formError}</span>
+              </div>
+            )}
             <form onSubmit={handleSubmit} className="space-y-3 text-xs">
               <div>
-                <label className="font-semibold text-gray-700 block mb-1">Vehicle Registration #</label>
+                <label className="font-semibold text-gray-700 block mb-1">Vehicle Registration # *</label>
                 <input
                   type="text"
                   placeholder="e.g. CSD-9821 or MRD-5520"
                   value={vehicleNo}
                   onChange={(e) => setVehicleNo(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-black"
+                  disabled={isSubmitting}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-black disabled:opacity-50"
                   required
                 />
               </div>
               <div>
-                <label className="font-semibold text-gray-700 block mb-1">Supplier or Farm Name</label>
+                <label className="font-semibold text-gray-700 block mb-1">Supplier or Customer Name *</label>
                 <input
                   type="text"
                   placeholder="Supplier or customer name"
                   value={supplier}
                   onChange={(e) => setSupplier(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-black"
+                  disabled={isSubmitting}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-black disabled:opacity-50"
                   required
                 />
+              </div>
+              <div>
+                <label className="font-semibold text-gray-700 block mb-1">Pass Type *</label>
+                <select
+                  value={passType}
+                  onChange={(e) => setPassType(e.target.value)}
+                  disabled={isSubmitting}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-black disabled:opacity-50"
+                >
+                  <option value="inward">Inward (Receiving / Goods Arrival)</option>
+                  <option value="outward">Outward (Dispatch / Delivery)</option>
+                </select>
               </div>
               <div className="flex justify-end gap-2 pt-2">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="px-3 py-1.5 rounded-lg border border-gray-300 text-gray-600 font-semibold"
+                  disabled={isSubmitting}
+                  className="px-3 py-1.5 rounded-lg border border-gray-300 text-gray-600 font-semibold disabled:opacity-50"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-1.5 rounded-lg bg-black text-white font-bold"
+                  disabled={isSubmitting}
+                  className="px-4 py-1.5 rounded-lg bg-black text-white font-bold hover:bg-zinc-800 transition flex items-center gap-1.5 disabled:opacity-50"
                 >
-                  Confirm & Print Pass
+                  {isSubmitting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                  <span>{isSubmitting ? 'Issuing...' : 'Confirm & Print Pass'}</span>
                 </button>
               </div>
             </form>
