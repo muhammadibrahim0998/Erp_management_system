@@ -1,14 +1,25 @@
 import React, { useState } from 'react';
 import { Users, DollarSign, Calendar, CheckCircle2, Plus, Clock, FileText } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 
 export default function PayrollView({ payrollRuns, onGeneratePayroll }) {
   const [isGenerating, setIsGenerating] = useState(false);
+  const [generateError, setGenerateError] = useState(null);
   const [selectedMonth, setSelectedMonth] = useState('2026-10');
 
   const handleGenerate = async () => {
+    if (isGenerating) return;
     setIsGenerating(true);
-    await onGeneratePayroll(selectedMonth);
-    setIsGenerating(false);
+    setGenerateError(null);
+    try {
+      if (onGeneratePayroll) {
+        await onGeneratePayroll(selectedMonth);
+      }
+    } catch (err) {
+      setGenerateError(err.message || 'Failed to generate payroll');
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   return (
@@ -31,13 +42,23 @@ export default function PayrollView({ payrollRuns, onGeneratePayroll }) {
           <button
             onClick={handleGenerate}
             disabled={isGenerating}
-            className="flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-black hover:bg-zinc-800 rounded-lg transition shadow-sm"
+            className="flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-black hover:bg-zinc-800 rounded-lg transition shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <Plus className="w-4 h-4" />
+            {isGenerating ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Plus className="w-4 h-4" />
+            )}
             <span>{isGenerating ? 'Calculating...' : 'Generate payroll'}</span>
           </button>
         </div>
       </div>
+
+      {generateError && (
+        <div className="p-3 bg-rose-50 border border-rose-200 text-rose-800 text-xs font-semibold rounded-xl flex items-center gap-2 shadow-sm">
+          <span>{generateError}</span>
+        </div>
+      )}
 
       {/* Runs Table (Page 17) */}
       <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
@@ -54,7 +75,14 @@ export default function PayrollView({ payrollRuns, onGeneratePayroll }) {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 font-medium">
-              {(payrollRuns || []).map((run, idx) => (
+              {(!payrollRuns || payrollRuns.length === 0) ? (
+                <tr>
+                  <td colSpan={6} className="py-8 text-center text-gray-400">
+                    No payroll runs recorded yet
+                  </td>
+                </tr>
+              ) : (
+                payrollRuns.map((run, idx) => (
                 <tr key={idx} className="hover:bg-gray-50/80 transition">
                   <td className="py-3.5 px-4 font-mono font-bold text-gray-900">{run.run_number}</td>
                   <td className="py-3.5 px-4 text-gray-500">{run.run_date}</td>
@@ -71,7 +99,7 @@ export default function PayrollView({ payrollRuns, onGeneratePayroll }) {
                     {Number(run.net_pay).toLocaleString()}
                   </td>
                 </tr>
-              ))}
+              )))}
             </tbody>
           </table>
         </div>

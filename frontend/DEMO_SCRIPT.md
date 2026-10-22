@@ -150,9 +150,10 @@ The following accounts are pre-seeded in the database (demo accounts use the see
 - **Role to Log In**: Accounts Officer (`hamza.khan@yaf.com`) or Director Finance (`finance@yaf.com`)
 - **Screen**: **Finance** (Sidebar → *Finance*)
 - **Audience Sees**:
-  - Revenue, receivables, debtor balances, cash positions.
+  - Live cash & bank accounts, balances, receivables aging, top debtors, payables aging, top creditors.
+  - Screen displays `<DemoBadge />` indicating fixed baseline demonstration figures.
 - **Backend Verification**:
-  - `GET /api/finance/overview` — **VERIFIED** (HTTP 200).
+  - `GET /api/finance/overview` — **VERIFIED** (HTTP 200, returns cash accounts, receivables, and payables).
 
 ### 2.5 Outward Dispatch Gate Pass
 - **Role to Log In**: Gate Officer (`gate@yaf.com`)
@@ -210,7 +211,7 @@ The following accounts are pre-seeded in the database (demo accounts use the see
 
 | Screen | Primary API Endpoint | Status | Notes |
 |---|---|---|---|
-| **Chairman Dashboard** | `GET /api/dashboard/chairman` | **VERIFIED** | Connected to live DB; handles empty state. |
+| **Chairman Dashboard** | `GET /api/dashboard/chairman` | **VERIFIED** | Connected to live DB for approvals and exceptions; dynamic badge count; KPI sub-labels bound; static revenue chart labeled with `<DemoBadge />`. |
 | **Approvals Inbox** | `GET /api/approvals`, `POST /api/approvals/:id/action` | **VERIFIED** | Reject reason validated on client; server doesn't store reason. |
 | **Procurement** | `GET /api/procurement/pos`, `POST /api/procurement/pos` | **VERIFIED** | Live DB creation, auto-total, status display. |
 | **Gate Security** | `GET /api/gate`, `POST /api/gate` | **VERIFIED** | Inward pass creation live; outward pass queue NOT VERIFIED. |
@@ -219,6 +220,7 @@ The following accounts are pre-seeded in the database (demo accounts use the see
 | **Production Board** | `GET /api/production/board`, `POST /api/production/move` | **VERIFIED** | Live Kanban moves across stages. Client enforces forward advance and one-step rework return. Recipe labeled as example. |
 | **POS & Retail** | `POST /api/pos/checkout`, `GET /api/pos/orders` | **VERIFIED** | Real checkout & stock deduction. Customer list NOT VERIFIED (demo). |
 | **Sales & Credit** | `GET /api/sales/orders`, `POST /api/sales/approve` | **BLOCKED** | Orders list verified. POST /api/sales/approve returns 401 until authenticateToken is wired on operations routes (see BACKEND_REQUESTS.md item 1). |
-| **Finance** | `GET /api/finance/overview` | **VERIFIED** | Live finance summary. |
+| **Finance** | `GET /api/finance/overview` | **VERIFIED** | Live cash and bank, receivables, and payables bound from API; marked with `<DemoBadge />`. |
 | **Live Operations** | `GET /api/live-operations` | **VERIFIED** | Plant sensor telemetry. |
-| **Payroll** | `GET /api/payroll`, `POST /api/payroll/generate` | **VERIFIED** | Payroll run generation. |
+| **Payroll** | `GET /api/payroll`, `POST /api/payroll/generate` | **VERIFIED** | Live payroll runs from MySQL; hardened generate handler with try/catch/finally and empty state. |
+| **Reports** | `GET /api/reports/pnl` | **VERIFIED** | P&L statement wired to live API with loading, error state, and baseline fallback; marked with `<DemoBadge />`. |

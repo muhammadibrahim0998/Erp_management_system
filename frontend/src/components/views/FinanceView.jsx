@@ -107,7 +107,7 @@ export default function FinanceView({ financeData, onNavigate }) {
           <div className="flex items-center justify-between">
             <div>
               <h3 className="text-sm font-bold text-gray-900">Receivables</h3>
-              <div className="text-xl font-black text-gray-900 mt-0.5">PKR 45,660,034</div>
+              <div className="text-xl font-black text-gray-900 mt-0.5">{financeData?.receivables?.total || 'PKR 45,660,034'}</div>
             </div>
             <span className="text-xs font-semibold text-gray-500">Aging breakdown</span>
           </div>
@@ -115,28 +115,28 @@ export default function FinanceView({ financeData, onNavigate }) {
           <div className="space-y-2 text-xs border-y border-gray-100 py-3">
             <div className="flex justify-between">
               <span className="text-gray-500">Current (0-30 d):</span>
-              <span className="font-bold text-gray-900">31.0M</span>
+              <span className="font-bold text-gray-900">{financeData?.receivables?.current || '31.0M'}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-500">1-30 days overdue:</span>
-              <span className="font-bold text-amber-600">11.4M</span>
+              <span className="font-bold text-amber-600">{financeData?.receivables?.d1_30 || '11.4M'}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-500">31-60 days overdue:</span>
-              <span className="font-bold text-rose-600">3.2M</span>
+              <span className="font-bold text-rose-600">{financeData?.receivables?.d31_60 || '3.2M'}</span>
             </div>
           </div>
 
           <div>
             <h4 className="text-xs font-bold text-gray-800 mb-2">Top Debtors</h4>
             <div className="space-y-2 text-xs font-medium">
-              {[
+              {(financeData?.receivables?.topDebtors || [
                 { customer: 'Karachi Egg Wholesalers', amount: '12,386,999' },
                 { customer: 'Peek Freans', amount: '7,093,583' },
                 { customer: 'Barkat Frisian (value-added)', amount: '5,486,933' },
                 { customer: 'Dawn Foods', amount: '3,942,893' },
                 { customer: 'Swat Valley Egg Dealers', amount: '3,877,654' }
-              ].map((d, i) => (
+              ]).map((d, i) => (
                 <div key={i} className="flex justify-between items-center py-1 border-b border-gray-50">
                   <span className="text-gray-700">{d.customer}</span>
                   <span className="font-mono font-bold text-gray-900">PKR {d.amount}</span>
@@ -151,7 +151,7 @@ export default function FinanceView({ financeData, onNavigate }) {
           <div className="flex items-center justify-between">
             <div>
               <h3 className="text-sm font-bold text-gray-900">Payables</h3>
-              <div className="text-xl font-black text-gray-900 mt-0.5">PKR 27,122,966</div>
+              <div className="text-xl font-black text-gray-900 mt-0.5">{financeData?.payables?.total || 'PKR 27,122,966'}</div>
             </div>
             <span className="text-xs font-semibold text-gray-500">Aging breakdown</span>
           </div>
@@ -159,28 +159,28 @@ export default function FinanceView({ financeData, onNavigate }) {
           <div className="space-y-2 text-xs border-y border-gray-100 py-3">
             <div className="flex justify-between">
               <span className="text-gray-500">Current (0-30 d):</span>
-              <span className="font-bold text-gray-900">23.2M</span>
+              <span className="font-bold text-gray-900">{financeData?.payables?.current || '23.2M'}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-500">1-30 days:</span>
-              <span className="font-bold text-gray-800">4.0M</span>
+              <span className="font-bold text-gray-800">{financeData?.payables?.d1_30 || '4.0M'}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-500">31-60 days:</span>
-              <span className="font-bold text-gray-800">0.0M</span>
+              <span className="font-bold text-gray-800">{financeData?.payables?.d31_60 || '0.0M'}</span>
             </div>
           </div>
 
           <div>
             <h4 className="text-xs font-bold text-gray-800 mb-2">Top Creditors</h4>
             <div className="space-y-2 text-xs font-medium">
-              {[
+              {(financeData?.payables?.topCreditors || [
                 { supplier: 'Frontier Poultry Feeds', amount: '11,119,140' },
                 { supplier: 'Swabi Layer Farms', amount: '2,646,840' },
                 { supplier: 'Haripur Egg Farm', amount: '2,646,330' },
                 { supplier: 'Khyber Cold Chain Logistics', amount: '2,062,160' },
                 { supplier: 'Charsadda Poultry Farm', amount: '1,940,905' }
-              ].map((c, i) => (
+              ]).map((c, i) => (
                 <div key={i} className="flex justify-between items-center py-1 border-b border-gray-50">
                   <span className="text-gray-700">{c.supplier}</span>
                   <span className="font-mono font-bold text-gray-900">PKR {c.amount}</span>

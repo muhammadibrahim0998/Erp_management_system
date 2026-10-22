@@ -214,6 +214,7 @@ export default function App() {
       fetchAllData();
     } catch (e) {
       showNotification(e.message || 'Error generating payroll', 'error');
+      throw e;
     }
   };
 

@@ -64,3 +64,39 @@ Written by Developer B from checkpoints T2 and T3; each item names the file and 
     - `adjustStock` accepts `adjustType` and defaults to addition for any unrecognized string; `reason` defaults to `"General Adjustment"` if omitted. If an invalid or zero quantity string bypasses the client or is negative, edge cases can cause erratic delta calculations.
     - In `transferStock`, vehicle number and driver fields are not sanitized or length-capped, and transfer between invalid facility codes must return standardized JSON errors with HTTP 400 rather than raw database or generic error messages.
     - **Request**: Add strict input validation using a validation schema or guard conditions: reject `adjust_qty <= 0` or NaN with HTTP 400 Bad Request, restrict `adjustType` strictly to `['add', 'subtract']`, require a non-empty `reason` string of at least 3 characters, and validate that `fromWarehouse` and `toWarehouse` exist in known facility registries and are not identical.
+
+12. **HIGH — Missing authentication on payroll generation endpoint**:
+    - `backend/routes/operations.routes.js:43`: `router.post('/payroll/generate', operationsController.generatePayroll);` lacks `authenticateToken` middleware.
+    - Because `req.user` is undefined, `backend/utils/auditLogger.js` records the acting user as `"System"` in `audit_logs` rather than the logged-in HR/Finance officer.
+    - **Request**: Apply `authenticateToken` to `router.post('/payroll/generate')` and verify the caller holds `'HR Manager'`, `'Director Finance'`, or `'ERP Admin'` role before processing payroll runs.
+
+13. **MEDIUM — Hardcoded values in payroll generation controller**:
+    - `backend/controllers/operations.controller.js:598-605` (`generatePayroll`):
+      `await db.query('INSERT INTO payroll_runs (run_number, run_date, month, status, prepared_by, net_pay) VALUES (?, "29 Sep 2026", ?, "Pending approval", "Nadia Shah", 4868088.00)', [run_number, month || '2026-10']);`
+    - `run_date` is hardcoded to `"29 Sep 2026"`, `prepared_by` is hardcoded to `"Nadia Shah"`, and `net_pay` is hardcoded to `4868088.00`.
+    - **Request**: Derive `run_date` dynamically from the current date (e.g. formatted `DD Mon YYYY`), set `prepared_by` from `req.user.name`, and calculate `net_pay` from active staff salary records once employee tables are created.
+
+14. **MEDIUM — Static JSON in finance overview and executive dashboard controllers**:
+    - `backend/controllers/operations.controller.js:618-660` (`getFinanceOverview`) returns static JSON for `cashAndBank`, `receivables`, and `payables` without querying database tables.
+    - `backend/controllers/operations.controller.js:8-48` (`getChairmanDashboard`) executes `workflow_tasks` query but leaves `kpis`, `revenueChart`, `receivablesAging`, and `budgetVsActual` as static JSON.
+    - In `getChairmanDashboard` exceptions, `exceptions[0].desc` is returned while standard client code checks for `description` (`description` is MISSING from live API).
+    - **Request**: Transition `getFinanceOverview` and `getChairmanDashboard` to aggregate live figures from `inventory_transactions`, `purchase_orders`, `sales_orders`, and ledger accounts. Standardize exception objects to include `description`, `doc_number`, `party`, and `route`.
+
+## Open decisions for the owner
+
+1. **'Poultry Farms' Role & Department Navigation Access**:
+   - In `backend/initDb.js:331`, Zahid Afridi is seeded as:
+     `['Zahid Afridi', 'Poultry Farms', 'Farms', 'ZA', 'zahid.afridi@yaf.com', 'password']`
+   - In `frontend/src/App.jsx:243-250`, role and department visibility flags are:
+     ```javascript
+     const isFinance = userDept === 'Finance' || isGM;
+     const isOperations = ['Operations', 'Plant', 'Production'].includes(userDept) || isGM;
+     const isSecurity = userDept === 'Security' || userDept === 'Logistics' || isGM;
+     const isQC = userDept === 'Quality' || isGM;
+     const isInventory = userDept === 'Inventory' || isOperations || isGM;
+     const isSales = ['Sales', 'Marketing'].includes(userDept) || isGM;
+     const isHR = userDept === 'HR' || isGM;
+     ```
+   - Because `userDept === 'Farms'` does not match any of these department rules and `userRole === 'Poultry Farms'` is not an admin/GM role, Zahid Afridi currently sees ONLY Dashboard, Approvals, and Process Map in the sidebar. All operational tabs (Procurement, Gate, QC, Inventory, Production, POS, Sales, Marketing, HR, Payroll, Finance, Reports, Users, Audit logs, Settings) are hidden.
+   - **Decision Needed**: What navigation sections and screens should users in the `'Farms'` department have access to? (e.g., Inventory, Live Operations, Procurement, or a dedicated Farm Management view).
+

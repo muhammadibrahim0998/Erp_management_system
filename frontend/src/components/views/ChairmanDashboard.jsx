@@ -13,6 +13,7 @@ import {
   ShieldAlert,
   Loader2
 } from 'lucide-react';
+import DemoBadge from '../DemoBadge';
 
 export default function ChairmanDashboard({ data, onNavigate, onApproveTask, currentUser }) {
   const [processingId, setProcessingId] = useState(null);
@@ -86,7 +87,7 @@ export default function ChairmanDashboard({ data, onNavigate, onApproveTask, cur
           <div className="flex items-center gap-1 text-[11px] text-emerald-700 font-semibold">
             <ArrowUpRight className="w-3.5 h-3.5" />
             <span>{kpis.revenueTargetChange || '▲ 10.1%'}</span>
-            <span className="text-gray-400 font-normal ml-1">99% of target</span>
+            <span className="text-gray-400 font-normal ml-1">{kpis.revenueTargetText || '99% of target'}</span>
           </div>
         </div>
 
@@ -109,7 +110,7 @@ export default function ChairmanDashboard({ data, onNavigate, onApproveTask, cur
           <div className="my-2">
             <div className="text-2xl font-black text-gray-900">{kpis.cashAndBank || 'PKR 29.4M'}</div>
           </div>
-          <div className="text-[11px] text-gray-400">4 accounts</div>
+          <div className="text-[11px] text-gray-400">{kpis.cashAccounts || '4 accounts'}</div>
         </div>
 
         {/* Receivables */}
@@ -118,7 +119,7 @@ export default function ChairmanDashboard({ data, onNavigate, onApproveTask, cur
           <div className="my-2">
             <div className="text-2xl font-black text-gray-900">{kpis.receivables || 'PKR 45.7M'}</div>
           </div>
-          <div className="text-[11px] text-amber-700 font-semibold">PKR 3.2M over 30 days</div>
+          <div className="text-[11px] text-amber-700 font-semibold">{kpis.receivablesOverdue || 'PKR 3.2M over 30 days'}</div>
         </div>
 
         {/* Eggs sold */}
@@ -129,8 +130,8 @@ export default function ChairmanDashboard({ data, onNavigate, onApproveTask, cur
           </div>
           <div className="flex items-center gap-1 text-[11px] text-emerald-700 font-semibold">
             <ArrowUpRight className="w-3.5 h-3.5" />
-            <span>▲ 28.8%</span>
-            <span className="text-gray-400 font-normal ml-1">19,077 trays</span>
+            <span>{kpis.eggsSoldChange ? `▲ ${kpis.eggsSoldChange.replace(/^\+/, '')}` : '▲ 28.8%'}</span>
+            <span className="text-gray-400 font-normal ml-1">{kpis.eggsSoldTrays || '19,077 trays'}</span>
           </div>
         </div>
       </div>
@@ -142,7 +143,10 @@ export default function ChairmanDashboard({ data, onNavigate, onApproveTask, cur
           <div>
             <div className="flex items-center justify-between mb-2">
               <div>
-                <h3 className="text-sm font-bold text-gray-900">Revenue vs target</h3>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-sm font-bold text-gray-900">Revenue vs target</h3>
+                  <DemoBadge />
+                </div>
                 <p className="text-[11px] text-gray-400">Last 12 months, PKR millions (excluding sales tax)</p>
               </div>
               <div className="flex items-center gap-4 text-xs">
@@ -206,15 +210,22 @@ export default function ChairmanDashboard({ data, onNavigate, onApproveTask, cur
           <div>
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-sm font-bold text-gray-900">Waiting for you</h3>
-              <span className="text-xs font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
-                14
-              </span>
+              {tasks.length > 0 && (
+                <span className="text-xs font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
+                  {tasks.length}
+                </span>
+              )}
             </div>
 
             <div className="space-y-3">
-              {tasks.slice(0, 5).map((t) => (
-                <div
-                  key={t.id}
+              {tasks.length === 0 ? (
+                <div className="p-4 rounded-xl bg-gray-50 border border-gray-100 text-gray-400 text-xs text-center">
+                  No pending approvals waiting for your review
+                </div>
+              ) : (
+                tasks.slice(0, 5).map((t) => (
+                  <div
+                    key={t.id}
                   className="p-3 rounded-xl border border-gray-200 hover:border-gray-400 hover:shadow-sm transition bg-gray-50/50 flex items-center justify-between"
                 >
                   <div>
@@ -240,7 +251,7 @@ export default function ChairmanDashboard({ data, onNavigate, onApproveTask, cur
                     )}
                   </button>
                 </div>
-              ))}
+              )))}
             </div>
           </div>
 
@@ -259,13 +270,13 @@ export default function ChairmanDashboard({ data, onNavigate, onApproveTask, cur
         <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm">
           <div className="flex items-center justify-between mb-3">
             <h4 className="text-xs font-bold text-gray-900 uppercase tracking-wider">Receivables aging</h4>
-            <span className="text-xs font-mono font-bold text-gray-700">Total PKR 45.6M</span>
+            <span className="text-xs font-mono font-bold text-gray-700">Total {data?.receivablesAging?.total || 'PKR 45.6M'}</span>
           </div>
           <div className="space-y-3 text-xs">
             <div>
               <div className="flex justify-between text-gray-600 mb-1">
                 <span>Current</span>
-                <span className="font-bold text-gray-900">31.0M</span>
+                <span className="font-bold text-gray-900">{data?.receivablesAging?.current || '31.0M'}</span>
               </div>
               <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
                 <div className="h-full bg-emerald-600 rounded-full" style={{ width: '68%' }}></div>
@@ -274,7 +285,7 @@ export default function ChairmanDashboard({ data, onNavigate, onApproveTask, cur
             <div>
               <div className="flex justify-between text-gray-600 mb-1">
                 <span>1-30 days</span>
-                <span className="font-bold text-gray-900">11.4M</span>
+                <span className="font-bold text-gray-900">{data?.receivablesAging?.d1_30 || '11.4M'}</span>
               </div>
               <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
                 <div className="h-full bg-amber-500 rounded-full" style={{ width: '25%' }}></div>
@@ -283,7 +294,7 @@ export default function ChairmanDashboard({ data, onNavigate, onApproveTask, cur
             <div>
               <div className="flex justify-between text-gray-600 mb-1">
                 <span>31-60 days</span>
-                <span className="font-bold text-rose-600">3.2M</span>
+                <span className="font-bold text-rose-600">{data?.receivablesAging?.d31_60 || '3.2M'}</span>
               </div>
               <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
                 <div className="h-full bg-rose-500 rounded-full" style={{ width: '7%' }}></div>
@@ -298,33 +309,24 @@ export default function ChairmanDashboard({ data, onNavigate, onApproveTask, cur
             <h4 className="text-xs font-bold text-gray-900 uppercase tracking-wider">Budget vs actual · {budgetPeriod}</h4>
           </div>
           <div className="space-y-3 text-xs">
-            <div>
-              <div className="flex justify-between text-gray-600 mb-1">
-                <span>Poultry Farms</span>
-                <span className="font-bold text-gray-900">28.3M / 31.1M · 91%</span>
-              </div>
-              <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
-                <div className="h-full bg-blue-600 rounded-full" style={{ width: '91%' }}></div>
-              </div>
-            </div>
-            <div>
-              <div className="flex justify-between text-gray-600 mb-1">
-                <span>HR & Administration</span>
-                <span className="font-bold text-gray-900">3.8M / 4.2M · 90%</span>
-              </div>
-              <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
-                <div className="h-full bg-purple-600 rounded-full" style={{ width: '90%' }}></div>
-              </div>
-            </div>
-            <div>
-              <div className="flex justify-between text-gray-600 mb-1">
-                <span>Procurement & Supply Chain</span>
-                <span className="font-bold text-gray-900">74.1M / 90.3M · 82%</span>
-              </div>
-              <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
-                <div className="h-full bg-amber-600 rounded-full" style={{ width: '82%' }}></div>
-              </div>
-            </div>
+            {(data?.budgetVsActual || [
+              { dept: 'Poultry Farms', actual: '28.3M', budget: '31.1M', pct: 91 },
+              { dept: 'HR & Administration', actual: '3.8M', budget: '4.2M', pct: 90 },
+              { dept: 'Procurement & Supply Chain', actual: '74.1M', budget: '90.3M', pct: 82 }
+            ]).map((b, i) => {
+              const barColor = i === 0 ? 'bg-blue-600' : i === 1 ? 'bg-purple-600' : 'bg-amber-600';
+              return (
+                <div key={b.dept || i}>
+                  <div className="flex justify-between text-gray-600 mb-1">
+                    <span>{b.dept}</span>
+                    <span className="font-bold text-gray-900">{b.actual} / {b.budget} · {b.pct}%</span>
+                  </div>
+                  <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
+                    <div className={`h-full ${barColor} rounded-full`} style={{ width: `${Math.min(b.pct, 100)}%` }}></div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
 
@@ -343,7 +345,7 @@ export default function ChairmanDashboard({ data, onNavigate, onApproveTask, cur
                       <span>{exc.title || 'Credit limit exceeded'}</span>
                     </div>
                     <p className="text-[11px] text-rose-800 mt-1">
-                      {exc.description || `${exc.party || ''} · ${exc.doc_number || ''} ${exc.detail || ''}`}
+                      {exc.desc || exc.description || `${exc.party || ''} · ${exc.doc_number || ''} ${exc.detail || ''}`}
                     </p>
                     <button
                       onClick={() => onNavigate(exc.route || 'sales')}
