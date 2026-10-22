@@ -26,7 +26,7 @@ import { exportToExcel, exportToPDF } from '../../utils/exportUtils';
 
 function formatLogDetails(details) {
   if (!details) return '';
-  return String(details).replace(/\bundefined\b/g, 'Authorized User');
+  return String(details).replace(/\bundefined\b/g, 'User not recorded');
 }
 
 export default function AuditLogsView({ currentUser }) {

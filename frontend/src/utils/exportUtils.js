@@ -12,7 +12,7 @@ export function exportToExcel({ filename, sheetName = 'Sheet1', data, headers, c
 
   if (companyInfo) {
     sheetData.push(['YOUSAFZAI AGRI FOODS (PVT) LTD']);
-    sheetData.push(['AgenTech Enterprise Resource Planning System']);
+    sheetData.push(['Yousafzai Agri Foods ERP System']);
     sheetData.push([filename.replace(/_/g, ' ').toUpperCase()]);
     sheetData.push([`Generated On: ${new Date().toLocaleString()}`]);
     sheetData.push([]); // blank separator
@@ -80,7 +80,7 @@ export function exportToPDF({
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(9);
   doc.setTextColor(167, 243, 208); // Light emerald
-  doc.text('AgenTech ERP · Head Office Mardan · Rashakai Processing Plant', 40, 48);
+  doc.text('Yousafzai Agri Foods ERP · Head Office Mardan · Rashakai Processing Plant', 40, 48);
 
   doc.setTextColor(255, 255, 255);
   doc.setFontSize(8);

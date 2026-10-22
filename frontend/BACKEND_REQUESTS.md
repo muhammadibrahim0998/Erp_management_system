@@ -100,9 +100,18 @@ Written by Developer B from checkpoints T2 and T3; each item names the file and 
 18. **MEDIUM — `req.user.name` evaluated to `undefined` during sales approval, polluting `sales_orders.approval_step` and `audit_logs.details`**:
     - `backend/controllers/operations.controller.js:396`: `const approverText = \`Approved by \${req.user.name} (\${userRole})\`;`
     - `backend/controllers/operations.controller.js:407`: `details: \`\${userRole} (\${req.user.name}) approved sales order \${so_number}\``
-    - When `req.user` lacks a `.name` property in the decoded JWT token, it writes the literal string `"Approved by undefined (Chairman & CEO)"` to `sales_orders.approval_step` and `"Chairman & CEO (undefined) approved sales order SO-2026-0419"` to `audit_logs`.
-    - Client-side views (`SalesCreditView.jsx` and `AuditLogsView.jsx`) now sanitize occurrences of `"undefined"` to display `"Authorized Approver"` / `"Authorized User"`.
-    - **Request**: Add fallback in `backend/controllers/operations.controller.js` (`req.user?.name || req.user?.email || 'Authorized User'`), ensure JWT token payloads or `authenticateToken` middleware always populates `req.user.name`, and run a cleanup script to replace `"undefined"` in existing records in MySQL tables `sales_orders` and `audit_logs`.
+    - When `req.user` lacks a `.name` property (or `authenticateToken` middleware is missing on operations routes so `req.user` is undefined), it writes the literal string `"Approved by undefined (Chairman & CEO)"` to `sales_orders.approval_step` and `"Chairman & CEO (undefined) approved sales order SO-2026-0419"` to `audit_logs`.
+    - Client-side views (`SalesCreditView.jsx` and `AuditLogsView.jsx`) currently sanitize occurrences of `"undefined"` to honest neutral text ("Approver not recorded" / "User not recorded") as a stopgap.
+    - **Request**: Root cause is server-side: wire `authenticateToken` on all operations routes so `req.user` is populated, add fallback in `backend/controllers/operations.controller.js` (`req.user?.name || req.user?.email || 'Authorized User'`), and run a database cleanup script to replace `"undefined"` in existing records in MySQL tables `sales_orders` and `audit_logs`.
+
+19. **LOW — Branding: remove the former vendor name from backend codebase & metadata**:
+    - The former vendor name remains present in backend server strings, rate limiter responses, and initialization logs:
+      - `backend/server.js:28`: `system` banner string contains the former vendor name.
+      - `backend/server.js:49`: Server startup console log contains the former vendor name.
+      - `backend/middlewares/rateLimiter.js:10`: Rate limiter error response message contains the former vendor name.
+      - `backend/initDb.js:512`: Seeded bootstrap audit log record details contain the former vendor name.
+    - All client-facing frontend occurrences have been updated to "Yousafzai Agri Foods ERP" or "ALGOHUB".
+    - **Request**: Update backend strings to "Yousafzai Agri Foods ERP" for system naming and "ALGOHUB" for vendor delivery attribution, ensuring no legacy vendor names are sent in API responses or logs.
 
 ## Open decisions for the owner
 

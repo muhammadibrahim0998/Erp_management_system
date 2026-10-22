@@ -1047,7 +1047,7 @@ export default function PosView({ currentUser, onSaleCompleted }) {
               <div className="text-center space-y-1 text-[10px] text-gray-500 pt-1">
                 <p className="font-bold text-gray-800">Thank you for your business!</p>
                 <p>Farm fresh eggs guaranteed since 1960.</p>
-                <p className="text-[9px] text-gray-400 mt-1">Software powered by AgenTech Enterprise ERP</p>
+                <p className="text-[9px] text-gray-400 mt-1">Delivered by ALGOHUB</p>
               </div>
             </div>
 

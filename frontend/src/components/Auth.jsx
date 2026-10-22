@@ -119,7 +119,7 @@ export default function Auth({ onLogin }) {
             <span className="font-black text-amber-400 text-2xl tracking-tighter">YAF</span>
           </div>
           <h1 className="text-2xl font-bold text-white mb-1">
-            {isLogin ? 'Sign In to AgenTech ERP' : 'Register New Account'}
+            {isLogin ? 'Sign In to Yousafzai Agri Foods ERP' : 'Register New Account'}
           </h1>
           <p className="text-[#8CAAA0] text-xs">
             Yousafzai Agri Foods (Pvt) Ltd · Head Office Mardan

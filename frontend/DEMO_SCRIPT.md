@@ -222,8 +222,8 @@ The following accounts are pre-seeded in the database (demo accounts use the see
 | **Production Board** | `GET /api/production/board`, `POST /api/production/move` | **DB-BACKED** | Live Kanban moves across stages. Client enforces forward advance and one-step rework return. Recipe labeled as example. |
 | **POS & Retail** | `POST /api/pos/checkout`, `GET /api/pos/orders` | **DB-BACKED** | Real checkout & stock deduction. Customer list NOT VERIFIED (demo). |
 | **Sales & Credit** | `GET /api/sales/orders`, `POST /api/sales/approve` | **BLOCKED** | Orders list verified (DB-backed). POST /api/sales/approve returns 401 until authenticateToken is wired on operations routes (see BACKEND_REQUESTS.md item 1). |
-| **Marketing** | `GET /api/marketing` | **STATIC API** | Served by the API but static (sample data); marked with `<DemoBadge label="Sample data served by the API — not yet linked to live records" />`. |
-| **Payroll** | `GET /api/payroll`, `POST /api/payroll/generate` | **STATIC API** | Served by the API but static (sample data); marked with `<DemoBadge label="Sample data served by the API — not yet linked to live records" />`. |
+| **Marketing** | `GET /api/marketing` | **MIXED** | Campaign list queries `marketing_campaigns` in MySQL; KPI metric cards and pipeline stepper are sample data marked with `<DemoBadge />`. |
+| **Payroll** | `GET /api/payroll`, `POST /api/payroll/generate` | **DB-BACKED** | Runs table queries `payroll_runs` in MySQL; generated runs use fixed values noted near the button. |
 | **Finance** | `GET /api/finance/overview` | **STATIC API** | Served by the API but static (sample data); marked with `<DemoBadge label="Sample data served by the API — not yet linked to live records" />`. |
 | **Live Operations** | `GET /api/live-operations` | **STATIC API** | Served by the API but static (sample data mock telemetry); marked with `<DemoBadge label="Sample data served by the API — not yet linked to live records" />`. |
 | **Reports** | `GET /api/reports/pnl` | **STATIC API** | Served by the API but static (sample data); marked with `<DemoBadge label="Sample data served by the API — not yet linked to live records" />`. |

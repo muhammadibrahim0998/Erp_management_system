@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { Users, DollarSign, Calendar, CheckCircle2, Plus, Clock, FileText } from 'lucide-react';
 import { Loader2 } from 'lucide-react';
-import DemoBadge from '../DemoBadge';
 
 export default function PayrollView({ payrollRuns, onGeneratePayroll }) {
   const [isGenerating, setIsGenerating] = useState(false);
@@ -25,8 +24,6 @@ export default function PayrollView({ payrollRuns, onGeneratePayroll }) {
 
   return (
     <div className="space-y-6">
-      <DemoBadge label="Sample data served by the API — not yet linked to live records" />
-
       {/* Top Banner */}
       <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
@@ -35,25 +32,30 @@ export default function PayrollView({ payrollRuns, onGeneratePayroll }) {
             Monthly salary runs with tax, provident fund, EOBI and advance recovery — approved by Finance and the Chairman.
           </p>
         </div>
-        <div className="flex items-center gap-3">
-          <input
-            type="month"
-            value={selectedMonth}
-            onChange={(e) => setSelectedMonth(e.target.value)}
-            className="text-xs px-3 py-1.5 border border-gray-300 rounded-lg bg-gray-50 font-mono"
-          />
-          <button
-            onClick={handleGenerate}
-            disabled={isGenerating}
-            className="flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-black hover:bg-zinc-800 rounded-lg transition shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {isGenerating ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <Plus className="w-4 h-4" />
-            )}
-            <span>{isGenerating ? 'Calculating...' : 'Generate payroll'}</span>
-          </button>
+        <div className="flex flex-col items-end gap-1.5">
+          <div className="flex items-center gap-3">
+            <input
+              type="month"
+              value={selectedMonth}
+              onChange={(e) => setSelectedMonth(e.target.value)}
+              className="text-xs px-3 py-1.5 border border-gray-300 rounded-lg bg-gray-50 font-mono"
+            />
+            <button
+              onClick={handleGenerate}
+              disabled={isGenerating}
+              className="flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-black hover:bg-zinc-800 rounded-lg transition shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isGenerating ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Plus className="w-4 h-4" />
+              )}
+              <span>{isGenerating ? 'Calculating...' : 'Generate payroll'}</span>
+            </button>
+          </div>
+          <p className="text-[10px] text-gray-500">
+            Generated runs currently use fixed values for date, preparer and net pay (see BACKEND_REQUESTS item 13)
+          </p>
         </div>
       </div>
 
