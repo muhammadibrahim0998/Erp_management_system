@@ -18,6 +18,38 @@ const APPROVER_ROLES = [
   'ERP Admin'
 ];
 
+const APPROVED_OR_LATER_STATUSES = ['Approved', 'Invoiced', 'Paid'];
+
+function getApprovalSteps(order) {
+  if (!order) return [];
+  const creditBreach = Number(order.credit_breach) || 0;
+  const status = order.status || 'Draft';
+  const approvalStepText = order.approval_step || 'Not required';
+
+  const creditCheckStep = {
+    label: 'Credit check',
+    state: creditBreach > 0 ? 'breach' : 'ok',
+    detail: creditBreach > 0
+      ? `Credit breach: PKR ${creditBreach.toLocaleString()}`
+      : 'Within limit (PKR 0 breach)'
+  };
+
+  let ceoState = 'not required';
+  if (creditBreach > 0) {
+    ceoState = APPROVED_OR_LATER_STATUSES.includes(status) ? 'done' : 'waiting';
+  } else if (APPROVED_OR_LATER_STATUSES.includes(status)) {
+    ceoState = 'done';
+  }
+
+  const ceoApprovalStep = {
+    label: 'CEO approval',
+    state: ceoState,
+    detail: approvalStepText
+  };
+
+  return [creditCheckStep, ceoApprovalStep];
+}
+
 export default function SalesCreditView({
   salesOrders = [],
   salesOrder: initialOrder,
@@ -185,12 +217,11 @@ export default function SalesCreditView({
         }
       ];
 
+      // credit limit and exposure are decided by the server
       const res = await operationsService.createSalesOrder({
         customer: newCustomer.trim(),
         warehouse: newWarehouse,
         delivery_date: newDeliveryDate.trim(),
-        credit_limit: 4500000,
-        current_exposure: 0,
         items
       });
 
@@ -578,33 +609,25 @@ export default function SalesCreditView({
 
             {/* Approvers Timeline */}
             <div className="space-y-3 pt-2 text-xs">
-              <div className="flex items-start gap-3">
-                <span className="w-4 h-4 rounded-full bg-emerald-600 text-white flex items-center justify-center text-[10px] shrink-0 mt-0.5">✓</span>
-                <div>
-                  <div className="font-bold text-gray-900">Department head</div>
-                  <div className="text-gray-500 text-[11px]">Department head · approved</div>
-                </div>
-              </div>
-              <div className="flex items-start gap-3">
-                <span className="w-4 h-4 rounded-full bg-emerald-600 text-white flex items-center justify-center text-[10px] shrink-0 mt-0.5">✓</span>
-                <div>
-                  <div className="font-bold text-gray-900">Accounts & Finance</div>
-                  <div className="text-gray-500 text-[11px]">Accounts & Finance · approved</div>
-                </div>
-              </div>
-              <div className="flex items-start gap-3">
-                <span className={`w-4 h-4 rounded-full text-white flex items-center justify-center text-[10px] shrink-0 mt-0.5 ${
-                  isApproved ? 'bg-emerald-600' : 'bg-amber-500 animate-pulse'
-                }`}>
-                  {isApproved ? '✓' : '●'}
-                </span>
-                <div>
-                  <div className="font-bold text-gray-900">CEO Final Approval</div>
-                  <div className="text-gray-500 text-[11px]">
-                    {isApproved ? (currentOrder.approved_by ? `${currentOrder.approved_by} · Approved` : 'Approved') : 'Waiting for Chairman sign-off'}
+              {getApprovalSteps(currentOrder).map((step, idx) => (
+                <div key={idx} className="flex items-start gap-3">
+                  <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[10px] shrink-0 mt-0.5 text-white ${
+                    step.state === 'done' || step.state === 'ok'
+                      ? 'bg-emerald-600'
+                      : step.state === 'breach'
+                      ? 'bg-rose-600'
+                      : step.state === 'waiting'
+                      ? 'bg-amber-500 animate-pulse'
+                      : 'bg-gray-400'
+                  }`}>
+                    {step.state === 'done' || step.state === 'ok' ? '✓' : step.state === 'waiting' ? '●' : step.state === 'breach' ? '!' : '—'}
+                  </span>
+                  <div>
+                    <div className="font-bold text-gray-900">{step.label}</div>
+                    <div className="text-gray-500 text-[11px]">{step.detail}</div>
                   </div>
                 </div>
-              </div>
+              ))}
             </div>
           </div>
 

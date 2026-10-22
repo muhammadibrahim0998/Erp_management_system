@@ -193,10 +193,10 @@ export default function App() {
   const handleApproveSales = async (soNumber) => {
     try {
       await operationsService.approveSalesOrder(soNumber);
-      showNotification('Sales order approved by CEO exception');
       fetchAllData();
     } catch (e) {
       showNotification(e.message || 'Error approving sales order', 'error');
+      throw e;
     }
   };
 
