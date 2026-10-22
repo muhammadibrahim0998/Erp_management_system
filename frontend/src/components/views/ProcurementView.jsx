@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, Search, Filter, CheckCircle2, Clock, FileText, Download, Loader2, AlertCircle } from 'lucide-react';
+import { Plus, Search, Loader2, AlertCircle } from 'lucide-react';
 
 export default function ProcurementView({ purchaseOrders, onAddPo, isLoading, error, onRefetch }) {
   const [activeTab, setActiveTab] = useState('orders');

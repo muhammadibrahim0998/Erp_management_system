@@ -6,7 +6,7 @@ This document details the three core operational cycles for demonstration and us
 
 ## Verified User Logins
 
-The following accounts are pre-seeded in the database (default password for all demo accounts: `password`):
+The following accounts are pre-seeded in the database (demo accounts use the seed password configured in backend/initDb.js; ask the project owner):
 
 | Role | Name | Email | Department |
 |---|---|---|---|

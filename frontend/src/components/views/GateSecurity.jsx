@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Truck, Plus, CheckCircle2, Clock, ShieldCheck, ArrowDownLeft, ArrowUpRight, Loader2, AlertCircle } from 'lucide-react';
+import { Plus, Loader2, AlertCircle } from 'lucide-react';
 
 export default function GateSecurity({ gatePasses, onAddGatePass, isLoading, onRefetch }) {
   const [activeTab, setActiveTab] = useState('on_site');

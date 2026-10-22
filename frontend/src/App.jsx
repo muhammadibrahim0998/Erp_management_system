@@ -145,9 +145,9 @@ export default function App() {
   }, [isAuthenticated]);
 
   // Action Handlers
-  const handleApproveTask = async (taskId, actionType = 'approved') => {
+  const handleApproveTask = async (taskId, actionType = 'approved', reason = null) => {
     try {
-      await operationsService.actionApproval(taskId, actionType);
+      await operationsService.actionApproval(taskId, actionType, reason);
       showNotification(`Task marked as ${actionType} in MySQL database`);
       fetchAllData();
     } catch (e) {
@@ -217,7 +217,7 @@ export default function App() {
   if (!isAuthenticated || !currentUser) {
     return (
       <Auth
-        onLogin={(user, token) => {
+        onLogin={(user, _token) => {
           setCurrentUser(user);
           setIsAuthenticated(true);
           fetchAllData();

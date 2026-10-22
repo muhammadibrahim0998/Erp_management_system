@@ -70,7 +70,7 @@ export default function ApprovalsInbox({ tasks, onApproveTask, isLoading, error,
     setProcessingId(rejectModalTask.id);
     setRejectError('');
     try {
-      await onApproveTask(rejectModalTask.id, 'rejected');
+      await onApproveTask(rejectModalTask.id, 'rejected', rejectReason.trim());
       setRejectModalTask(null);
       setRejectReason('');
       if (onRefetch) onRefetch();
@@ -263,6 +263,9 @@ export default function ApprovalsInbox({ tasks, onApproveTask, isLoading, error,
                 className="w-full text-xs p-3 border border-gray-300 rounded-lg focus:outline-none focus:border-rose-500 h-24"
                 rows={3}
               />
+              <p className="text-[11px] text-gray-500 mt-1">
+                The reason is sent with the request. Saving it on the record needs a backend update.
+              </p>
               {rejectError && (
                 <p className="text-xs text-rose-600 font-semibold mt-1">{rejectError}</p>
               )}

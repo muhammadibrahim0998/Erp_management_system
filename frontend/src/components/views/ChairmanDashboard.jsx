@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   TrendingUp,
   DollarSign,
@@ -10,10 +10,12 @@ import {
   ArrowUpRight,
   ArrowDownRight,
   Clock,
-  ShieldAlert
+  ShieldAlert,
+  Loader2
 } from 'lucide-react';
 
 export default function ChairmanDashboard({ data, onNavigate, onApproveTask, currentUser }) {
+  const [processingId, setProcessingId] = useState(null);
   const kpis = data?.kpis || {};
   const tasks = data?.waitingApprovals || [];
   const firstName = currentUser?.name ? currentUser.name.split(' ')[0] : '';
@@ -25,6 +27,18 @@ export default function ChairmanDashboard({ data, onNavigate, onApproveTask, cur
   const startFiscalYear = today.getMonth() >= 6 ? currentYear : currentYear - 1;
   const currentFiscalQuarter = Math.floor(((today.getMonth() + 6) % 12) / 3) + 1;
   const budgetPeriod = `Q${currentFiscalQuarter} FY ${startFiscalYear}-${String(startFiscalYear + 1).slice(-2)}`;
+
+  const handleApprove = async (taskId) => {
+    if (!onApproveTask) return;
+    setProcessingId(taskId);
+    try {
+      await onApproveTask(taskId);
+    } catch {
+      // Error notification is already handled by App.jsx handleApproveTask
+    } finally {
+      setProcessingId(null);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -214,11 +228,16 @@ export default function ChairmanDashboard({ data, onNavigate, onApproveTask, cur
                     </div>
                   </div>
                   <button
-                    onClick={() => onApproveTask(t.id)}
-                    className="p-1.5 rounded-lg bg-black text-white hover:bg-gray-800 transition"
+                    onClick={() => handleApprove(t.id)}
+                    disabled={processingId === t.id}
+                    className="p-1.5 rounded-lg bg-black text-white hover:bg-gray-800 transition disabled:opacity-50 disabled:cursor-not-allowed"
                     title="Process"
                   >
-                    <ArrowRight className="w-3.5 h-3.5" />
+                    {processingId === t.id ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    )}
                   </button>
                 </div>
               ))}

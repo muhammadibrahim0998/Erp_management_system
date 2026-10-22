@@ -9,8 +9,12 @@ export const operationsService = {
     return apiClient.get('/api/approvals');
   },
 
-  actionApproval(id, action) {
-    return apiClient.post(`/api/approvals/${id}/action`, { action });
+  actionApproval(id, action, reason) {
+    const payload = { action };
+    if (typeof reason === 'string' && reason.trim()) {
+      payload.reason = reason.trim();
+    }
+    return apiClient.post(`/api/approvals/${id}/action`, payload);
   },
 
   getLiveOperations() {
