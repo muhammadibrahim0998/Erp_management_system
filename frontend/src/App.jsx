@@ -69,6 +69,7 @@ export default function App() {
   const [campaigns, setCampaigns] = useState([]);
   const [payrollRuns, setPayrollRuns] = useState([]);
   const [financeData, setFinanceData] = useState(null);
+  const [failedDatasets, setFailedDatasets] = useState([]);
 
   const [isLoading, setIsLoading] = useState(true);
   const [notification, setNotification] = useState(null);
@@ -104,8 +105,13 @@ export default function App() {
       if (data.payroll) setPayrollRuns(data.payroll);
       if (data.finance) setFinanceData(data.finance);
 
-      if (data.failed && data.failed.length > 0) {
-        showNotification(`Could not load: ${data.failed.join(', ')}`, 'error');
+      if (data.failed) {
+        setFailedDatasets(data.failed);
+        if (data.failed.length > 0) {
+          showNotification(`Could not load: ${data.failed.join(', ')}`, 'error');
+        }
+      } else {
+        setFailedDatasets([]);
       }
     } catch (err) {
       console.error('Data fetch error:', err);
@@ -187,6 +193,7 @@ export default function App() {
       fetchAllData();
     } catch (e) {
       showNotification(e.message || 'Error moving order', 'error');
+      throw e;
     }
   };
 
@@ -476,6 +483,9 @@ export default function App() {
             {activeTab === 'inventory' && (
               <InventoryView
                 inventoryItems={inventoryItems}
+                isLoading={isLoading}
+                error={failedDatasets.includes('inventory') ? 'Could not load inventory items from server' : null}
+                onRefetch={fetchAllData}
                 onAdjustStock={() => {
                   fetchAllData();
                   showNotification('Inventory & warehouse levels refreshed');
@@ -487,6 +497,9 @@ export default function App() {
               <ProductionBoard
                 productionOrders={productionOrders}
                 onMoveOrder={handleMoveOrder}
+                isLoading={isLoading}
+                error={failedDatasets.includes('production') ? 'Could not load production orders from server' : null}
+                onRefetch={fetchAllData}
               />
             )}
 

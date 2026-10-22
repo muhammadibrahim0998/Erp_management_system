@@ -1,17 +1,20 @@
 import React, { useState } from 'react';
 import {
-  Layers,
   ArrowRight,
-  Clock,
-  CheckCircle2,
-  Calendar,
-  Calculator,
   ChevronRight,
-  Printer
+  Loader2
 } from 'lucide-react';
 
-export default function ProductionBoard({ productionOrders, onMoveOrder }) {
+export default function ProductionBoard({
+  productionOrders = [],
+  onMoveOrder,
+  isLoading,
+  error,
+  onRefetch
+}) {
   const [selectedOrder, setSelectedOrder] = useState(null);
+  const [movingId, setMovingId] = useState(null);
+  const [moveError, setMoveError] = useState(null);
 
   const columns = [
     'With GM',
@@ -21,6 +24,23 @@ export default function ProductionBoard({ productionOrders, onMoveOrder }) {
     'In production',
     'Completed'
   ];
+
+  const handleMove = async (targetStage) => {
+    if (!selectedOrder || movingId) return;
+    setMovingId(selectedOrder.id);
+    setMoveError(null);
+    try {
+      if (onMoveOrder) {
+        await onMoveOrder(selectedOrder.id, targetStage);
+      }
+      setSelectedOrder({ ...selectedOrder, stage: targetStage });
+      if (onRefetch) onRefetch();
+    } catch (err) {
+      setMoveError(err.message || 'Failed to move order stage');
+    } finally {
+      setMovingId(null);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -39,8 +59,25 @@ export default function ProductionBoard({ productionOrders, onMoveOrder }) {
         </div>
       </div>
 
-      {/* Kanban Board (Page 11) */}
-      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-3.5">
+      {/* Loading, Error, Empty, or Kanban Board */}
+      {isLoading ? (
+        <div className="bg-white p-12 rounded-2xl border border-gray-200 text-center text-gray-500 text-sm flex items-center justify-center gap-2">
+          <Loader2 className="w-4 h-4 animate-spin text-gray-400" />
+          <span>Loading production orders...</span>
+        </div>
+      ) : error ? (
+        <div className="p-8 text-center text-rose-700 bg-rose-50 border border-rose-200 rounded-xl text-xs font-semibold">
+          {error}
+        </div>
+      ) : (!productionOrders || productionOrders.length === 0) ? (
+        <div className="bg-white p-12 rounded-2xl border border-gray-200 text-center">
+          <h3 className="text-base font-bold text-gray-900">No production orders yet</h3>
+          <p className="text-xs text-gray-500 mt-1">
+            Work orders created in the plant will appear here on the Kanban board.
+          </p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-3.5">
         {columns.map((col, idx) => {
           const ordersInCol = (productionOrders || []).filter(o => o.stage === col);
           return (
@@ -56,7 +93,10 @@ export default function ProductionBoard({ productionOrders, onMoveOrder }) {
                 {ordersInCol.map((wo) => (
                   <div
                     key={wo.id}
-                    onClick={() => setSelectedOrder(wo)}
+                    onClick={() => {
+                      setSelectedOrder(wo);
+                      setMoveError(null);
+                    }}
                     className="p-3 bg-white rounded-xl border border-gray-200 hover:border-black hover:shadow-md transition cursor-pointer flex flex-col justify-between"
                   >
                     <div>
@@ -87,6 +127,7 @@ export default function ProductionBoard({ productionOrders, onMoveOrder }) {
           );
         })}
       </div>
+      )}
 
       {/* Production Order Detail & Recipe Calculation Modal (Page 12) */}
       {selectedOrder && (
@@ -100,12 +141,21 @@ export default function ProductionBoard({ productionOrders, onMoveOrder }) {
                 </h3>
               </div>
               <button
-                onClick={() => setSelectedOrder(null)}
+                onClick={() => {
+                  setSelectedOrder(null);
+                  setMoveError(null);
+                }}
                 className="text-xs font-bold text-gray-500 hover:text-black"
               >
                 Close ✕
               </button>
             </div>
+
+            {moveError && (
+              <div className="p-3 text-xs text-rose-700 bg-rose-50 border border-rose-200 rounded-xl font-medium">
+                {moveError}
+              </div>
+            )}
 
             {/* Stepper (Sales -> GM -> Plant -> Prod Mgr -> Raw store -> Breaking -> Finish store) */}
             <div className="p-3 bg-gray-50 rounded-xl border border-gray-200 text-[11px] flex items-center justify-between overflow-x-auto gap-2">
@@ -150,32 +200,51 @@ export default function ProductionBoard({ productionOrders, onMoveOrder }) {
 
             {/* Raw Material Requirement Calculation (Page 12 Formula) */}
             <div className="p-4 bg-gray-50 rounded-xl border border-gray-200 text-xs font-mono space-y-2 text-gray-800">
-              <div className="font-bold text-gray-900">Raw material requirement calculation:</div>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                <div className="font-bold text-gray-900">Raw material requirement calculation:</div>
+                <span className="text-[10px] font-sans font-medium px-2 py-0.5 bg-amber-50 text-amber-700 border border-amber-200 rounded-full w-fit">
+                  Example calculation (fixed recipe, not from live records)
+                </span>
+              </div>
               <div>1. Liquid per egg = 57 g × (1 - 11.5% shell) × (1 - 2% breaking loss) = <strong>49.44 g</strong></div>
               <div>2. Whole-egg liquid needed 2,270 kg ÷ 49.44 g = <strong>45,915 eggs</strong></div>
               <div>3. Total 45,915 eggs ÷ 30 = <strong>1,531 trays</strong> of breaking-grade eggs.</div>
             </div>
 
             {/* Advance Stage Button */}
-            <div className="flex justify-between items-center pt-2">
+            {/* UI convenience only; the server must enforce stage order */}
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 pt-2">
               <span className="text-xs text-gray-500">
                 Current stage: <strong>{selectedOrder.stage}</strong>
               </span>
-              <div className="flex gap-2">
-                {columns.map((c, i) => (
-                  <button
-                    key={i}
-                    onClick={() => {
-                      onMoveOrder(selectedOrder.id, c);
-                      setSelectedOrder({ ...selectedOrder, stage: c });
-                    }}
-                    className={`px-2.5 py-1 text-[11px] font-semibold rounded-lg border transition ${
-                      selectedOrder.stage === c ? 'bg-black text-white border-black' : 'bg-gray-100 text-gray-700 border-gray-200 hover:bg-gray-200'
-                    }`}
-                  >
-                    {c}
-                  </button>
-                ))}
+              <div className="flex flex-wrap gap-2">
+                {columns.map((c, i) => {
+                  const currentIdx = columns.indexOf(selectedOrder.stage);
+                  const isCurrent = i === currentIdx;
+                  const isNext = i === currentIdx + 1;
+                  const isMovingThis = movingId === selectedOrder.id;
+
+                  return (
+                    <button
+                      key={c}
+                      onClick={() => handleMove(c)}
+                      disabled={isCurrent || !isNext || isMovingThis}
+                      title={!isCurrent && !isNext ? 'Can only advance one stage at a time' : isCurrent ? 'Current stage' : undefined}
+                      className={`px-2.5 py-1 text-[11px] font-semibold rounded-lg border transition inline-flex items-center gap-1.5 ${
+                        isCurrent
+                          ? 'bg-black text-white border-black cursor-default'
+                          : isNext
+                          ? 'bg-blue-600 text-white border-blue-600 hover:bg-blue-700 cursor-pointer shadow-sm'
+                          : 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed opacity-60'
+                      }`}
+                    >
+                      {isMovingThis && isNext && (
+                        <Loader2 className="w-3 h-3 animate-spin" />
+                      )}
+                      <span>{c}</span>
+                    </button>
+                  );
+                })}
               </div>
             </div>
           </div>

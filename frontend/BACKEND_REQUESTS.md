@@ -42,3 +42,25 @@ Written by Developer B from checkpoints T2 and T3; each item names the file and 
    - `backend/controllers/operations.controller.js:602-675` (`getFinanceOverview`) returns static financials.
    - `backend/controllers/operations.controller.js:692-703` (`getSettingsMatrix`) returns static approval limits.
    - **Request**: Transition these read controllers from static JSON payloads to live database queries as tables are created.
+
+8. **HIGH — Stage progression not enforced on server**:
+   - `backend/controllers/operations.controller.js:208-223` (`moveProduction`) updates `stage` in `production_orders` directly using `UPDATE production_orders SET stage = ? WHERE id = ?`.
+   - Today the server accepts ANY arbitrary string and does not verify the existing stage of the work order. An API caller can skip intermediate stages (e.g., jump from "With GM" directly to "Completed") or move backward without authorization.
+   - **Request**: Define the permitted linear progression order (`['With GM', 'With Plant Manager', 'With Production Manager', 'Materials requested', 'In production', 'Completed']`), query the order's current stage with row locking, verify that the requested stage is strictly the next valid sequential step, and reject invalid transitions with HTTP 400.
+
+9. **HIGH — Inventory deduction and finished goods generation on work order completion**:
+   - `backend/controllers/operations.controller.js:208-223` (`moveProduction`) only updates the `stage` text column.
+   - When a work order transitions to `"Completed"`, no inventory transactions are generated: breaking-grade eggs are not deducted from raw materials store (`RSK_RM`), and produced liquid egg product (`quantity_kg`) is not added to finished goods inventory (`RSK_FG`).
+   - **Request**: When stage advances to `"Completed"`, wrap the transition in a database transaction that: (1) calculates bill-of-materials raw egg consumption, (2) decrements raw materials in `inventory_items` and logs `inventory_transactions` (`'PRODUCTION_CONSUMPTION'`), and (3) increments finished goods inventory in `RSK_FG` and logs `inventory_transactions` (`'PRODUCTION_OUTPUT'`).
+
+10. **HIGH — Missing authentication and role checks on production and inventory endpoints**:
+    - `backend/routes/operations.routes.js:25` (`POST /production/move`) and `backend/routes/inventory.routes.js:6-7` (`POST /adjust`, `POST /transfer`) have no `authenticateToken` middleware attached.
+    - Any anonymous caller can move production order stages, adjust stock quantities, or execute warehouse transfers.
+    - In `backend/controllers/operations.controller.js:208-223`, there is no role check verifying if the user has production management authority.
+    - **Request**: Mount `authenticateToken` on `backend/routes/inventory.routes.js` and `operations.routes.js`. Enforce role-based access control: only `'Plant Manager'`, `'Production Manager'`, and `'ERP Admin'` should be permitted to advance production orders; only `'Raw Material Store'`, `'Finish Store & Delivery'`, `'Director Operations'`, and `'ERP Admin'` should be permitted to adjust or transfer stock.
+
+11. **MEDIUM — Server-side validation of stock adjustments and warehouse transfer payload**:
+    - `backend/controllers/inventory.controller.js:37-125` (`adjustStock`) and `130-253` (`transferStock`):
+    - `adjustStock` accepts `adjustType` and defaults to addition for any unrecognized string; `reason` defaults to `"General Adjustment"` if omitted. If an invalid or zero quantity string bypasses the client or is negative, edge cases can cause erratic delta calculations.
+    - In `transferStock`, vehicle number and driver fields are not sanitized or length-capped, and transfer between invalid facility codes must return standardized JSON errors with HTTP 400 rather than raw database or generic error messages.
+    - **Request**: Add strict input validation using a validation schema or guard conditions: reject `adjust_qty <= 0` or NaN with HTTP 400 Bad Request, restrict `adjustType` strictly to `['add', 'subtract']`, require a non-empty `reason` string of at least 3 characters, and validate that `fromWarehouse` and `toWarehouse` exist in known facility registries and are not identical.

@@ -87,14 +87,21 @@ The following accounts are pre-seeded in the database (demo accounts use the see
 - **Backend Verification**:
   - **NOT VERIFIED** (No `/api/qc` backend endpoint exists; screen operates on mock state).
 
-### 1.5 Inventory & Warehouse Verification
+### 1.5 Inventory & Multi-Warehouse Control
 - **Role to Log In**: Raw Material Store (`usman.ali@yaf.com`) or Admin (`admin@yaf.com`)
 - **Screen**: **Inventory** (Sidebar → *Inventory*)
 - **Audience Sees**:
-  - Multi-warehouse stock balances: Mardan (MRD), Attock (ATK), Charsadda (CCF), Peshawar (PHF), Risalpur Raw Materials (RSK RM).
+  - Multi-warehouse stock balances: Mardan (MRD), Attock (ATK), Charsadda (CCF), Peshawar (PHF), Rashakai Raw Materials (RSK RM), Rashakai Finished Goods (RSK FG).
+  - Empty state when no inventory exists: `"No inventory items found."`
+- **Action & Verification Checks**:
+  1. Click **"Stock Adjustment"**: Test validation by submitting with 0 quantity, negative quantity, or empty reason. Verify inline error banner appears and modal remains open. Then submit a valid adjustment.
+  2. Click **"Inter-Warehouse Transfer"**: Test validation by selecting identical source and destination warehouses (e.g., CCF to CCF) or invalid quantity. Verify inline error banner prevents submission. Notice vehicle number is optional and defaults to empty (no hardcoded plate).
+  3. Switch to **"Stock Movement Ledger"** tab: Verify table displays audit ledger with loading indicator, inline error handling, or empty state (`"No stock movements yet"`).
 - **Backend Verification**:
   - `GET /api/inventory` — **VERIFIED** (HTTP 200, reads `inventory_items`).
   - `POST /api/inventory/adjust` — **VERIFIED** (HTTP 200, posts stock adjustment and writes to `inventory_transactions`).
+  - `POST /api/inventory/transfer` — **VERIFIED** (HTTP 200, ACID row-level locking transfer between warehouses).
+  - `GET /api/inventory/ledger` — **VERIFIED** (HTTP 200, returns audit ledger).
 
 ---
 
@@ -105,10 +112,14 @@ The following accounts are pre-seeded in the database (demo accounts use the see
 - **Screen**: **Sales & Credit** (Sidebar → *Sales & Credit*)
 - **Audience Sees**:
   - Sales order details, customer exposure, credit limit bar, payment terms.
-- **Action**: Click "Approve Order" to trigger approval workflow.
+  - Pending orders table or `"No sales orders yet"` empty state.
+- **Action**:
+  - Review orders and customer credit exposure.
+  - **BLOCKED until Developer A applies authenticateToken to the operations routes: today POST /api/sales/approve returns 401 for everyone (see BACKEND_REQUESTS.md item 1).**
+  - *Demo Workaround*: Demonstrate viewing existing sales orders, inspecting invoicing tabs, and reviewing customer credit limits. Do not click Approve during a live presentation until Developer A deploys the auth middleware fix.
 - **Backend Verification**:
   - `GET /api/sales/orders` — **VERIFIED** (HTTP 200, returns orders).
-  - `POST /api/sales/approve` — **VERIFIED** (HTTP 200).
+  - `POST /api/sales/approve` — **NOT VERIFIED / BLOCKED** (returns HTTP 401 Unauthorized for all users because `operations.routes.js` lacks `authenticateToken`).
 
 ### 2.2 Finance Credit Release
 - **Role to Log In**: Director Finance (`finance@yaf.com`)
@@ -161,15 +172,17 @@ The following accounts are pre-seeded in the database (demo accounts use the see
 - **Audience Sees**:
   - Kanban columns:
     1. *With GM*
-    2. *Shell Egg Washing*
-    3. *Breaking & Separation*
-    4. *Pasteurization*
-    5. *Finished Goods Packing*
-    6. *Quality Cleared*
-  - Work orders with calculated egg counts, tray counts, duration, and batch costs.
-- **Action**:
-  1. Click **"Move to Next Stage"** on a work order card.
-  2. Verify that the order transitions forward to the next stage in sequence.
+    2. *With Plant Manager*
+    3. *With Production Manager*
+    4. *Materials requested*
+    5. *In production*
+    6. *Completed*
+  - Empty state when no work orders exist: `"No production orders yet"`.
+  - Detail modal displays formula box clearly labeled with badge: `"Example calculation (fixed recipe, not from live records)"`.
+- **Action & Verification Checks**:
+  1. Click any work order card to open the Detail & Recipe Calculation modal.
+  2. Verify stage advancement enforcement: non-adjacent stage buttons are disabled with tooltip `"Can only advance one stage at a time"` (e.g., cannot skip from "With GM" directly to "Completed").
+  3. Click the next sequential stage button: verify button is disabled and shows a spinner while the request processes, with inline error banner (`moveError`) keeping modal open if the backend rejects.
 - **Backend Verification**:
   - `GET /api/production/board` — **VERIFIED** (HTTP 200, reads `production_orders`).
   - `POST /api/production/move` — **VERIFIED** (HTTP 200, updates stage in `production_orders`).
@@ -202,10 +215,10 @@ The following accounts are pre-seeded in the database (demo accounts use the see
 | **Procurement** | `GET /api/procurement/pos`, `POST /api/procurement/pos` | **VERIFIED** | Live DB creation, auto-total, status display. |
 | **Gate Security** | `GET /api/gate`, `POST /api/gate` | **VERIFIED** | Inward pass creation live; outward pass queue NOT VERIFIED. |
 | **QC & Goods Receipt** | None (`/api/qc`) | **NOT VERIFIED** | Demo data screen marked with `<DemoBadge />`. |
-| **Inventory** | `GET /api/inventory`, `POST /api/inventory/adjust` | **VERIFIED** | Multi-warehouse balances from DB. |
-| **Production Board** | `GET /api/production/board`, `POST /api/production/move` | **VERIFIED** | Live Kanban moves across stages. |
+| **Inventory** | `GET /api/inventory`, `POST /api/inventory/adjust`, `POST /api/inventory/transfer` | **VERIFIED** | Multi-warehouse balances, ACID stock transfer, client validation & inline error banners, movement ledger. |
+| **Production Board** | `GET /api/production/board`, `POST /api/production/move` | **VERIFIED** | Live Kanban moves across stages. Client enforces sequential stage advancement. Recipe labeled as example. |
 | **POS & Retail** | `POST /api/pos/checkout`, `GET /api/pos/orders` | **VERIFIED** | Real checkout & stock deduction. Customer list NOT VERIFIED (demo). |
-| **Sales & Credit** | `GET /api/sales/orders`, `POST /api/sales/approve` | **VERIFIED** | Live orders list. |
+| **Sales & Credit** | `GET /api/sales/orders`, `POST /api/sales/approve` | **BLOCKED** | Orders list verified. POST /api/sales/approve returns 401 until authenticateToken is wired on operations routes (see BACKEND_REQUESTS.md item 1). |
 | **Finance** | `GET /api/finance/overview` | **VERIFIED** | Live finance summary. |
 | **Live Operations** | `GET /api/live-operations` | **VERIFIED** | Plant sensor telemetry. |
 | **Payroll** | `GET /api/payroll`, `POST /api/payroll/generate` | **VERIFIED** | Payroll run generation. |
