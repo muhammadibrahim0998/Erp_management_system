@@ -67,7 +67,9 @@ export default function Auth({ onLogin }) {
             setDevUsers(users);
           }
         })
-        .catch(() => {});
+        .catch((err) => {
+          console.warn('Could not load dev shortcut users:', err.message);
+        });
       return () => { isMounted = false; };
     }
   }, [isLogin]);

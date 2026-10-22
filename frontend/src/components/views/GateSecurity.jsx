@@ -132,7 +132,7 @@ export default function GateSecurity({ gatePasses, onAddGatePass }) {
                 <label className="font-semibold text-gray-700 block mb-1">Supplier or Farm Name</label>
                 <input
                   type="text"
-                  placeholder="e.g. Charsadda Poultry Farm"
+                  placeholder="Supplier or customer name"
                   value={supplier}
                   onChange={(e) => setSupplier(e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-black"

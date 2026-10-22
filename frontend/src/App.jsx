@@ -101,6 +101,10 @@ export default function App() {
       if (data.marketing) setCampaigns(data.marketing);
       if (data.payroll) setPayrollRuns(data.payroll);
       if (data.finance) setFinanceData(data.finance);
+
+      if (data.failed && data.failed.length > 0) {
+        showNotification(`Could not load: ${data.failed.join(', ')}`, 'error');
+      }
     } catch (err) {
       console.error('Data fetch error:', err);
     } finally {
@@ -207,9 +211,21 @@ export default function App() {
     setCurrentUser(null);
   };
 
+  if (!isAuthenticated || !currentUser) {
+    return (
+      <Auth
+        onLogin={(user, token) => {
+          setCurrentUser(user);
+          setIsAuthenticated(true);
+          fetchAllData();
+        }}
+      />
+    );
+  }
+
   // Role & Department permission checking
-  const userRole = currentUser?.role || '';
-  const userDept = currentUser?.department || '';
+  const userRole = currentUser.role || '';
+  const userDept = currentUser.department || '';
   const isSuperAdmin = userRole === 'ERP Admin' || userRole === 'Chairman & CEO';
   const isGM = userRole === 'General Manager' || isSuperAdmin;
   const isFinance = userDept === 'Finance' || isGM;
@@ -272,18 +288,6 @@ export default function App() {
       ].filter(item => item.visible)
     }
   ].filter(section => section.items.length > 0);
-
-  if (!isAuthenticated || !currentUser) {
-    return (
-      <Auth
-        onLogin={(user, token) => {
-          setCurrentUser(user);
-          setIsAuthenticated(true);
-          fetchAllData();
-        }}
-      />
-    );
-  }
 
   return (
     <div className="flex h-screen bg-[#0E2118] text-gray-900 overflow-hidden font-sans">

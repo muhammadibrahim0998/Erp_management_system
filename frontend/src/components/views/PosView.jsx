@@ -28,6 +28,7 @@ import {
 } from 'lucide-react';
 import { posService } from '../../services';
 import { exportToPDF } from '../../utils/exportUtils';
+import DemoBadge from '../DemoBadge';
 
 export default function PosView({ currentUser, onSaleCompleted }) {
   // Navigation inside POS view: 'terminal' or 'history'
@@ -68,6 +69,7 @@ export default function PosView({ currentUser, onSaleCompleted }) {
     todayTraysSold: 0
   });
 
+  // demo customers
   // Pre-registered B2B Egg Dealers for quick selection
   const REGISTERED_DEALERS = [
     { name: 'Swat Valley Egg Dealers', phone: '0300-9876543', limit: 'PKR 15.0M', rating: 'Tier 1' },
@@ -571,6 +573,7 @@ export default function PosView({ currentUser, onSaleCompleted }) {
 
                   {customerType === 'dealer' ? (
                     <div className="space-y-1.5">
+                      <DemoBadge />
                       <select
                         value={customerName}
                         onChange={(e) => handleSelectDealer(e.target.value)}
