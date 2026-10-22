@@ -32,7 +32,7 @@ import {
 
 import ChairmanDashboard from './components/views/ChairmanDashboard';
 import ApprovalsInbox from './components/views/ApprovalsInbox';
-import { authService, operationsService } from './services';
+import { authService, operationsService, userService } from './services';
 import LiveOperations from './components/views/LiveOperations';
 import GateSecurity from './components/views/GateSecurity';
 import QcGoodsReceipt from './components/views/QcGoodsReceipt';
@@ -183,16 +183,12 @@ export default function App() {
 
   const handleAddUser = async (userData) => {
     try {
-      const res = await fetch('http://localhost:7000/api/users', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(userData)
-      });
-      if (res.ok) {
-        showNotification('New staff member added successfully in MySQL');
-        fetchAllData();
-      }
-    } catch (e) { }
+      await userService.createUser(userData);
+      showNotification('New staff member added successfully in MySQL');
+      fetchAllData();
+    } catch (e) {
+      showNotification(e.message || 'Failed to add user');
+    }
   };
 
   const handleLogout = () => {
