@@ -328,20 +328,23 @@ export default function App() {
           </button>
         </div>
 
-        {/* Center: Modern Professional White 3D Search Bar */}
-        <div className="relative flex-1 max-w-lg mx-6 group">
-          <div className="relative flex items-center bg-white rounded-xl border-t border-t-white border-x border-gray-200 border-b-[3px] border-b-gray-300 shadow-[0_3px_8px_rgba(0,0,0,0.25),inset_0_1px_1px_rgba(255,255,255,0.9)] hover:-translate-y-0.5 hover:border-b-gray-400 hover:shadow-[0_5px_14px_rgba(0,0,0,0.3)] focus-within:-translate-y-0.5 focus-within:ring-2 focus-within:ring-emerald-500/40 focus-within:border-emerald-600 focus-within:border-b-[3px] focus-within:border-b-emerald-700 transition-all duration-200">
-            <Search className="w-4 h-4 absolute left-3.5 text-emerald-700 pointer-events-none transition-colors group-focus-within:text-emerald-800" />
+        {/* Center: Modern Compact 3D Search Bar with Stable Position & Yellow Hover */}
+        <div className="relative mx-4 sm:mx-6 w-60 sm:w-68 md:w-76 group">
+          <div className="relative flex items-center bg-white rounded-xl border-t border-t-white border-x border-gray-200 border-b-[3px] border-b-gray-300 shadow-[0_3px_8px_rgba(0,0,0,0.25),inset_0_1px_1px_rgba(255,255,255,0.9)] hover:border-amber-400 hover:border-b-[3px] hover:border-b-amber-500 hover:shadow-[0_0_15px_rgba(245,158,11,0.5),0_3px_8px_rgba(0,0,0,0.2)] focus-within:ring-2 focus-within:ring-amber-400/40 focus-within:border-amber-400 focus-within:border-b-[3px] focus-within:border-b-amber-500 focus-within:shadow-[0_0_15px_rgba(245,158,11,0.5)] transition-all duration-200 pl-3.5 pr-1 py-1">
             <input
               type="text"
-              placeholder="Search documents, items, customers, suppliers..."
-              className="w-full bg-transparent pl-10 pr-20 py-2 text-xs md:text-sm text-gray-800 font-bold placeholder:text-gray-400 placeholder:font-normal focus:outline-none"
+              placeholder="Search ERP..."
+              className="w-full bg-transparent pr-2 py-1 text-xs text-gray-800 font-bold placeholder:text-gray-400 placeholder:font-normal focus:outline-none"
             />
-            <div className="absolute right-2.5 flex items-center gap-1">
-              <span className="hidden sm:inline-flex items-center px-1.5 py-0.5 rounded-md bg-gray-100 border border-gray-200 text-[10px] font-mono font-bold text-gray-500 shadow-xs">
-                ⌘K
-              </span>
-            </div>
+            
+            {/* Circular 3D Search Button Inside Right of Search Bar */}
+            <button
+              onClick={() => showNotification('Searching system records...')}
+              className="w-7 h-7 rounded-full bg-gradient-to-b from-[#0d4f2b] to-[#07361c] border-t border-emerald-300/60 border-x border-[#094223] border-b-2 border-b-[#032412] text-emerald-100 flex items-center justify-center shadow-[0_2px_0_0_#02180c,0_3px_6px_rgba(0,0,0,0.25)] hover:from-amber-400 hover:via-amber-500 hover:to-amber-600 hover:text-amber-950 hover:border-t-amber-200 hover:border-x-amber-400 hover:border-b-[#78350f] hover:shadow-[0_2px_0_0_#78350f,0_5px_12px_rgba(245,158,11,0.6)] active:translate-y-[1px] active:border-b active:shadow-none transition-all duration-150 cursor-pointer shrink-0 group/btn"
+              title="Search ERP System"
+            >
+              <Search className="w-3.5 h-3.5 transition-transform duration-200 group-hover/btn:scale-110 group-hover/btn:rotate-6" />
+            </button>
           </div>
         </div>
 
@@ -398,11 +401,10 @@ export default function App() {
       <div className="flex flex-1 min-h-0 overflow-hidden">
         {/* Vibrant Green Sidebar matching image (#0c8547) */}
         <aside
-          className={`${
-            isSidebarOpen
+          className={`${isSidebarOpen
               ? 'w-56 border-r-2 border-r-[#032612] shadow-[6px_0_18px_-2px_rgba(0,0,0,0.35),14px_0_32px_-4px_rgba(0,0,0,0.28),2px_0_5px_rgba(0,0,0,0.2)]'
               : 'w-0 border-r-0 shadow-none pointer-events-none'
-          } overflow-hidden relative z-20 bg-gradient-to-b from-[#0c8748] via-[#0b8445] to-[#09783c] flex flex-col justify-between shrink-0 transition-all duration-300 ease-in-out`}
+            } overflow-hidden relative z-20 bg-gradient-to-b from-[#0c8748] via-[#0b8445] to-[#09783c] flex flex-col justify-between shrink-0 transition-all duration-300 ease-in-out`}
         >
           {/* Scrollable Navigation with Enhanced Spacing and Green 3D Shadow */}
           <div
@@ -422,15 +424,15 @@ export default function App() {
                       key={item.id}
                       onClick={() => setActiveTab(item.id)}
                       className={`w-full group relative flex items-center justify-between px-2.5 py-2 rounded-xl text-[13px] font-black transition-all duration-200 transform cursor-pointer ${isActive
-                          ? 'bg-gradient-to-b from-[#fbbf24] via-[#f59e0b] to-[#d97706] text-emerald-950 border-t border-t-amber-100 border-x border-x-amber-400 border-b-[3.5px] border-b-[#78350f] shadow-[0_4px_0_0_#78350f,0_8px_18px_rgba(245,158,11,0.55),inset_0_1px_2px_rgba(255,255,255,0.7)] translate-y-[-0.5px]'
-                          : 'bg-gradient-to-b from-[#0f4d2b] via-[#0a3f23] to-[#07321c] text-white border-t border-t-emerald-300/40 border-x border-[#094124] border-b-[3.5px] border-b-[#032613] shadow-[0_4px_0_0_#021d0f,0_6px_14px_rgba(4,45,23,0.55)] hover:-translate-y-1 hover:scale-[1.02] hover:from-[#135a34] hover:to-[#0a3c21] hover:text-amber-300 hover:border-t-amber-300 hover:border-x-amber-400/40 hover:shadow-[0_5px_0_0_#021d0f,0_10px_22px_rgba(245,158,11,0.35)] active:translate-y-[1px] active:border-b-[1.5px] active:shadow-none'
+                        ? 'bg-gradient-to-b from-[#fbbf24] via-[#f59e0b] to-[#d97706] text-emerald-950 border-t border-t-amber-100 border-x border-x-amber-400 border-b-[3.5px] border-b-[#78350f] shadow-[0_4px_0_0_#78350f,0_8px_18px_rgba(245,158,11,0.55),inset_0_1px_2px_rgba(255,255,255,0.7)] translate-y-[-0.5px]'
+                        : 'bg-gradient-to-b from-[#0f4d2b] via-[#0a3f23] to-[#07321c] text-white border-t border-t-emerald-300/40 border-x border-[#094124] border-b-[3.5px] border-b-[#032613] shadow-[0_4px_0_0_#021d0f,0_6px_14px_rgba(4,45,23,0.55)] hover:-translate-y-1 hover:scale-[1.02] hover:from-[#135a34] hover:to-[#0a3c21] hover:text-amber-300 hover:border-t-amber-300 hover:border-x-amber-400/40 hover:shadow-[0_5px_0_0_#021d0f,0_10px_22px_rgba(245,158,11,0.35)] active:translate-y-[1px] active:border-b-[1.5px] active:shadow-none'
                         }`}
                     >
                       <div className="flex items-center gap-2 min-w-0">
                         <div
                           className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 transition-all duration-200 ${isActive
-                              ? 'bg-[#062e16] border border-emerald-900 text-amber-300 shadow-[inset_0_1.5px_3px_rgba(0,0,0,0.6)] scale-105'
-                              : 'bg-[#062413] border border-emerald-400/40 shadow-[inset_0_1.5px_3px_rgba(0,0,0,0.5)] text-emerald-200 group-hover:border-amber-400 group-hover:text-amber-300 group-hover:bg-[#09351d] group-hover:shadow-[0_0_10px_rgba(245,158,11,0.6)] group-hover:scale-105'
+                            ? 'bg-[#062e16] border border-emerald-900 text-amber-300 shadow-[inset_0_1.5px_3px_rgba(0,0,0,0.6)] scale-105'
+                            : 'bg-[#062413] border border-emerald-400/40 shadow-[inset_0_1.5px_3px_rgba(0,0,0,0.5)] text-emerald-200 group-hover:border-amber-400 group-hover:text-amber-300 group-hover:bg-[#09351d] group-hover:shadow-[0_0_10px_rgba(245,158,11,0.6)] group-hover:scale-105'
                             }`}
                         >
                           <Icon className="w-3.5 h-3.5 transition-transform duration-200 group-hover:rotate-6" />
@@ -471,7 +473,7 @@ export default function App() {
         </aside>
 
         {/* Gray Dashboard Background with Full White Content Views */}
-        <main className="flex-1 bg-gray-100 overflow-y-auto overflow-x-hidden p-8">
+        <main className="flex-1 bg-gray-100 overflow-y-auto overflow-x-hidden p-8 relative [perspective:1400px]">
           <div key={activeTab} className="max-w-7xl mx-auto animate-page-slide-left">
             {activeTab === 'dashboard' && (
               <ChairmanDashboard
