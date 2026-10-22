@@ -533,7 +533,7 @@ export default function App() {
 
             {activeTab === 'hr' && (
               <ApprovalsInbox
-                tasks={tasks.filter(t => t.doc_type?.includes('Production') || t.assigned_role?.includes('HR'))}
+                tasks={tasks.filter(t => t.assigned_role === currentUser?.name || t.assigned_role === 'Nadia Shah' || t.doc_type?.includes('HR'))}
                 onApproveTask={handleApproveTask}
                 isLoading={isLoading}
                 onRefetch={fetchAllData}

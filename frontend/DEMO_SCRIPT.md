@@ -2,6 +2,8 @@
 
 This document details the three core operational cycles for demonstration and user acceptance testing of the Yousafzai Agri Foods (YAF) ERP. Every step documents the sequence of screens, the recommended user credentials and role, the expected audience observation, and verification status against the backend API.
 
+Presenters can honestly state that only the following operational screens are DB-backed: Approvals Inbox, Procurement, Gate Security (inward), Inventory, Production Board, POS & Retail, Sales Orders list, Payroll runs, and User Management. All other screens (Chairman Dashboard executive KPIs, Finance Overview, Reports P&L, Live Operations telemetry, and Settings Matrix) are served by the API but static (sample data), or are pure client demonstrations (QC Cell, Process Map).
+
 ---
 
 ## Verified User Logins
@@ -150,10 +152,10 @@ The following accounts are pre-seeded in the database (demo accounts use the see
 - **Role to Log In**: Accounts Officer (`hamza.khan@yaf.com`) or Director Finance (`finance@yaf.com`)
 - **Screen**: **Finance** (Sidebar → *Finance*)
 - **Audience Sees**:
-  - Live cash & bank accounts, balances, receivables aging, top debtors, payables aging, top creditors.
-  - Screen displays `<DemoBadge />` indicating fixed baseline demonstration figures.
+  - Cash & bank accounts, balances, receivables aging, top debtors, payables aging, top creditors served as sample baseline data by the API.
+  - Screen displays `<DemoBadge />` indicating sample data served by the API not yet linked to live records.
 - **Backend Verification**:
-  - `GET /api/finance/overview` — **VERIFIED** (HTTP 200, returns cash accounts, receivables, and payables).
+  - `GET /api/finance/overview` — served by the API but static (sample data) (HTTP 200, returns literal JSON without querying database tables).
 
 ### 2.5 Outward Dispatch Gate Pass
 - **Role to Log In**: Gate Officer (`gate@yaf.com`)
@@ -211,16 +213,16 @@ The following accounts are pre-seeded in the database (demo accounts use the see
 
 | Screen | Primary API Endpoint | Status | Notes |
 |---|---|---|---|
-| **Chairman Dashboard** | `GET /api/dashboard/chairman` | **VERIFIED** | Connected to live DB for approvals and exceptions; dynamic badge count; KPI sub-labels bound; static revenue chart labeled with `<DemoBadge />`. |
-| **Approvals Inbox** | `GET /api/approvals`, `POST /api/approvals/:id/action` | **VERIFIED** | Reject reason validated on client; server doesn't store reason. |
-| **Procurement** | `GET /api/procurement/pos`, `POST /api/procurement/pos` | **VERIFIED** | Live DB creation, auto-total, status display. |
-| **Gate Security** | `GET /api/gate`, `POST /api/gate` | **VERIFIED** | Inward pass creation live; outward pass queue NOT VERIFIED. |
-| **QC & Goods Receipt** | None (`/api/qc`) | **NOT VERIFIED** | Demo data screen marked with `<DemoBadge />`. |
-| **Inventory** | `GET /api/inventory`, `POST /api/inventory/adjust`, `POST /api/inventory/transfer` | **VERIFIED** | Multi-warehouse balances, ACID stock transfer, client validation & inline error banners, movement ledger. |
-| **Production Board** | `GET /api/production/board`, `POST /api/production/move` | **VERIFIED** | Live Kanban moves across stages. Client enforces forward advance and one-step rework return. Recipe labeled as example. |
-| **POS & Retail** | `POST /api/pos/checkout`, `GET /api/pos/orders` | **VERIFIED** | Real checkout & stock deduction. Customer list NOT VERIFIED (demo). |
-| **Sales & Credit** | `GET /api/sales/orders`, `POST /api/sales/approve` | **BLOCKED** | Orders list verified. POST /api/sales/approve returns 401 until authenticateToken is wired on operations routes (see BACKEND_REQUESTS.md item 1). |
-| **Finance** | `GET /api/finance/overview` | **VERIFIED** | Live cash and bank, receivables, and payables bound from API; marked with `<DemoBadge />`. |
-| **Live Operations** | `GET /api/live-operations` | **VERIFIED** | Plant sensor telemetry. |
-| **Payroll** | `GET /api/payroll`, `POST /api/payroll/generate` | **VERIFIED** | Live payroll runs from MySQL; hardened generate handler with try/catch/finally and empty state. |
-| **Reports** | `GET /api/reports/pnl` | **VERIFIED** | P&L statement wired to live API with loading, error state, and baseline fallback; marked with `<DemoBadge />`. |
+| **Chairman Dashboard** | `GET /api/dashboard/chairman` | **MIXED** | Approvals list is DB-backed; KPI metrics, revenue chart, aging, budget, and exceptions are served by the API but static (sample data) and labeled with `<DemoBadge />`. |
+| **Approvals Inbox** | `GET /api/approvals`, `POST /api/approvals/:id/action` | **DB-BACKED** | Tasks query `workflow_tasks` table in MySQL; reject reason validated on client; server doesn't store reason. |
+| **Procurement** | `GET /api/procurement/pos`, `POST /api/procurement/pos` | **DB-BACKED** | Live DB creation, auto-total, status display. |
+| **Gate Security** | `GET /api/gate`, `POST /api/gate` | **DB-BACKED** | Inward pass creation live; outward pass queue NOT VERIFIED. |
+| **QC & Goods Receipt** | None (`/api/qc`) | **DEMO** | Demo data screen (no endpoint) marked with `<DemoBadge />`. |
+| **Inventory** | `GET /api/inventory`, `POST /api/inventory/adjust`, `POST /api/inventory/transfer` | **DB-BACKED** | Multi-warehouse balances, ACID stock transfer, client validation & inline error banners, movement ledger. |
+| **Production Board** | `GET /api/production/board`, `POST /api/production/move` | **DB-BACKED** | Live Kanban moves across stages. Client enforces forward advance and one-step rework return. Recipe labeled as example. |
+| **POS & Retail** | `POST /api/pos/checkout`, `GET /api/pos/orders` | **DB-BACKED** | Real checkout & stock deduction. Customer list NOT VERIFIED (demo). |
+| **Sales & Credit** | `GET /api/sales/orders`, `POST /api/sales/approve` | **BLOCKED** | Orders list verified (DB-backed). POST /api/sales/approve returns 401 until authenticateToken is wired on operations routes (see BACKEND_REQUESTS.md item 1). |
+| **Finance** | `GET /api/finance/overview` | **STATIC API** | Served by the API but static (sample data); marked with `<DemoBadge label="Sample data served by the API — not yet linked to live records" />`. |
+| **Live Operations** | `GET /api/live-operations` | **STATIC API** | Served by the API but static (sample data mock telemetry). |
+| **Payroll** | `GET /api/payroll`, `POST /api/payroll/generate` | **DB-BACKED** | Live payroll runs query `payroll_runs` in MySQL; hardened generate handler with try/catch/finally and empty state. |
+| **Reports** | `GET /api/reports/pnl` | **STATIC API** | Served by the API but static (sample data); marked with `<DemoBadge label="Sample data served by the API — not yet linked to live records" />`. |

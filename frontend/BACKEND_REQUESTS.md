@@ -82,6 +82,17 @@ Written by Developer B from checkpoints T2 and T3; each item names the file and 
     - In `getChairmanDashboard` exceptions, `exceptions[0].desc` is returned while standard client code checks for `description` (`description` is MISSING from live API).
     - **Request**: Transition `getFinanceOverview` and `getChairmanDashboard` to aggregate live figures from `inventory_transactions`, `purchase_orders`, `sales_orders`, and ledger accounts. Standardize exception objects to include `description`, `doc_number`, `party`, and `route`.
 
+15. **LOW — Missing nested keys in static financial & dashboard payloads**:
+    - `backend/controllers/operations.controller.js:646`: `financeData.payables` lacks `d31_60` key; client falls back safely to `'0.0M'`.
+    - `backend/controllers/operations.controller.js:44`: `exceptions[0]` lacks `description` (provides `desc` instead) as well as metadata keys `party`, `doc_number`, `detail`, `route`, `action_label`. Client evaluates `exc.desc` first and defaults safely.
+    - Live `/api/approvals` check confirmed all client-consumed task properties (`id`, `doc_number`, `doc_type`, `title`, `party`, `priority`, `action_label`, `waiting_since`, `status`, `assigned_role`, `created_at`, `amount`) are present.
+    - **Request**: Add `"d31_60": "0.0M"` to `payables` in `getFinanceOverview`, and add `description` and full metadata to exception items in `getChairmanDashboard`.
+
+16. **MEDIUM — Standardize workflow_tasks.assigned_role or add explicit assignee role/department columns**:
+    - `backend/initDb.js:348-356`: The `assigned_role` column in `workflow_tasks` currently stores individual person names (`'Farhan Ali'`, `'Usama Tariq'`, `'Usman Ali'`, `'Khalid Mehmood'`, `'Dr. Asma Noor'`, `'Sana Ullah'`) instead of role or department identifiers.
+    - There are no HR tasks seeded, and no tasks assigned to the seeded HR Manager (`'Nadia Shah'`), making role-based task filtering ambiguous.
+    - **Request**: Either standardize `assigned_role` to store actual role titles (e.g. `'Production Manager'`, `'Store Officer'`, `'HR Manager'`), or add separate `assigned_to_name`, `assigned_role`, and `department` columns to `workflow_tasks` table so workflow routing matches user roles.
+
 ## Open decisions for the owner
 
 1. **'Poultry Farms' Role & Department Navigation Access**:
@@ -99,4 +110,8 @@ Written by Developer B from checkpoints T2 and T3; each item names the file and 
      ```
    - Because `userDept === 'Farms'` does not match any of these department rules and `userRole === 'Poultry Farms'` is not an admin/GM role, Zahid Afridi currently sees ONLY Dashboard, Approvals, and Process Map in the sidebar. All operational tabs (Procurement, Gate, QC, Inventory, Production, POS, Sales, Marketing, HR, Payroll, Finance, Reports, Users, Audit logs, Settings) are hidden.
    - **Decision Needed**: What navigation sections and screens should users in the `'Farms'` department have access to? (e.g., Inventory, Live Operations, Procurement, or a dedicated Farm Management view).
+
+2. **HR & Admin Tab Scope and Tasks Definition**:
+   - Currently, `activeTab === 'hr'` renders `ApprovalsInbox`. In `backend/initDb.js:348-356`, all 8 seeded workflow tasks belong to operations (production orders, gate pass, purchase order, store receipts) with zero HR tasks.
+   - **Decision Needed**: What specific document types and approval workflows belong under the "HR & Admin" tab? (e.g. Leave requests, hiring requisitions, staff salary revisions).
 

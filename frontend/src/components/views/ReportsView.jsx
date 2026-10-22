@@ -324,9 +324,10 @@ export default function ReportsView() {
       {/* REPORT CONTENT: 1. Profit & Loss */}
       {selectedReport === 'pnl' && (
         <div className="space-y-4">
+          <DemoBadge label="Sample data served by the API — not yet linked to live records" />
           {pnlError && (
             <div className="p-3 bg-amber-50 border border-amber-200 text-amber-800 text-xs font-semibold rounded-xl flex items-center justify-between shadow-sm">
-              <span>Could not load live statement ({pnlError}); displaying baseline P&L.</span>
+              <span>Could not load statement from server ({pnlError}); displaying baseline P&L.</span>
               <DemoBadge />
             </div>
           )}
@@ -365,7 +366,7 @@ export default function ReportsView() {
                 <div className="p-4 border-b border-gray-100 flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <h3 className="text-xs font-bold text-gray-900 uppercase tracking-wider">Statement of Comprehensive Income (PKR)</h3>
-                    {!livePnl && <DemoBadge />}
+                    <DemoBadge label="Sample data served by the API — not yet linked to live records" className="mb-0" />
                   </div>
                   <span className="text-[11px] text-gray-400 font-mono">Period: {livePnl?.period || `${fromDate} to ${toDate}`}</span>
                 </div>

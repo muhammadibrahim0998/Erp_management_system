@@ -77,6 +77,7 @@ export default function ChairmanDashboard({ data, onNavigate, onApproveTask, cur
       </div>
 
       {/* 5 KPI Metric Cards (Page 5) */}
+      <DemoBadge label="Sample data served by the API — not yet linked to live records" />
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
         {/* Revenue */}
         <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex flex-col justify-between">
@@ -145,7 +146,7 @@ export default function ChairmanDashboard({ data, onNavigate, onApproveTask, cur
               <div>
                 <div className="flex items-center gap-2">
                   <h3 className="text-sm font-bold text-gray-900">Revenue vs target</h3>
-                  <DemoBadge />
+                  <DemoBadge label="Sample data served by the API — not yet linked to live records" className="mb-0" />
                 </div>
                 <p className="text-[11px] text-gray-400">Last 12 months, PKR millions (excluding sales tax)</p>
               </div>
@@ -268,6 +269,7 @@ export default function ChairmanDashboard({ data, onNavigate, onApproveTask, cur
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* Receivables aging */}
         <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm">
+          <DemoBadge label="Sample data served by the API — not yet linked to live records" />
           <div className="flex items-center justify-between mb-3">
             <h4 className="text-xs font-bold text-gray-900 uppercase tracking-wider">Receivables aging</h4>
             <span className="text-xs font-mono font-bold text-gray-700">Total {data?.receivablesAging?.total || 'PKR 45.6M'}</span>
@@ -305,6 +307,7 @@ export default function ChairmanDashboard({ data, onNavigate, onApproveTask, cur
 
         {/* Budget vs actual */}
         <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm">
+          <DemoBadge label="Sample data served by the API — not yet linked to live records" />
           <div className="flex items-center justify-between mb-3">
             <h4 className="text-xs font-bold text-gray-900 uppercase tracking-wider">Budget vs actual · {budgetPeriod}</h4>
           </div>
@@ -333,9 +336,15 @@ export default function ChairmanDashboard({ data, onNavigate, onApproveTask, cur
         {/* Exceptions */}
         <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm flex flex-col justify-between">
           <div>
-            <h4 className="text-xs font-bold text-gray-900 uppercase tracking-wider mb-3">
-              Exceptions (Needs Attention)
-            </h4>
+            <div className="flex items-center justify-between mb-2">
+              <h4 className="text-xs font-bold text-gray-900 uppercase tracking-wider">
+                Exceptions (Needs Attention)
+              </h4>
+              <span className="text-xs font-semibold text-rose-600 bg-rose-50 px-2 py-0.5 rounded-full border border-rose-200">
+                {data?.exceptions?.length || 1} on hold
+              </span>
+            </div>
+            <DemoBadge label="Sample data served by the API — not yet linked to live records" />
             {data?.exceptions && data.exceptions.length > 0 ? (
               <div className="space-y-3">
                 {data.exceptions.map((exc, idx) => (

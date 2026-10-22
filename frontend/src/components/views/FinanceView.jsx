@@ -104,6 +104,7 @@ export default function FinanceView({ financeData, onNavigate }) {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Receivables */}
         <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 space-y-4">
+          <DemoBadge label="Sample data served by the API — not yet linked to live records" />
           <div className="flex items-center justify-between">
             <div>
               <h3 className="text-sm font-bold text-gray-900">Receivables</h3>
@@ -148,6 +149,7 @@ export default function FinanceView({ financeData, onNavigate }) {
 
         {/* Payables */}
         <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 space-y-4">
+          <DemoBadge label="Sample data served by the API — not yet linked to live records" />
           <div className="flex items-center justify-between">
             <div>
               <h3 className="text-sm font-bold text-gray-900">Payables</h3>
