@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Users, DollarSign, Calendar, CheckCircle2, Plus, Clock, FileText } from 'lucide-react';
 import { Loader2 } from 'lucide-react';
+import DemoBadge from '../DemoBadge';
 
 export default function PayrollView({ payrollRuns, onGeneratePayroll }) {
   const [isGenerating, setIsGenerating] = useState(false);
@@ -24,6 +25,8 @@ export default function PayrollView({ payrollRuns, onGeneratePayroll }) {
 
   return (
     <div className="space-y-6">
+      <DemoBadge label="Sample data served by the API — not yet linked to live records" />
+
       {/* Top Banner */}
       <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>

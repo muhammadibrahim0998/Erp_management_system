@@ -20,11 +20,16 @@ const APPROVER_ROLES = [
 
 const APPROVED_OR_LATER_STATUSES = ['Approved', 'Invoiced', 'Paid'];
 
+function formatApprovalStep(step) {
+  if (!step) return '';
+  return String(step).replace(/\bundefined\b/g, 'Authorized Approver');
+}
+
 function getApprovalSteps(order) {
   if (!order) return [];
   const creditBreach = Number(order.credit_breach) || 0;
   const status = order.status || 'Draft';
-  const approvalStepText = order.approval_step || 'Not required';
+  const approvalStepText = formatApprovalStep(order.approval_step) || 'Not required';
 
   const creditCheckStep = {
     label: 'Credit check',
@@ -323,7 +328,7 @@ export default function SalesCreditView({
             </span>
             {currentOrder.approval_step && (
               <span className="text-[11px] text-gray-500">
-                · {currentOrder.approval_step}
+                · {formatApprovalStep(currentOrder.approval_step)}
               </span>
             )}
           </div>

@@ -10,12 +10,15 @@ import {
   ArrowRight,
   CheckCircle2
 } from 'lucide-react';
+import DemoBadge from '../DemoBadge';
 
 export default function MarketingView({ campaigns }) {
   const [selectedCampaign, setSelectedCampaign] = useState(campaigns?.[0] || null);
 
   return (
     <div className="space-y-6">
+      <DemoBadge label="Sample data served by the API — not yet linked to live records" />
+
       {/* Top Banner */}
       <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>

@@ -93,6 +93,17 @@ Written by Developer B from checkpoints T2 and T3; each item names the file and 
     - There are no HR tasks seeded, and no tasks assigned to the seeded HR Manager (`'Nadia Shah'`), making role-based task filtering ambiguous.
     - **Request**: Either standardize `assigned_role` to store actual role titles (e.g. `'Production Manager'`, `'Store Officer'`, `'HR Manager'`), or add separate `assigned_to_name`, `assigned_role`, and `department` columns to `workflow_tasks` table so workflow routing matches user roles.
 
+17. **MEDIUM — Chairman dashboard query assumes 'pending' status while tasks advance to other statuses**:
+    - `backend/controllers/operations.controller.js:10`: `const [tasks] = await db.query('SELECT * FROM workflow_tasks WHERE status = "pending" LIMIT 6');`
+    - When tasks are approved, rejected, or returned (currently all 8 seeded tasks have statuses: `['approved', 'rejected', 'returned']`), `waitingApprovals` returns an empty array `[]`.
+    - Furthermore, `getChairmanDashboard` does not filter tasks by assignee (`assigned_role`), so when pending tasks do exist, it returns arbitrary pending tasks rather than tasks specifically requiring executive action.
+18. **MEDIUM — `req.user.name` evaluated to `undefined` during sales approval, polluting `sales_orders.approval_step` and `audit_logs.details`**:
+    - `backend/controllers/operations.controller.js:396`: `const approverText = \`Approved by \${req.user.name} (\${userRole})\`;`
+    - `backend/controllers/operations.controller.js:407`: `details: \`\${userRole} (\${req.user.name}) approved sales order \${so_number}\``
+    - When `req.user` lacks a `.name` property in the decoded JWT token, it writes the literal string `"Approved by undefined (Chairman & CEO)"` to `sales_orders.approval_step` and `"Chairman & CEO (undefined) approved sales order SO-2026-0419"` to `audit_logs`.
+    - Client-side views (`SalesCreditView.jsx` and `AuditLogsView.jsx`) now sanitize occurrences of `"undefined"` to display `"Authorized Approver"` / `"Authorized User"`.
+    - **Request**: Add fallback in `backend/controllers/operations.controller.js` (`req.user?.name || req.user?.email || 'Authorized User'`), ensure JWT token payloads or `authenticateToken` middleware always populates `req.user.name`, and run a cleanup script to replace `"undefined"` in existing records in MySQL tables `sales_orders` and `audit_logs`.
+
 ## Open decisions for the owner
 
 1. **'Poultry Farms' Role & Department Navigation Access**:

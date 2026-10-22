@@ -24,6 +24,11 @@ import {
 import { auditService } from '../../services';
 import { exportToExcel, exportToPDF } from '../../utils/exportUtils';
 
+function formatLogDetails(details) {
+  if (!details) return '';
+  return String(details).replace(/\bundefined\b/g, 'Authorized User');
+}
+
 export default function AuditLogsView({ currentUser }) {
   const [logs, setLogs] = useState([]);
   const [stats, setStats] = useState({
@@ -540,9 +545,9 @@ export default function AuditLogsView({ currentUser }) {
                       </td>
 
                       {/* Details */}
-                      <td className="py-3.5 px-4 max-w-xs truncate" title={log.details}>
+                      <td className="py-3.5 px-4 max-w-xs truncate" title={formatLogDetails(log.details)}>
                         <span className="text-gray-600 text-xs">
-                          {log.details || '—'}
+                          {formatLogDetails(log.details) || '—'}
                         </span>
                       </td>
 
@@ -658,7 +663,7 @@ export default function AuditLogsView({ currentUser }) {
               <div>
                 <span className="text-gray-400 block text-[10px] uppercase font-bold mb-1">Details & Description</span>
                 <div className="p-3 bg-gray-900 text-emerald-400 rounded-xl font-mono text-[11px] leading-relaxed break-words">
-                  {selectedLog.details || 'No additional description provided.'}
+                  {formatLogDetails(selectedLog.details) || 'No additional description provided.'}
                 </div>
               </div>
 
