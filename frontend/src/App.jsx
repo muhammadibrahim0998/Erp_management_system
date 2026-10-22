@@ -65,7 +65,7 @@ export default function App() {
   const [purchaseOrders, setPurchaseOrders] = useState([]);
   const [productionOrders, setProductionOrders] = useState([]);
   const [inventoryItems, setInventoryItems] = useState([]);
-  const [salesOrder, setSalesOrder] = useState(null);
+  const [salesOrders, setSalesOrders] = useState([]);
   const [campaigns, setCampaigns] = useState([]);
   const [payrollRuns, setPayrollRuns] = useState([]);
   const [financeData, setFinanceData] = useState(null);
@@ -88,7 +88,9 @@ export default function App() {
       if (data.procurement) setPurchaseOrders(data.procurement);
       if (data.production) setProductionOrders(data.production);
       if (data.inventory) setInventoryItems(data.inventory);
-      if (data.sales) setSalesOrder(data.sales);
+      if (data.sales) {
+        setSalesOrders(Array.isArray(data.sales) ? data.sales : [data.sales]);
+      }
       if (data.marketing) setCampaigns(data.marketing);
       if (data.payroll) setPayrollRuns(data.payroll);
       if (data.finance) setFinanceData(data.finance);
@@ -455,8 +457,12 @@ export default function App() {
 
             {activeTab === 'sales' && (
               <SalesCreditView
-                salesOrder={salesOrder}
+                salesOrders={salesOrders}
+                salesOrder={salesOrders[0]}
+                currentUser={currentUser}
                 onApproveOrder={handleApproveSales}
+                onRefresh={fetchAllData}
+                showNotification={showNotification}
               />
             )}
 

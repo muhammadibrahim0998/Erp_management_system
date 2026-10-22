@@ -24,9 +24,16 @@ router.post('/procurement/pos', operationsController.createProcurementPO);
 router.get('/production/board', operationsController.getProductionBoard);
 router.post('/production/move', operationsController.moveProduction);
 
-// Sales Orders & CEO Credit Approvals
+// Sales Orders & Order-to-Cash (Order -> Approval -> Invoice -> Payment)
 router.get('/sales/orders', operationsController.getSalesOrders);
+router.get('/sales/orders/:so_number', operationsController.getSalesOrderDetails);
+router.post('/sales/orders', operationsController.createSalesOrder);
 router.post('/sales/approve', operationsController.approveSalesOrder);
+router.post('/sales/orders/:so_number/approve', operationsController.approveSalesOrder);
+router.post('/sales/invoice', operationsController.invoiceSalesOrder);
+router.post('/sales/orders/:so_number/invoice', operationsController.invoiceSalesOrder);
+router.post('/sales/payment', operationsController.recordSalesPayment);
+router.post('/sales/orders/:so_number/payment', operationsController.recordSalesPayment);
 
 // Marketing Campaigns
 router.get('/marketing', operationsController.getMarketing);

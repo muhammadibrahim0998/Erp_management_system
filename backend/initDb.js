@@ -127,6 +127,71 @@ async function initDatabase() {
       )
     `);
 
+    // 7b. Sales Order Items
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS sales_order_items (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        so_number VARCHAR(50) NOT NULL,
+        item_code VARCHAR(50) NOT NULL,
+        item_name VARCHAR(255) NOT NULL,
+        quantity DECIMAL(10, 2) NOT NULL,
+        rate DECIMAL(10, 2) NOT NULL,
+        discount_percent DECIMAL(5, 2) DEFAULT 0.00,
+        total_amount DECIMAL(15, 2) NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_soi_so (so_number)
+      ) ENGINE=InnoDB;
+    `);
+
+    // 7c. Sales Invoices (Order to Cash: Stage 3)
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS sales_invoices (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        invoice_no VARCHAR(50) NOT NULL UNIQUE,
+        so_number VARCHAR(50) NOT NULL,
+        customer VARCHAR(255) NOT NULL,
+        invoice_date VARCHAR(50) NOT NULL,
+        due_date VARCHAR(50),
+        subtotal DECIMAL(15, 2) NOT NULL,
+        tax_amount DECIMAL(15, 2) DEFAULT 0.00,
+        total_amount DECIMAL(15, 2) NOT NULL,
+        paid_amount DECIMAL(15, 2) DEFAULT 0.00,
+        status VARCHAR(50) DEFAULT 'Unpaid',
+        created_by VARCHAR(100),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_inv_so (so_number)
+      ) ENGINE=InnoDB;
+    `);
+
+    // 7d. Sales Payments (Order to Cash: Stage 4)
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS sales_payments (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        payment_no VARCHAR(50) NOT NULL UNIQUE,
+        invoice_no VARCHAR(50) NOT NULL,
+        so_number VARCHAR(50) NOT NULL,
+        customer VARCHAR(255) NOT NULL,
+        payment_date VARCHAR(50) NOT NULL,
+        amount DECIMAL(15, 2) NOT NULL,
+        payment_method VARCHAR(50) DEFAULT 'Bank Transfer',
+        reference_no VARCHAR(100),
+        received_by VARCHAR(100),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_pay_so (so_number),
+        INDEX idx_pay_inv (invoice_no)
+      ) ENGINE=InnoDB;
+    `);
+
+    // 7e. Document Sequences (No Math.random)
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS document_sequences (
+        seq_key VARCHAR(50) PRIMARY KEY,
+        prefix VARCHAR(20) NOT NULL,
+        current_val INT NOT NULL DEFAULT 0,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      ) ENGINE=InnoDB;
+    `);
+
     // 8. Marketing Campaigns
     await db.query(`
       CREATE TABLE IF NOT EXISTS marketing_campaigns (
@@ -380,6 +445,31 @@ async function initDatabase() {
         (so_number, order_date, delivery_date, customer, warehouse, total_amount, credit_limit, current_exposure, credit_breach, status, approval_step)
         VALUES 
         ('SO-2026-0418', '28 Sep 2026', '1 Oct 2026', 'Swat Valley Egg Dealers', 'Mardan sales point & store', 1583850.00, 4500000.00, 5461504.00, 961504.00, 'Pending approval', 'CEO Waiting')
+      `);
+    }
+
+    // Seed Sales Order Items for SO-2026-0418 (PDF Page 14)
+    const [soiRows] = await db.query('SELECT COUNT(*) as count FROM sales_order_items');
+    if (soiRows[0].count === 0) {
+      await db.query(`
+        INSERT INTO sales_order_items 
+        (so_number, item_code, item_name, quantity, rate, discount_percent, total_amount)
+        VALUES
+        ('SO-2026-0418', 'SE-01-01-02', 'White eggs Grade A – Large', 1800.00, 700.00, 8.00, 1159200.00),
+        ('SO-2026-0418', 'SE-01-01-01', 'White eggs Grade A – Extra large', 600.00, 745.00, 5.00, 424650.00)
+      `);
+    }
+
+    // Seed Document Sequences (for sequence-backed doc numbers, no Math.random)
+    const [seqRows] = await db.query('SELECT COUNT(*) as count FROM document_sequences');
+    if (seqRows[0].count === 0) {
+      await db.query(`
+        INSERT INTO document_sequences (seq_key, prefix, current_val) VALUES
+        ('sales_order', 'SO-2026', 418),
+        ('sales_invoice', 'INV-2026', 100),
+        ('sales_payment', 'PAY-2026', 50),
+        ('production_order', 'WO-2026', 100),
+        ('payroll_run', 'PAY-2026', 9)
       `);
     }
 
