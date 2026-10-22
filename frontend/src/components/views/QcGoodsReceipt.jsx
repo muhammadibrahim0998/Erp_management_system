@@ -9,12 +9,14 @@ import {
   ArrowRight,
   FileText
 } from 'lucide-react';
+import DemoBadge from '../DemoBadge';
 
 export default function QcGoodsReceipt({ onReceiveStore }) {
   const [received, setReceived] = useState(false);
 
   return (
     <div className="space-y-6">
+      <DemoBadge />
       {/* Top Banner */}
       <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
@@ -86,7 +88,7 @@ export default function QcGoodsReceipt({ onReceiveStore }) {
         <div>
           <span className="font-bold">QC result: Passed with deductions</span>
           <p className="text-amber-800 mt-0.5">
-            Inspected by <strong>Dr. Asma Noor</strong> · 29 Sept, 22:41 · vehicle CSD-2298 (GPI-2026-0003) — <strong>10 trays of cracked eggs rejected</strong> and returned with the driver.
+            Inspected by <strong>Dr. Asma Noor</strong> · 29 Sept, 22:41 · vehicle CSD-2298 (Sample Pass) — <strong>10 trays of cracked eggs rejected</strong> and returned with the driver.
           </p>
         </div>
       </div>

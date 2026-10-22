@@ -20,10 +20,7 @@ export default function GateSecurity({ gatePasses, onAddGatePass }) {
     setIsModalOpen(false);
   };
 
-  const inboundVehicles = gatePasses || [
-    { pass_number: 'GPI-2026-0003', vehicle_number: 'CSD-2298', supplier_customer: 'Charsadda Poultry Farm', since_time: '2 h ago', status: 'QC done — unloading' },
-    { pass_number: 'GPI-2026-0002', vehicle_number: 'MRD-4471', supplier_customer: 'Swabi Layer Farms', since_time: '35 min ago', status: 'At gate — waiting for QC' }
-  ];
+  const inboundVehicles = Array.isArray(gatePasses) ? gatePasses : [];
 
   return (
     <div className="space-y-6">
@@ -64,34 +61,40 @@ export default function GateSecurity({ gatePasses, onAddGatePass }) {
         <div className="lg:col-span-2 bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
           <h3 className="text-sm font-bold text-gray-900 mb-4">Inbound vehicles on site</h3>
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead>
-                <tr className="border-b border-gray-200 text-gray-400 font-medium">
-                  <th className="pb-3">GATE PASS</th>
-                  <th className="pb-3">VEHICLE</th>
-                  <th className="pb-3">SUPPLIER</th>
-                  <th className="pb-3">SINCE</th>
-                  <th className="pb-3">STATUS</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100 font-medium">
-                {inboundVehicles.map((v, i) => (
-                  <tr key={i} className="hover:bg-gray-50/80 transition">
-                    <td className="py-3.5 font-mono font-bold text-gray-900">{v.pass_number}</td>
-                    <td className="py-3.5 font-semibold text-gray-800">{v.vehicle_number}</td>
-                    <td className="py-3.5 text-gray-600">{v.supplier_customer}</td>
-                    <td className="py-3.5 text-gray-400">{v.since_time}</td>
-                    <td className="py-3.5">
-                      <span className={`px-2 py-0.5 rounded-full text-[11px] font-semibold ${
-                        v.status.includes('QC done') ? 'bg-blue-50 text-blue-700 border border-blue-200' : 'bg-amber-50 text-amber-700 border border-amber-200'
-                      }`}>
-                        {v.status}
-                      </span>
-                    </td>
+            {inboundVehicles.length === 0 ? (
+              <div className="p-8 text-center text-xs text-gray-500 font-medium border border-dashed border-gray-200 rounded-xl">
+                No gate passes yet
+              </div>
+            ) : (
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="border-b border-gray-200 text-gray-400 font-medium">
+                    <th className="pb-3">GATE PASS</th>
+                    <th className="pb-3">VEHICLE</th>
+                    <th className="pb-3">SUPPLIER</th>
+                    <th className="pb-3">SINCE</th>
+                    <th className="pb-3">STATUS</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-gray-100 font-medium">
+                  {inboundVehicles.map((v, i) => (
+                    <tr key={i} className="hover:bg-gray-50/80 transition">
+                      <td className="py-3.5 font-mono font-bold text-gray-900">{v.pass_number}</td>
+                      <td className="py-3.5 font-semibold text-gray-800">{v.vehicle_number}</td>
+                      <td className="py-3.5 text-gray-600">{v.supplier_customer}</td>
+                      <td className="py-3.5 text-gray-400">{v.since_time}</td>
+                      <td className="py-3.5">
+                        <span className={`px-2 py-0.5 rounded-full text-[11px] font-semibold ${
+                          v.status?.includes('QC done') ? 'bg-blue-50 text-blue-700 border border-blue-200' : 'bg-amber-50 text-amber-700 border border-amber-200'
+                        }`}>
+                          {v.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
           </div>
         </div>
 

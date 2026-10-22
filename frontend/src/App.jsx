@@ -73,8 +73,17 @@ export default function App() {
   const [isLoading, setIsLoading] = useState(true);
   const [notification, setNotification] = useState(null);
 
-  const showNotification = (msg) => {
-    setNotification(msg);
+  const today = new Date();
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const formattedToday = `${today.getDate()} ${months[today.getMonth()]} ${today.getFullYear()}`;
+  const currentYear = today.getFullYear();
+  const startFiscalYear = today.getMonth() >= 6 ? currentYear : currentYear - 1;
+  const endFiscalYear = startFiscalYear + 1;
+  const fiscalYearText = `FY ${startFiscalYear}-${String(endFiscalYear).slice(-2)}`;
+
+  const showNotification = (msg, type = 'success') => {
+    const text = typeof msg === 'string' ? msg : msg?.message || 'Notification';
+    setNotification({ text, type });
     setTimeout(() => setNotification(null), 4000);
   };
 
@@ -99,7 +108,7 @@ export default function App() {
     }
   };
 
-  // Verify session token on initial mount
+  // Verify session token on initial mount & listen for unauthorized events
   useEffect(() => {
     if (authService.isAuthenticated()) {
       authService.getMe()
@@ -113,6 +122,14 @@ export default function App() {
           setCurrentUser(null);
         });
     }
+
+    const handleUnauthorized = () => {
+      authService.logout();
+      setIsAuthenticated(false);
+      setCurrentUser(null);
+    };
+    window.addEventListener('yaf_unauthorized', handleUnauthorized);
+    return () => window.removeEventListener('yaf_unauthorized', handleUnauthorized);
   }, []);
 
   useEffect(() => {
@@ -130,7 +147,7 @@ export default function App() {
       showNotification(`Task marked as ${actionType} in MySQL database`);
       fetchAllData();
     } catch (e) {
-      showNotification('Error processing task');
+      showNotification(e.message || 'Error processing task', 'error');
     }
   };
 
@@ -140,7 +157,7 @@ export default function App() {
       showNotification('Inward Gate Pass issued successfully in MySQL');
       fetchAllData();
     } catch (e) {
-      showNotification('Error issuing gate pass');
+      showNotification(e.message || 'Error issuing gate pass', 'error');
     }
   };
 
@@ -150,7 +167,7 @@ export default function App() {
       showNotification('Purchase Order created in MySQL');
       fetchAllData();
     } catch (e) {
-      showNotification('Error creating PO');
+      showNotification(e.message || 'Error creating PO', 'error');
     }
   };
 
@@ -159,7 +176,9 @@ export default function App() {
       await operationsService.moveProduction(id, stage);
       showNotification(`Order moved to ${stage}`);
       fetchAllData();
-    } catch (e) {}
+    } catch (e) {
+      showNotification(e.message || 'Error moving order', 'error');
+    }
   };
 
   const handleApproveSales = async (soNumber) => {
@@ -167,7 +186,9 @@ export default function App() {
       await operationsService.approveSalesOrder(soNumber);
       showNotification('Sales order approved by CEO exception');
       fetchAllData();
-    } catch (e) {}
+    } catch (e) {
+      showNotification(e.message || 'Error approving sales order', 'error');
+    }
   };
 
   const handleGeneratePayroll = async (month) => {
@@ -175,7 +196,9 @@ export default function App() {
       await operationsService.generatePayroll(month);
       showNotification(`Payroll generated for ${month} in MySQL`);
       fetchAllData();
-    } catch (e) {}
+    } catch (e) {
+      showNotification(e.message || 'Error generating payroll', 'error');
+    }
   };
 
   const handleLogout = () => {
@@ -250,7 +273,7 @@ export default function App() {
     }
   ].filter(section => section.items.length > 0);
 
-  if (!isAuthenticated) {
+  if (!isAuthenticated || !currentUser) {
     return (
       <Auth
         onLogin={(user, token) => {
@@ -266,9 +289,17 @@ export default function App() {
     <div className="flex h-screen bg-[#0E2118] text-gray-900 overflow-hidden font-sans">
       {/* Toast Notification */}
       {notification && (
-        <div className="fixed top-5 right-5 z-50 bg-[#0E2118] text-white px-4 py-2.5 rounded-xl border border-[#27533E] shadow-2xl flex items-center gap-2 text-xs font-semibold animate-bounce">
-          <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-          <span>{notification}</span>
+        <div className={`fixed top-5 right-5 z-50 px-4 py-2.5 rounded-xl shadow-2xl flex items-center gap-2 text-xs font-semibold animate-bounce ${
+          notification.type === 'error'
+            ? 'bg-rose-950 text-white border border-rose-700'
+            : 'bg-[#0E2118] text-white border border-[#27533E]'
+        }`}>
+          {notification.type === 'error' ? (
+            <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping" />
+          ) : (
+            <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+          )}
+          <span>{notification.text}</span>
         </div>
       )}
 
@@ -284,7 +315,7 @@ export default function App() {
               <h1 className="font-extrabold text-sm tracking-tight text-white uppercase truncate">
                 Yousafzai Agri Foods
               </h1>
-              <p className="text-xs text-white font-bold truncate">Head office - Mardan · FY 2026-27</p>
+              <p className="text-xs text-white font-bold truncate">Head office - Mardan · {fiscalYearText}</p>
             </div>
           </div>
 
@@ -354,7 +385,7 @@ export default function App() {
 
           <div className="flex items-center gap-4">
             <span className="text-sm font-mono font-bold text-white bg-[#132C20] px-2.5 py-1 rounded-md border border-[#1D4433]">
-              29 Sep 2026
+              {formattedToday}
             </span>
 
             <button
@@ -374,11 +405,11 @@ export default function App() {
 
             <div className="flex items-center gap-2.5 transition">
               <div className="w-8 h-8 rounded-lg bg-[#132C20] border border-[#1D4433] flex items-center justify-center font-bold text-sm text-white">
-                {currentUser?.avatar || 'SU'}
+                {currentUser?.avatar || currentUser?.name?.charAt(0) || 'U'}
               </div>
               <div>
-                <div className="text-sm font-bold text-white">{currentUser?.name || 'Sana Ullah'}</div>
-                <div className="text-xs text-white font-bold">{currentUser?.role || 'Chairman & CEO'}</div>
+                <div className="text-sm font-bold text-white">{currentUser?.name || ''}</div>
+                <div className="text-xs text-white font-bold">{currentUser?.role || ''}</div>
               </div>
             </div>
           </div>
@@ -390,6 +421,7 @@ export default function App() {
             {activeTab === 'dashboard' && (
               <ChairmanDashboard
                 data={chairmanData}
+                currentUser={currentUser}
                 onNavigate={(t) => setActiveTab(t)}
                 onApproveTask={handleApproveTask}
               />

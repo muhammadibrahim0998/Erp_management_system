@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { DollarSign, Landmark, ArrowUpRight, ArrowDownRight, FileText, Download, FileSpreadsheet, CheckCircle2 } from 'lucide-react';
 import { exportToPDF, exportToExcel } from '../../utils/exportUtils';
+import DemoBadge from '../DemoBadge';
 
 export default function FinanceView({ financeData, onNavigate }) {
   const [notice, setNotice] = useState(null);
@@ -43,6 +44,7 @@ export default function FinanceView({ financeData, onNavigate }) {
 
   return (
     <div className="space-y-6">
+      <DemoBadge />
       {/* Top Banner */}
       <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>

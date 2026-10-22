@@ -198,7 +198,7 @@ export function exportToPDF({
     doc.text('(Hamza Khan)', 40, finalY + 22);
 
     doc.text('Approved by: Director Finance / CEO', pageWidth - 190, finalY + 12);
-    doc.text('(Mujeeb Ullah / Sana Ullah)', pageWidth - 190, finalY + 22);
+    doc.text('(Authorized Signatory)', pageWidth - 190, finalY + 22);
   }
 
   // 6. Page Numbers in Footer

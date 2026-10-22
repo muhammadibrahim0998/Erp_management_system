@@ -13,18 +13,27 @@ import {
   ShieldAlert
 } from 'lucide-react';
 
-export default function ChairmanDashboard({ data, onNavigate, onApproveTask }) {
+export default function ChairmanDashboard({ data, onNavigate, onApproveTask, currentUser }) {
   const kpis = data?.kpis || {};
   const tasks = data?.waitingApprovals || [];
+  const firstName = currentUser?.name ? currentUser.name.split(' ')[0] : '';
+  const today = new Date();
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const formattedToday = `${today.getDate()} ${months[today.getMonth()]} ${today.getFullYear()}`;
+  const revenueMonthYear = `${months[today.getMonth()]} ${today.getFullYear()}`;
+  const currentYear = today.getFullYear();
+  const startFiscalYear = today.getMonth() >= 6 ? currentYear : currentYear - 1;
+  const currentFiscalQuarter = Math.floor(((today.getMonth() + 6) % 12) / 3) + 1;
+  const budgetPeriod = `Q${currentFiscalQuarter} FY ${startFiscalYear}-${String(startFiscalYear + 1).slice(-2)}`;
 
   return (
     <div className="space-y-6">
       {/* Top Welcome Bar */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-2xl border border-gray-200 shadow-sm">
         <div>
-          <h2 className="text-xl font-bold text-gray-900 tracking-tight">Good morning, Sana</h2>
+          <h2 className="text-xl font-bold text-gray-900 tracking-tight">Good morning{firstName ? `, ${firstName}` : ''}</h2>
           <p className="text-xs text-gray-500 mt-0.5">
-            6 items waiting for your approval · 29 Sep 2026
+            {tasks.length > 0 ? `${tasks.length} items waiting for your approval · ` : ''}{formattedToday}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -56,7 +65,7 @@ export default function ChairmanDashboard({ data, onNavigate, onApproveTask }) {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
         {/* Revenue */}
         <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex flex-col justify-between">
-          <span className="text-[11px] font-medium text-gray-500 uppercase tracking-wider">Revenue · Sep 2026</span>
+          <span className="text-[11px] font-medium text-gray-500 uppercase tracking-wider">Revenue · {revenueMonthYear}</span>
           <div className="my-2">
             <div className="text-2xl font-black text-gray-900">{kpis.revenue || 'PKR 50.3M'}</div>
           </div>
@@ -267,7 +276,7 @@ export default function ChairmanDashboard({ data, onNavigate, onApproveTask }) {
         {/* Budget vs actual */}
         <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm">
           <div className="flex items-center justify-between mb-3">
-            <h4 className="text-xs font-bold text-gray-900 uppercase tracking-wider">Budget vs actual · Q1 FY 2026-27</h4>
+            <h4 className="text-xs font-bold text-gray-900 uppercase tracking-wider">Budget vs actual · {budgetPeriod}</h4>
           </div>
           <div className="space-y-3 text-xs">
             <div>
@@ -306,21 +315,31 @@ export default function ChairmanDashboard({ data, onNavigate, onApproveTask }) {
             <h4 className="text-xs font-bold text-gray-900 uppercase tracking-wider mb-3">
               Exceptions (Needs Attention)
             </h4>
-            <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-900">
-              <div className="flex items-center gap-2 text-xs font-bold text-rose-700">
-                <AlertTriangle className="w-4 h-4 text-rose-600" />
-                <span>Credit limit exceeded</span>
+            {data?.exceptions && data.exceptions.length > 0 ? (
+              <div className="space-y-3">
+                {data.exceptions.map((exc, idx) => (
+                  <div key={idx} className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-900">
+                    <div className="flex items-center gap-2 text-xs font-bold text-rose-700">
+                      <AlertTriangle className="w-4 h-4 text-rose-600" />
+                      <span>{exc.title || 'Credit limit exceeded'}</span>
+                    </div>
+                    <p className="text-[11px] text-rose-800 mt-1">
+                      {exc.description || `${exc.party || ''} · ${exc.doc_number || ''} ${exc.detail || ''}`}
+                    </p>
+                    <button
+                      onClick={() => onNavigate(exc.route || 'sales')}
+                      className="mt-3 text-[11px] font-bold text-white bg-rose-600 hover:bg-rose-700 px-3 py-1 rounded-md transition shadow-sm"
+                    >
+                      Review {exc.action_label || 'Sales Order & Credit'}
+                    </button>
+                  </div>
+                ))}
               </div>
-              <p className="text-[11px] text-rose-800 mt-1">
-                Swat Valley Egg Dealers · SO-2026-0418 on hold (121% credit exposure)
-              </p>
-              <button
-                onClick={() => onNavigate('sales')}
-                className="mt-3 text-[11px] font-bold text-white bg-rose-600 hover:bg-rose-700 px-3 py-1 rounded-md transition shadow-sm"
-              >
-                Review Sales Order & Credit
-              </button>
-            </div>
+            ) : (
+              <div className="p-4 rounded-xl bg-gray-50 border border-gray-100 text-gray-400 text-xs text-center">
+                No active exceptions
+              </div>
+            )}
           </div>
           <div className="text-[11px] text-gray-400 mt-4">
             Security audit: locked posted documents active.

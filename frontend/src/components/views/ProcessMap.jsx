@@ -18,6 +18,7 @@ import {
   AlertCircle,
   GitBranch
 } from 'lucide-react';
+import DemoBadge from '../DemoBadge';
 
 const processes = [
   {
@@ -92,7 +93,7 @@ const processes = [
       { name: 'Attendance record', role: 'HR Manager (Nadia Shah)', desc: 'Monthly attendance, leaves, overtime compiled for all staff.', status: 'done' },
       { name: 'Payroll run generated', role: 'HR Manager (Nadia Shah)', desc: 'System calculates gross pay, tax, EOBI, provident fund, advance recovery.', status: 'done' },
       { name: 'Finance review', role: 'Director Finance (Mujeeb Ullah)', desc: 'Verifies totals, tax deductions, and cash availability.', status: 'active' },
-      { name: 'CEO approval', role: 'Chairman & CEO (Sana Ullah)', desc: 'Final sign-off on total net pay (PKR 4.87M / month).', status: 'pending' },
+      { name: 'CEO approval', role: 'Chairman & CEO', desc: 'Final sign-off on total net pay (PKR 4.87M / month).', status: 'pending' },
       { name: 'Bank transfer', role: 'Accounts Officer (Hamza Khan)', desc: 'Salary transferred via MCB payroll account ••7702.', status: 'pending' },
     ]
   },
@@ -105,7 +106,7 @@ const processes = [
     steps: [
       { name: 'Campaign brief', role: 'Head of Marketing (Mahnoor Khan)', desc: 'Defines objectives, platform, audience, creatives & budget.', status: 'done' },
       { name: 'Finance review', role: 'Director Finance (Mujeeb Ullah)', desc: 'Checks budget against annual marketing allocation.', status: 'done' },
-      { name: 'CEO approval', role: 'Chairman & CEO (Sana Ullah)', desc: 'Final approval to spend above PKR 500K.', status: 'done' },
+      { name: 'CEO approval', role: 'Chairman & CEO', desc: 'Final approval to spend above PKR 500K.', status: 'done' },
       { name: 'Campaign live', role: 'Social Media & Content (Sana Gul)', desc: 'Creatives published. Spend tracked daily vs budget.', status: 'active' },
       { name: 'Results report', role: 'Head of Marketing (Mahnoor Khan)', desc: 'Monthly reach, engagement, leads & cost-per-lead reported to CEO.', status: 'pending' },
     ]
@@ -182,6 +183,7 @@ export default function ProcessMap({ onNavigate }) {
 
   return (
     <div className="space-y-6">
+      <DemoBadge />
       {/* Top Banner */}
       <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>

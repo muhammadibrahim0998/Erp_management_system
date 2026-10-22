@@ -12,6 +12,7 @@ import {
   CheckCircle2
 } from 'lucide-react';
 import { exportToPDF, exportToExcel } from '../../utils/exportUtils';
+import DemoBadge from '../DemoBadge';
 
 export default function ReportsView() {
   const [selectedReport, setSelectedReport] = useState('pnl');
@@ -159,6 +160,7 @@ export default function ReportsView() {
 
   return (
     <div className="space-y-6">
+      <DemoBadge />
       {/* Top Banner */}
       <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
