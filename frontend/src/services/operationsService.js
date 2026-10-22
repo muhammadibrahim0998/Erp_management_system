@@ -49,8 +49,24 @@ export const operationsService = {
     return apiClient.get('/api/sales/orders');
   },
 
+  getSalesOrderDetails(so_number) {
+    return apiClient.get(`/api/sales/orders/${so_number}`);
+  },
+
+  createSalesOrder(orderData) {
+    return apiClient.post('/api/sales/orders', orderData);
+  },
+
   approveSalesOrder(so_number) {
     return apiClient.post('/api/sales/approve', { so_number });
+  },
+
+  invoiceSalesOrder(so_number) {
+    return apiClient.post(`/api/sales/orders/${so_number}/invoice`, {});
+  },
+
+  recordSalesPayment(so_number, paymentData = {}) {
+    return apiClient.post(`/api/sales/orders/${so_number}/payment`, paymentData);
   },
 
   getMarketing() {

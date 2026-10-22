@@ -1,5 +1,6 @@
 const { db } = require('../config/db');
 const { logAudit } = require('../utils/auditLogger');
+const { getNextDocNumber } = require('../utils/sequence');
 
 /**
  * 1. Chairman's Executive Dashboard
@@ -222,33 +223,353 @@ const moveProduction = async (req, res) => {
 };
 
 /**
- * 7. Sales Orders & CEO Credit Approval
+ * 7. Sales Orders & Order-to-Cash Lifecycle (Order -> Approval -> Invoice -> Payment)
  */
+const APPROVER_ROLES = [
+  'Chairman & CEO',
+  'General Manager',
+  'Director Finance',
+  'Sales Manager',
+  'ERP Admin'
+];
+
+const INVOICE_ROLES = [
+  'Accounts Officer',
+  'Director Finance',
+  'Sales Manager',
+  'General Manager',
+  'Chairman & CEO',
+  'ERP Admin'
+];
+
+const PAYMENT_ROLES = [
+  'Accounts Officer',
+  'Director Finance',
+  'General Manager',
+  'Chairman & CEO',
+  'ERP Admin'
+];
+
+// Returns ALL sales orders
 const getSalesOrders = async (req, res) => {
   try {
     const [orders] = await db.query('SELECT * FROM sales_orders ORDER BY id DESC');
-    res.json(orders[0] || null);
+    res.json(orders);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 };
 
-const approveSalesOrder = async (req, res) => {
-  const { so_number } = req.body;
+// Returns single sales order with items, invoice, and payment history
+const getSalesOrderDetails = async (req, res) => {
+  const so_number = req.params.so_number || req.query.so_number;
   try {
-    await db.query('UPDATE sales_orders SET status = "Approved", approval_step = "CEO Approved" WHERE so_number = ?', [so_number]);
+    const [orders] = await db.query('SELECT * FROM sales_orders WHERE so_number = ?', [so_number]);
+    if (orders.length === 0) {
+      return res.status(404).json({ error: `Sales order ${so_number} not found` });
+    }
+    const order = orders[0];
+    const [items] = await db.query('SELECT * FROM sales_order_items WHERE so_number = ?', [so_number]);
+    const [invoices] = await db.query('SELECT * FROM sales_invoices WHERE so_number = ?', [so_number]);
+    const [payments] = await db.query('SELECT * FROM sales_payments WHERE so_number = ?', [so_number]);
+
+    res.json({
+      ...order,
+      items,
+      invoice: invoices[0] || null,
+      payments
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// Creates a new sales order with document number from sequence (no Math.random)
+const createSalesOrder = async (req, res) => {
+  try {
+    const {
+      customer,
+      delivery_date,
+      warehouse = 'Mardan sales point & store',
+      items = [],
+      credit_limit = 4500000.00,
+      current_exposure = 0.00
+    } = req.body;
+
+    if (!customer) {
+      return res.status(400).json({ error: 'Customer name is required' });
+    }
+
+    const so_number = await getNextDocNumber('sales_order', 'SO-2026');
+    const order_date = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+    const del_date = delivery_date || order_date;
+
+    let total_amount = Number(req.body.total_amount) || 0;
+    if (items && items.length > 0) {
+      total_amount = items.reduce((sum, it) => {
+        const qty = Number(it.quantity) || 1;
+        const rate = Number(it.rate) || 0;
+        const disc = Number(it.discount_percent) || 0;
+        const lineTotal = Number(it.total_amount) || (qty * rate * (1 - disc / 100));
+        return sum + lineTotal;
+      }, 0);
+    } else {
+      total_amount = total_amount || 1500000.00;
+    }
+
+    const totalExposure = Number(current_exposure) + total_amount;
+    const creditBreach = totalExposure > Number(credit_limit) ? (totalExposure - Number(credit_limit)) : 0;
+    const status = creditBreach > 0 ? 'Pending approval' : 'Draft';
+    const approval_step = creditBreach > 0 ? 'CEO Waiting' : 'Not required';
+    const created_by = req.user ? `${req.user.name} (${req.user.role})` : 'Sales Officer (Bilal Yousafzai)';
+
+    await db.query(
+      `INSERT INTO sales_orders 
+       (so_number, order_date, delivery_date, customer, warehouse, total_amount, credit_limit, current_exposure, credit_breach, status, approval_step, created_by)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [so_number, order_date, del_date, customer, warehouse, total_amount, credit_limit, totalExposure, creditBreach, status, approval_step, created_by]
+    );
+
+    if (items && items.length > 0) {
+      for (const it of items) {
+        const qty = Number(it.quantity) || 1;
+        const rate = Number(it.rate) || 0;
+        const disc = Number(it.discount_percent) || 0;
+        const lineTotal = Number(it.total_amount) || (qty * rate * (1 - disc / 100));
+        await db.query(
+          `INSERT INTO sales_order_items (so_number, item_code, item_name, quantity, rate, discount_percent, total_amount)
+           VALUES (?, ?, ?, ?, ?, ?, ?)`,
+          [so_number, it.item_code || 'SE-01-01-02', it.item_name || 'Liquid/Shell Eggs', qty, rate, disc, lineTotal]
+        );
+      }
+    }
+
+    await logAudit({
+      req,
+      action: 'CREATE_SALES_ORDER',
+      entityType: 'SALES_ORDER',
+      entityId: so_number,
+      details: `Created sales order ${so_number} for "${customer}" (PKR ${total_amount.toLocaleString()})`
+    });
+
+    const [created] = await db.query('SELECT * FROM sales_orders WHERE so_number = ?', [so_number]);
+    res.status(201).json(created[0]);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// Stage 2: Approve Sales Order (enforces role check + allowed status order)
+const approveSalesOrder = async (req, res) => {
+  const so_number = req.params.so_number || req.body.so_number;
+  if (!so_number) {
+    return res.status(400).json({ error: 'so_number is required' });
+  }
+
+  try {
+    // 1. Role verification
+    const userRole = req.user?.role;
+    if (!userRole) {
+      return res.status(401).json({ error: 'Authentication required. Please sign in with an approver account.' });
+    }
+    if (!APPROVER_ROLES.includes(userRole)) {
+      return res.status(403).json({
+        error: `Access Denied: Role "${userRole}" is not authorized to approve sales orders. Allowed roles: ${APPROVER_ROLES.join(', ')}.`
+      });
+    }
+
+    // 2. Fetch existing order
+    const [orders] = await db.query('SELECT * FROM sales_orders WHERE so_number = ?', [so_number]);
+    if (orders.length === 0) {
+      return res.status(404).json({ error: `Sales order ${so_number} not found` });
+    }
+    const order = orders[0];
+
+    // 3. Status order check: must be Pending approval or Draft
+    if (order.status !== 'Pending approval' && order.status !== 'Draft') {
+      return res.status(400).json({
+        error: `Cannot approve order ${so_number}: order is already in "${order.status}" status. Allowed transition to Approved only from "Pending approval" or "Draft".`
+      });
+    }
+
+    // 4. Update order to Approved
+    const approverText = `Approved by ${req.user.name} (${userRole})`;
+    await db.query(
+      'UPDATE sales_orders SET status = "Approved", approval_step = ? WHERE so_number = ?',
+      [approverText, so_number]
+    );
+
     await logAudit({
       req,
       action: 'APPROVE_SALES_ORDER',
       entityType: 'SALES_ORDER',
       entityId: so_number,
-      details: `CEO approved sales order ${so_number} overriding credit threshold`
+      details: `${userRole} (${req.user.name}) approved sales order ${so_number}`
     });
-    res.json({ success: true, message: 'Sales order approved despite credit limit breach' });
+
+    const [updated] = await db.query('SELECT * FROM sales_orders WHERE so_number = ?', [so_number]);
+    res.json({
+      success: true,
+      message: `Sales order ${so_number} approved successfully by ${userRole}`,
+      order: updated[0]
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 };
+
+// Stage 3: Generate Commercial Invoice (enforces status check + sequence)
+const invoiceSalesOrder = async (req, res) => {
+  const so_number = req.params.so_number || req.body.so_number;
+  if (!so_number) {
+    return res.status(400).json({ error: 'so_number is required' });
+  }
+
+  try {
+    // 1. Role verification
+    const userRole = req.user?.role;
+    if (userRole && !INVOICE_ROLES.includes(userRole)) {
+      return res.status(403).json({
+        error: `Access Denied: Role "${userRole}" is not authorized to generate invoices.`
+      });
+    }
+
+    // 2. Fetch order
+    const [orders] = await db.query('SELECT * FROM sales_orders WHERE so_number = ?', [so_number]);
+    if (orders.length === 0) {
+      return res.status(404).json({ error: `Sales order ${so_number} not found` });
+    }
+    const order = orders[0];
+
+    // 3. Status order check: MUST be 'Approved'
+    if (order.status !== 'Approved') {
+      return res.status(400).json({
+        error: `Cannot generate invoice: sales order must be in "Approved" status (current status: "${order.status}"). Follow allowed order-to-cash flow: Order -> Approval -> Invoice -> Payment.`
+      });
+    }
+
+    // Check if invoice already exists
+    const [existing] = await db.query('SELECT * FROM sales_invoices WHERE so_number = ?', [so_number]);
+    if (existing.length > 0) {
+      return res.status(400).json({
+        error: `Invoice already exists for sales order ${so_number} (${existing[0].invoice_no})`
+      });
+    }
+
+    // 4. Generate invoice number from database sequence (no Math.random)
+    const invoice_no = await getNextDocNumber('sales_invoice', 'INV-2026');
+    const invoice_date = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+    const created_by = req.user ? `${req.user.name} (${req.user.role})` : 'Accounts Officer (Hamza Khan)';
+
+    await db.query(
+      `INSERT INTO sales_invoices 
+       (invoice_no, so_number, customer, invoice_date, due_date, subtotal, tax_amount, total_amount, paid_amount, status, created_by)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0.00, 'Unpaid', ?)`,
+      [invoice_no, so_number, order.customer, invoice_date, order.delivery_date, order.total_amount, 0.00, order.total_amount, created_by]
+    );
+
+    // 5. Update sales order status to Invoiced
+    await db.query('UPDATE sales_orders SET status = "Invoiced" WHERE so_number = ?', [so_number]);
+
+    await logAudit({
+      req,
+      action: 'CREATE_SALES_INVOICE',
+      entityType: 'SALES_INVOICE',
+      entityId: invoice_no,
+      details: `Generated invoice ${invoice_no} for order ${so_number} (PKR ${Number(order.total_amount).toLocaleString()})`
+    });
+
+    const [invRows] = await db.query('SELECT * FROM sales_invoices WHERE invoice_no = ?', [invoice_no]);
+    res.status(201).json({
+      success: true,
+      message: `Commercial invoice ${invoice_no} generated for sales order ${so_number}`,
+      invoice: invRows[0]
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// Stage 4: Record Payment (enforces status check + sequence)
+const recordSalesPayment = async (req, res) => {
+  const so_number = req.params.so_number || req.body.so_number;
+  if (!so_number) {
+    return res.status(400).json({ error: 'so_number is required' });
+  }
+
+  try {
+    // 1. Role verification
+    const userRole = req.user?.role;
+    if (userRole && !PAYMENT_ROLES.includes(userRole)) {
+      return res.status(403).json({
+        error: `Access Denied: Role "${userRole}" is not authorized to record payments.`
+      });
+    }
+
+    // 2. Fetch order
+    const [orders] = await db.query('SELECT * FROM sales_orders WHERE so_number = ?', [so_number]);
+    if (orders.length === 0) {
+      return res.status(404).json({ error: `Sales order ${so_number} not found` });
+    }
+    const order = orders[0];
+
+    // 3. Status order check: MUST be 'Invoiced'
+    if (order.status !== 'Invoiced') {
+      return res.status(400).json({
+        error: `Cannot record payment: order must be in "Invoiced" status (current status: "${order.status}"). Follow allowed order-to-cash flow: Order -> Approval -> Invoice -> Payment.`
+      });
+    }
+
+    // Find the associated invoice
+    const [invoices] = await db.query('SELECT * FROM sales_invoices WHERE so_number = ?', [so_number]);
+    const invoice = invoices[0];
+    const invoice_no = invoice ? invoice.invoice_no : 'DIRECT';
+
+    // 4. Generate payment number from database sequence (no Math.random)
+    const payment_no = await getNextDocNumber('sales_payment', 'PAY-2026');
+    const payment_date = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+    const amount = Number(req.body.amount) || Number(order.total_amount);
+    const payment_method = req.body.payment_method || 'Bank Transfer';
+    const reference_no = req.body.reference_no || `TRX-${Date.now().toString().slice(-6)}`;
+    const received_by = req.user ? `${req.user.name} (${req.user.role})` : 'Accounts Officer (Hamza Khan)';
+
+    await db.query(
+      `INSERT INTO sales_payments 
+       (payment_no, invoice_no, so_number, customer, payment_date, amount, payment_method, reference_no, received_by)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [payment_no, invoice_no, so_number, order.customer, payment_date, amount, payment_method, reference_no, received_by]
+    );
+
+    // 5. Update invoice to Paid
+    if (invoice) {
+      await db.query(
+        'UPDATE sales_invoices SET paid_amount = total_amount, status = "Paid" WHERE invoice_no = ?',
+        [invoice_no]
+      );
+    }
+
+    // 6. Update sales order status to Paid
+    await db.query('UPDATE sales_orders SET status = "Paid" WHERE so_number = ?', [so_number]);
+
+    await logAudit({
+      req,
+      action: 'RECORD_SALES_PAYMENT',
+      entityType: 'SALES_PAYMENT',
+      entityId: payment_no,
+      details: `Recorded payment ${payment_no} of PKR ${amount.toLocaleString()} for order ${so_number}`
+    });
+
+    const [payRows] = await db.query('SELECT * FROM sales_payments WHERE payment_no = ?', [payment_no]);
+    res.status(201).json({
+      success: true,
+      message: `Payment ${payment_no} recorded successfully for sales order ${so_number}`,
+      payment: payRows[0]
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
 
 /**
  * 8. Marketing Campaigns
@@ -383,7 +704,11 @@ module.exports = {
   getProductionBoard,
   moveProduction,
   getSalesOrders,
+  getSalesOrderDetails,
+  createSalesOrder,
   approveSalesOrder,
+  invoiceSalesOrder,
+  recordSalesPayment,
   getMarketing,
   getPayroll,
   generatePayroll,
