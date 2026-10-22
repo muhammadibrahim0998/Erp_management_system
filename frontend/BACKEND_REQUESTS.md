@@ -95,8 +95,9 @@ Written by Developer B from checkpoints T2 and T3; each item names the file and 
 
 17. **MEDIUM — Chairman dashboard query assumes 'pending' status while tasks advance to other statuses**:
     - `backend/controllers/operations.controller.js:10`: `const [tasks] = await db.query('SELECT * FROM workflow_tasks WHERE status = "pending" LIMIT 6');`
-    - When tasks are approved, rejected, or returned (currently all 8 seeded tasks have statuses: `['approved', 'rejected', 'returned']`), `waitingApprovals` returns an empty array `[]`.
+    - In MySQL table `workflow_tasks`, the 8 seeded tasks have distribution `Counter({'approved': 5, 'rejected': 2, 'returned': 1})`. Because 0 tasks have `status = 'pending'`, `waitingApprovals` returns `[]`, and the sidebar Approvals badge (`tasks.filter(t => t.status === 'pending').length` in `frontend/src/App.jsx:258`) evaluates to 0 (badge hidden).
     - Furthermore, `getChairmanDashboard` does not filter tasks by assignee (`assigned_role`), so when pending tasks do exist, it returns arbitrary pending tasks rather than tasks specifically requiring executive action.
+    - **Request**: Update `getChairmanDashboard` to filter by executive role / assignee, or return actionable executive tasks rather than an arbitrary `LIMIT 6` on `pending` status.
 18. **MEDIUM — `req.user.name` evaluated to `undefined` during sales approval, polluting `sales_orders.approval_step` and `audit_logs.details`**:
     - `backend/controllers/operations.controller.js:396`: `const approverText = \`Approved by \${req.user.name} (\${userRole})\`;`
     - `backend/controllers/operations.controller.js:407`: `details: \`\${userRole} (\${req.user.name}) approved sales order \${so_number}\``

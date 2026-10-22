@@ -25,8 +25,9 @@ import { auditService } from '../../services';
 import { exportToExcel, exportToPDF } from '../../utils/exportUtils';
 
 function formatLogDetails(details) {
-  if (!details) return '';
-  return String(details).replace(/\bundefined\b/g, 'User not recorded');
+  if (!details || !String(details).trim()) return 'No details recorded';
+  return String(details)
+    .replace(/\b(undefined|null)\b/g, 'User not recorded');
 }
 
 export default function AuditLogsView({ currentUser }) {

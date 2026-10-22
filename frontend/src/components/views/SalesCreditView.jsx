@@ -22,7 +22,14 @@ const APPROVED_OR_LATER_STATUSES = ['Approved', 'Invoiced', 'Paid'];
 
 function formatApprovalStep(step) {
   if (!step) return '';
-  return String(step).replace(/\bundefined\b/g, 'Approver not recorded');
+  const text = String(step).trim();
+  if (!text || text === 'undefined' || text === 'null') {
+    return 'Approver not recorded';
+  }
+  return text
+    .replace(/\bby\s+(undefined|null)\b/g, 'by Approver not recorded')
+    .replace(/\((undefined|null)\)/g, '(role not recorded)')
+    .replace(/\b(undefined|null)\b/g, 'Approver not recorded');
 }
 
 function getApprovalSteps(order) {

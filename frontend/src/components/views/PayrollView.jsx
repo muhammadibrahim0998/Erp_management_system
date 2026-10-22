@@ -32,7 +32,7 @@ export default function PayrollView({ payrollRuns, onGeneratePayroll }) {
             Monthly salary runs with tax, provident fund, EOBI and advance recovery — approved by Finance and the Chairman.
           </p>
         </div>
-        <div className="flex flex-col items-end gap-1.5">
+        <div className="flex flex-col items-end gap-1">
           <div className="flex items-center gap-3">
             <input
               type="month"
@@ -53,8 +53,8 @@ export default function PayrollView({ payrollRuns, onGeneratePayroll }) {
               <span>{isGenerating ? 'Calculating...' : 'Generate payroll'}</span>
             </button>
           </div>
-          <p className="text-[10px] text-gray-500">
-            Generated runs currently use fixed values for date, preparer and net pay (see BACKEND_REQUESTS item 13)
+          <p className="text-[10px] text-gray-400">
+            Generated runs currently use fixed values (see BACKEND_REQUESTS item 13)
           </p>
         </div>
       </div>

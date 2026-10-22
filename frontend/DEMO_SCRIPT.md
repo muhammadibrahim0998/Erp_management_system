@@ -10,6 +10,12 @@ Presenters can honestly state that only the following operational screens are DB
 
 The following accounts are pre-seeded in the database (demo accounts use the seed password configured in backend/initDb.js; ask the project owner):
 
+> [!WARNING] Login Rate Limiting (Demo Precaution)
+> The backend enforces a strict authentication rate limiter (`backend/middlewares/rateLimiter.js`):
+> - **Limit**: Max **10 authentication attempts** per 15-minute window per IP.
+> - **Risk**: Exceeding 10 failed or rapid login attempts blocks authentication with HTTP 429 (`"Too many authentication attempts from this IP address. Please wait 15 minutes before trying again."`).
+> - **Demo Action**: Do not mistype passwords repeatedly during a live presentation. Use the verified credentials below or development shortcuts. If blocked, presenters must wait for the 15-minute rate limit window to expire.
+
 | Role | Name | Email | Department |
 |---|---|---|---|
 | **Chairman & CEO** | Sana Ullah | `ceo@yaf.com` | Executive |
