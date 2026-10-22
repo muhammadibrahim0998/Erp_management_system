@@ -1,13 +1,45 @@
-import React from 'react';
-import { DollarSign, Landmark, ArrowUpRight, ArrowDownRight, FileText } from 'lucide-react';
+import React, { useState } from 'react';
+import { DollarSign, Landmark, ArrowUpRight, ArrowDownRight, FileText, Download, FileSpreadsheet, CheckCircle2 } from 'lucide-react';
+import { exportToPDF, exportToExcel } from '../../utils/exportUtils';
 
 export default function FinanceView({ financeData, onNavigate }) {
+  const [notice, setNotice] = useState(null);
+
   const cashAccounts = financeData?.cashAndBank || [
     { name: 'Cash in hand', balance: '800,000', account: 'Cash' },
     { name: 'Bank — Current A/C ••4410', balance: '14,905,300', account: 'Meezan Bank' },
     { name: 'Bank — Current A/C ••2231', balance: '10,713,825', account: 'HBL Mardan' },
     { name: 'Bank — Payroll A/C ••7702', balance: '3,000,000', account: 'MCB' }
   ];
+
+  const handleExportPDF = () => {
+    exportToPDF({
+      filename: 'YAF_Treasury_Cash_Receivables_Summary',
+      title: 'Cash, Bank & Treasury Summary',
+      subtitle: 'Yousafzai Agri Foods (Pvt) Ltd · Head Office Mardan',
+      period: 'FY 2026-27 (Current Position)',
+      kpis: [
+        { label: 'Total Cash & Bank', value: 'PKR 29.41M', note: '4 Accounts' },
+        { label: 'Total Receivables', value: 'PKR 45.66M', note: 'Aging tracked' },
+        { label: 'Overdue >30d', value: 'PKR 3.20M', note: 'Credit hold' }
+      ],
+      headers: ['Account / Facility Name', 'Institution / Bank', 'Current Balance (PKR)'],
+      rows: cashAccounts.map(a => [a.name, a.account, a.balance])
+    });
+    setNotice('Treasury summary exported to PDF!');
+    setTimeout(() => setNotice(null), 3000);
+  };
+
+  const handleExportExcel = () => {
+    exportToExcel({
+      filename: 'YAF_Treasury_Cash_Receivables_Summary',
+      sheetName: 'Cash & Bank Accounts',
+      headers: ['Account / Facility Name', 'Institution / Bank', 'Current Balance (PKR)'],
+      data: cashAccounts.map(a => [a.name, a.account, a.balance])
+    });
+    setNotice('Treasury summary exported to Excel (.xlsx)!');
+    setTimeout(() => setNotice(null), 3000);
+  };
 
   return (
     <div className="space-y-6">
@@ -21,14 +53,37 @@ export default function FinanceView({ financeData, onNavigate }) {
         </div>
         <div className="flex items-center gap-2">
           <button
+            onClick={handleExportPDF}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-lg transition shadow-sm"
+          >
+            <Download className="w-3.5 h-3.5" />
+            <span>PDF</span>
+          </button>
+
+          <button
+            onClick={handleExportExcel}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-white bg-emerald-700 hover:bg-emerald-800 rounded-lg transition shadow-sm"
+          >
+            <FileSpreadsheet className="w-3.5 h-3.5" />
+            <span>Excel</span>
+          </button>
+
+          <button
             onClick={() => onNavigate('reports')}
             className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-gray-700 bg-gray-50 border border-gray-300 rounded-lg hover:bg-gray-100"
           >
             <FileText className="w-3.5 h-3.5" />
-            <span>Profit & loss report</span>
+            <span>P&L Statement</span>
           </button>
         </div>
       </div>
+
+      {notice && (
+        <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold rounded-xl flex items-center gap-2 shadow-sm">
+          <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+          <span>{notice}</span>
+        </div>
+      )}
 
       {/* 4 Cash and Bank Cards (Page 18) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">

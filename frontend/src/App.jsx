@@ -24,17 +24,22 @@ import {
   ChevronRight,
   GitBranch,
   LogOut,
-  Menu
+  Menu,
+  Shield,
+  History,
+  Store
 } from 'lucide-react';
 
 import ChairmanDashboard from './components/views/ChairmanDashboard';
 import ApprovalsInbox from './components/views/ApprovalsInbox';
+import { authService, operationsService } from './services';
 import LiveOperations from './components/views/LiveOperations';
 import GateSecurity from './components/views/GateSecurity';
 import QcGoodsReceipt from './components/views/QcGoodsReceipt';
 import ProcurementView from './components/views/ProcurementView';
 import ProductionBoard from './components/views/ProductionBoard';
 import InventoryView from './components/views/InventoryView';
+import PosView from './components/views/PosView';
 import SalesCreditView from './components/views/SalesCreditView';
 import MarketingView from './components/views/MarketingView';
 import HrAdminView from './components/views/HrAdminView';
@@ -42,6 +47,8 @@ import PayrollView from './components/views/PayrollView';
 import FinanceView from './components/views/FinanceView';
 import ReportsView from './components/views/ReportsView';
 import SettingsMatrix from './components/views/SettingsMatrix';
+import UserManagement from './components/views/UserManagement';
+import AuditLogsView from './components/views/AuditLogsView';
 import RoleSwitcherModal from './components/RoleSwitcherModal';
 import ProcessMap from './components/views/ProcessMap';
 import Auth from './components/Auth';
@@ -51,8 +58,8 @@ export default function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isRoleModalOpen, setIsRoleModalOpen] = useState(false);
   const [users, setUsers] = useState([]);
-  const [currentUser, setCurrentUser] = useState(null);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [currentUser, setCurrentUser] = useState(() => authService.getCurrentUser());
+  const [isAuthenticated, setIsAuthenticated] = useState(() => authService.isAuthenticated());
 
   // Live Server Data
   const [chairmanData, setChairmanData] = useState(null);
@@ -76,47 +83,18 @@ export default function App() {
 
   const fetchAllData = async () => {
     try {
-      const [
-        usersRes,
-        chairRes,
-        tasksRes,
-        gateRes,
-        poRes,
-        prodRes,
-        invRes,
-        salesRes,
-        campRes,
-        payRes,
-        finRes
-      ] = await Promise.all([
-        fetch('http://localhost:7000/api/users').catch(() => null),
-        fetch('http://localhost:7000/api/dashboard/chairman').catch(() => null),
-        fetch('http://localhost:7000/api/approvals').catch(() => null),
-        fetch('http://localhost:7000/api/gate').catch(() => null),
-        fetch('http://localhost:7000/api/procurement/pos').catch(() => null),
-        fetch('http://localhost:7000/api/production/board').catch(() => null),
-        fetch('http://localhost:7000/api/inventory').catch(() => null),
-        fetch('http://localhost:7000/api/sales/orders').catch(() => null),
-        fetch('http://localhost:7000/api/marketing').catch(() => null),
-        fetch('http://localhost:7000/api/payroll').catch(() => null),
-        fetch('http://localhost:7000/api/finance/overview').catch(() => null)
-      ]);
-
-      if (usersRes?.ok) {
-        const u = await usersRes.json();
-        setUsers(u);
-        if (!currentUser && u.length > 0) setCurrentUser(u[0]);
-      }
-      if (chairRes?.ok) setChairmanData(await chairRes.json());
-      if (tasksRes?.ok) setTasks(await tasksRes.json());
-      if (gateRes?.ok) setGatePasses(await gateRes.json());
-      if (poRes?.ok) setPurchaseOrders(await poRes.json());
-      if (prodRes?.ok) setProductionOrders(await prodRes.json());
-      if (invRes?.ok) setInventoryItems(await invRes.json());
-      if (salesRes?.ok) setSalesOrder(await salesRes.json());
-      if (campRes?.ok) setCampaigns(await campRes.json());
-      if (payRes?.ok) setPayrollRuns(await payRes.json());
-      if (finRes?.ok) setFinanceData(await finRes.json());
+      const data = await operationsService.getBootstrapData();
+      if (data.users) setUsers(data.users);
+      if (data.chairman) setChairmanData(data.chairman);
+      if (data.approvals) setTasks(data.approvals);
+      if (data.gate) setGatePasses(data.gate);
+      if (data.procurement) setPurchaseOrders(data.procurement);
+      if (data.production) setProductionOrders(data.production);
+      if (data.inventory) setInventoryItems(data.inventory);
+      if (data.sales) setSalesOrder(data.sales);
+      if (data.marketing) setCampaigns(data.marketing);
+      if (data.payroll) setPayrollRuns(data.payroll);
+      if (data.finance) setFinanceData(data.finance);
     } catch (err) {
       console.error('Data fetch error:', err);
     } finally {
@@ -124,24 +102,36 @@ export default function App() {
     }
   };
 
+  // Verify session token on initial mount
   useEffect(() => {
-    fetchAllData();
-    const interval = setInterval(fetchAllData, 20000);
-    return () => clearInterval(interval);
+    if (authService.isAuthenticated()) {
+      authService.getMe()
+        .then(user => {
+          setCurrentUser(user);
+          setIsAuthenticated(true);
+        })
+        .catch(() => {
+          authService.logout();
+          setIsAuthenticated(false);
+          setCurrentUser(null);
+        });
+    }
   }, []);
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      fetchAllData();
+      const interval = setInterval(fetchAllData, 20000);
+      return () => clearInterval(interval);
+    }
+  }, [isAuthenticated]);
 
   // Action Handlers
   const handleApproveTask = async (taskId, actionType = 'approved') => {
     try {
-      const res = await fetch(`http://localhost:7000/api/approvals/${taskId}/action`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: actionType })
-      });
-      if (res.ok) {
-        showNotification(`Task marked as ${actionType} in MySQL database`);
-        fetchAllData();
-      }
+      await operationsService.actionApproval(taskId, actionType);
+      showNotification(`Task marked as ${actionType} in MySQL database`);
+      fetchAllData();
     } catch (e) {
       showNotification('Error processing task');
     }
@@ -149,15 +139,9 @@ export default function App() {
 
   const handleAddGatePass = async (data) => {
     try {
-      const res = await fetch('http://localhost:7000/api/gate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data)
-      });
-      if (res.ok) {
-        showNotification('Inward Gate Pass issued successfully in MySQL');
-        fetchAllData();
-      }
+      await operationsService.createGatePass(data);
+      showNotification('Inward Gate Pass issued successfully in MySQL');
+      fetchAllData();
     } catch (e) {
       showNotification('Error issuing gate pass');
     }
@@ -165,15 +149,9 @@ export default function App() {
 
   const handleAddPo = async (data) => {
     try {
-      const res = await fetch('http://localhost:7000/api/procurement/pos', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data)
-      });
-      if (res.ok) {
-        showNotification('Purchase Order created in MySQL');
-        fetchAllData();
-      }
+      await operationsService.createProcurementPO(data);
+      showNotification('Purchase Order created in MySQL');
+      fetchAllData();
     } catch (e) {
       showNotification('Error creating PO');
     }
@@ -181,11 +159,7 @@ export default function App() {
 
   const handleMoveOrder = async (id, stage) => {
     try {
-      await fetch('http://localhost:7000/api/production/move', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id, stage })
-      });
+      await operationsService.moveProduction(id, stage);
       showNotification(`Order moved to ${stage}`);
       fetchAllData();
     } catch (e) { }
@@ -193,11 +167,7 @@ export default function App() {
 
   const handleApproveSales = async (soNumber) => {
     try {
-      await fetch('http://localhost:7000/api/sales/approve', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ so_number: soNumber })
-      });
+      await operationsService.approveSalesOrder(soNumber);
       showNotification('Sales order approved by CEO exception');
       fetchAllData();
     } catch (e) { }
@@ -205,11 +175,7 @@ export default function App() {
 
   const handleGeneratePayroll = async (month) => {
     try {
-      await fetch('http://localhost:7000/api/payroll/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ month })
-      });
+      await operationsService.generatePayroll(month);
       showNotification(`Payroll generated for ${month} in MySQL`);
       fetchAllData();
     } catch (e) { }
@@ -229,58 +195,88 @@ export default function App() {
     } catch (e) { }
   };
 
-  // Nav Groups matching PDF
+  const handleLogout = () => {
+    authService.logout();
+    setIsAuthenticated(false);
+    setCurrentUser(null);
+  };
+
+  // Role & Department permission checking
+  const userRole = currentUser?.role || '';
+  const userDept = currentUser?.department || '';
+  const isSuperAdmin = userRole === 'ERP Admin' || userRole === 'Chairman & CEO';
+  const isGM = userRole === 'General Manager' || isSuperAdmin;
+  const isFinance = userDept === 'Finance' || isGM;
+  const isOperations = ['Operations', 'Plant', 'Production'].includes(userDept) || isGM;
+  const isSecurity = userDept === 'Security' || userDept === 'Logistics' || isGM;
+  const isQC = userDept === 'Quality' || isGM;
+  const isInventory = userDept === 'Inventory' || isOperations || isGM;
+  const isSales = ['Sales', 'Marketing'].includes(userDept) || isGM;
+  const isHR = userDept === 'HR' || isGM;
+
+  // Nav Groups with Role-Based Access Control
   const navSections = [
     {
       title: 'OVERVIEW',
       items: [
-        { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-        { id: 'approvals', label: 'Approvals', icon: CheckSquare, badge: tasks.filter(t => t.status === 'pending').length },
-        { id: 'live-operations', label: 'Live operations', icon: Activity },
-        { id: 'process-map', label: 'Process map', icon: GitBranch }
-      ]
+        { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, visible: true },
+        { id: 'approvals', label: 'Approvals', icon: CheckSquare, badge: tasks.filter(t => t.status === 'pending').length, visible: true },
+        { id: 'live-operations', label: 'Live operations', icon: Activity, visible: isOperations || isSecurity || isQC || isGM },
+        { id: 'process-map', label: 'Process map', icon: GitBranch, visible: true }
+      ].filter(item => item.visible)
     },
     {
       title: 'OPERATIONS',
       items: [
-        { id: 'procurement', label: 'Procurement', icon: ShoppingBag },
-        { id: 'gate', label: 'Gate & security', icon: Truck },
-        { id: 'qc', label: 'QC cell', icon: CheckCircle2 },
-        { id: 'inventory', label: 'Inventory', icon: Package },
-        { id: 'production', label: 'Production', icon: Layers }
-      ]
+        { id: 'procurement', label: 'Procurement', icon: ShoppingBag, visible: userDept === 'Purchasing' || isFinance || isOperations || isGM },
+        { id: 'gate', label: 'Gate & security', icon: Truck, visible: isSecurity || isOperations || isGM },
+        { id: 'qc', label: 'QC cell', icon: CheckCircle2, visible: isQC || isOperations || isGM },
+        { id: 'inventory', label: 'Inventory', icon: Package, visible: isInventory || isGM },
+        { id: 'production', label: 'Production', icon: Layers, visible: isOperations || isGM }
+      ].filter(item => item.visible)
     },
     {
       title: 'SALES & MARKETING',
       items: [
-        { id: 'sales', label: 'Sales', icon: ShoppingCart },
-        { id: 'marketing', label: 'Marketing', icon: Share2 }
-      ]
+        { id: 'pos', label: 'Point of Sale (POS)', icon: Store, visible: isSales || isFinance || isGM },
+        { id: 'sales', label: 'Sales orders', icon: ShoppingCart, visible: isSales || isFinance || isGM },
+        { id: 'marketing', label: 'Marketing', icon: Share2, visible: isSales || isGM }
+      ].filter(item => item.visible)
     },
     {
       title: 'PEOPLE',
       items: [
-        { id: 'hr', label: 'HR & Admin', icon: Users },
-        { id: 'payroll', label: 'Payroll', icon: DollarSign }
-      ]
+        { id: 'hr', label: 'HR & Admin', icon: Users, visible: isHR || isGM },
+        { id: 'payroll', label: 'Payroll', icon: DollarSign, visible: isHR || isFinance || isGM }
+      ].filter(item => item.visible)
     },
     {
       title: 'MONEY',
       items: [
-        { id: 'finance', label: 'Accounts & Finance', icon: Building2 },
-        { id: 'reports', label: 'Reports', icon: FileText }
-      ]
+        { id: 'finance', label: 'Accounts & Finance', icon: Building2, visible: isFinance || isGM },
+        { id: 'reports', label: 'Reports', icon: FileText, visible: isGM || isFinance }
+      ].filter(item => item.visible)
     },
     {
-      title: 'SETTINGS',
+      title: 'ADMIN & SETTINGS',
       items: [
-        { id: 'settings', label: 'Approval matrix', icon: Sliders }
-      ]
+        { id: 'users', label: 'User Management', icon: Shield, visible: isSuperAdmin || isGM },
+        { id: 'audit-logs', label: 'Audit Trail & Logs', icon: History, visible: isSuperAdmin || isGM },
+        { id: 'settings', label: 'Approval matrix', icon: Sliders, visible: isSuperAdmin || isGM }
+      ].filter(item => item.visible)
     }
-  ];
+  ].filter(section => section.items.length > 0);
 
   if (!isAuthenticated) {
-    return <Auth onLogin={(user) => { setCurrentUser(user); setIsAuthenticated(true); fetchAllData(); }} />;
+    return (
+      <Auth
+        onLogin={(user, token) => {
+          setCurrentUser(user);
+          setIsAuthenticated(true);
+          fetchAllData();
+        }}
+      />
+    );
   }
 
   return (
@@ -459,7 +455,7 @@ export default function App() {
           {/* Logout Link in Sidebar with Spacing, Green 3D Shadow and Yellow Hover */}
           <div className="w-56 px-2.5 py-3 border-t border-[#086634] shrink-0">
             <button
-              onClick={() => { setIsAuthenticated(false); setCurrentUser(null); }}
+              onClick={handleLogout}
               className="w-full group flex items-center justify-between px-2.5 py-2 rounded-xl text-[13px] font-black text-rose-200 bg-gradient-to-b from-[#381116] to-[#22070a] border-t border-t-rose-500/40 border-x border-[#2c090e] border-b-[3.5px] border-b-[#120305] shadow-[0_4px_0_0_#0a0103,0_6px_14px_rgba(30,5,8,0.5)] hover:-translate-y-1 hover:scale-[1.02] hover:from-[#44161c] hover:to-[#2c090e] hover:border-t-amber-400 hover:border-x-amber-400/40 hover:shadow-[0_5px_0_0_#0a0103,0_10px_22px_rgba(245,158,11,0.35)] active:translate-y-[1px] active:border-b-[1.5px] active:shadow-none transition-all duration-200 transform cursor-pointer"
             >
               <div className="flex items-center gap-2">
@@ -518,7 +514,10 @@ export default function App() {
             {activeTab === 'inventory' && (
               <InventoryView
                 inventoryItems={inventoryItems}
-                onAdjustStock={() => showNotification('Stock adjusted')}
+                onAdjustStock={() => {
+                  fetchAllData();
+                  showNotification('Inventory & warehouse levels refreshed');
+                }}
               />
             )}
 
@@ -526,6 +525,16 @@ export default function App() {
               <ProductionBoard
                 productionOrders={productionOrders}
                 onMoveOrder={handleMoveOrder}
+              />
+            )}
+
+            {activeTab === 'pos' && (
+              <PosView
+                currentUser={currentUser}
+                onSaleCompleted={() => {
+                  fetchAllData();
+                  showNotification('POS Sale recorded and inventory deducted atomically');
+                }}
               />
             )}
 
@@ -567,6 +576,19 @@ export default function App() {
               <ReportsView />
             )}
 
+            {activeTab === 'users' && (
+              <UserManagement
+                currentUser={currentUser}
+                onUserUpdated={fetchAllData}
+              />
+            )}
+
+            {activeTab === 'audit-logs' && (
+              <AuditLogsView
+                currentUser={currentUser}
+              />
+            )}
+
             {activeTab === 'settings' && (
               <SettingsMatrix />
             )}
@@ -586,6 +608,7 @@ export default function App() {
         currentUser={currentUser}
         onSelectUser={(u) => {
           setCurrentUser(u);
+          localStorage.setItem('yaf_user', JSON.stringify(u));
           showNotification(`Switched role to: ${u.name} (${u.role})`);
         }}
       />

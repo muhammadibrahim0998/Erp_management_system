@@ -1,0 +1,54 @@
+version: '3.8'
+
+services:
+  mysql_db:
+    image: mysql:8.4
+    container_name: yaf_mysql_db
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: Erp_management
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-prootpassword"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: yaf_backend_api
+    restart: always
+    ports:
+      - "7001:7001"
+    environment:
+      - PORT=7001
+      - DB_HOST=mysql_db
+      - DB_PORT=3306
+      - DB_USER=root
+      - DB_PASSWORD=rootpassword
+      - DB_NAME=Erp_management
+      - JWT_SECRET=yaf_super_secure_enterprise_secret_2026_mardan
+    depends_on:
+      mysql_db:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: yaf_frontend_web
+    restart: always
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend
+
+volumes:
+  mysql_data:
+    driver: local
