@@ -81,7 +81,16 @@ function securityHeadersMiddleware(req, res, next) {
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
   res.setHeader('Content-Security-Policy', "default-src 'none'; frame-ancestors 'none'");
 
-  if (req.secure || req.headers['x-forwarded-proto'] === 'https') {
+  // HSTS: Only emit when connection is genuinely verified as secure (req.secure).
+  // Never trust raw, unverified client-controlled X-Forwarded-Proto headers.
+  // In development/test, HSTS is disabled by default to prevent caching on localhost,
+  // but can be explicitly enabled with ENABLE_HSTS=true. In production, enabled unless ENABLE_HSTS=false.
+  const isProduction = process.env.NODE_ENV === 'production';
+  const hstsExplicitlyDisabled = process.env.ENABLE_HSTS === 'false';
+  const hstsExplicitlyEnabled = process.env.ENABLE_HSTS === 'true';
+  const shouldEmitHsts = Boolean(req.secure) && !hstsExplicitlyDisabled && (isProduction || hstsExplicitlyEnabled);
+
+  if (shouldEmitHsts) {
     res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
   }
   next();

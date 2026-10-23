@@ -274,6 +274,84 @@ async function runPhaseC1SecurityTestSuite() {
     });
 
     // ------------------------------------------------------------------------
+    // SECTION 3B: HSTS REMEDIATION & VERIFIED SECURE PROTOCOL ENFORCEMENT
+    // ------------------------------------------------------------------------
+    await test('Plain HTTP request with spoofed X-Forwarded-Proto: https does not receive HSTS header', async () => {
+      const res = await fetch(`${BASE_URL}/`, {
+        headers: { 'X-Forwarded-Proto': 'https' }
+      });
+      assert.strictEqual(res.status, 200);
+      assert.strictEqual(
+        res.headers.get('strict-transport-security'),
+        null,
+        'HSTS must never be emitted over plain HTTP with untrusted X-Forwarded-Proto header'
+      );
+    });
+
+    await test('A genuinely secure request receives HSTS when enabled', () => {
+      const prevEnv = process.env.ENABLE_HSTS;
+      try {
+        process.env.ENABLE_HSTS = 'true';
+        const mockReq = { secure: true, headers: {} };
+        const headers = {};
+        const mockRes = {
+          setHeader: (name, val) => { headers[name.toLowerCase()] = val; }
+        };
+        securityHeadersMiddleware(mockReq, mockRes, () => {});
+        assert.strictEqual(
+          headers['strict-transport-security'],
+          'max-age=31536000; includeSubDomains',
+          'HSTS header must be emitted when connection is verified secure and HSTS is enabled'
+        );
+      } finally {
+        if (prevEnv === undefined) delete process.env.ENABLE_HSTS;
+        else process.env.ENABLE_HSTS = prevEnv;
+      }
+    });
+
+    await test('HSTS remains absent when explicitly disabled via ENABLE_HSTS=false', () => {
+      const prevEnv = process.env.ENABLE_HSTS;
+      try {
+        process.env.ENABLE_HSTS = 'false';
+        const mockReq = { secure: true, headers: {} };
+        const headers = {};
+        const mockRes = {
+          setHeader: (name, val) => { headers[name.toLowerCase()] = val; }
+        };
+        securityHeadersMiddleware(mockReq, mockRes, () => {});
+        assert.strictEqual(
+          headers['strict-transport-security'],
+          undefined,
+          'HSTS must not be emitted when ENABLE_HSTS=false'
+        );
+      } finally {
+        if (prevEnv === undefined) delete process.env.ENABLE_HSTS;
+        else process.env.ENABLE_HSTS = prevEnv;
+      }
+    });
+
+    await test('HSTS remains absent on unsecure connection even when ENABLE_HSTS=true and client sends X-Forwarded-Proto: https', () => {
+      const prevEnv = process.env.ENABLE_HSTS;
+      try {
+        process.env.ENABLE_HSTS = 'true';
+        const mockReq = { secure: false, headers: { 'x-forwarded-proto': 'https' } };
+        const headers = {};
+        const mockRes = {
+          setHeader: (name, val) => { headers[name.toLowerCase()] = val; }
+        };
+        securityHeadersMiddleware(mockReq, mockRes, () => {});
+        assert.strictEqual(
+          headers['strict-transport-security'],
+          undefined,
+          'HSTS must never be emitted when req.secure is false regardless of headers or ENABLE_HSTS setting'
+        );
+      } finally {
+        if (prevEnv === undefined) delete process.env.ENABLE_HSTS;
+        else process.env.ENABLE_HSTS = prevEnv;
+      }
+    });
+
+    // ------------------------------------------------------------------------
     // SECTION 4: STRICT BCRYPT VERIFICATION & AUTHENTICATION HARDENING
     // ------------------------------------------------------------------------
     const bcryptPassword = 'StrongBcryptPassword123!';
