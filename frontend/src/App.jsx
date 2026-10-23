@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   LayoutDashboard,
   CheckSquare,
@@ -55,26 +55,134 @@ import ProcessMap from './components/views/ProcessMap';
 import Auth from './components/Auth';
 
 /**
- * Returns the primary operational workspace tab matching the user's role and department
+ * Strict role-to-pages access control mapping.
+ * Each user ONLY sees the modules directly related to their operational duties.
  */
-export function getDefaultTabForUser(user) {
-  if (!user) return 'dashboard';
-  const role = (user.role || '').toLowerCase();
-  const dept = (user.department || '').toLowerCase();
+export const ROLE_ALLOWED_PAGES = {
+  // 1. Executive Leadership & Super Admins (Comprehensive access)
+  'Chairman & CEO': [
+    'dashboard', 'approvals', 'live-operations', 'procurement', 'gate', 'qc', 
+    'inventory', 'production', 'pos', 'sales', 'marketing', 'hr', 'payroll', 
+    'finance', 'reports', 'users', 'audit-logs', 'settings', 'process-map'
+  ],
+  'General Manager': [
+    'dashboard', 'approvals', 'live-operations', 'procurement', 'gate', 'qc', 
+    'inventory', 'production', 'pos', 'sales', 'marketing', 'hr', 'payroll', 
+    'finance', 'reports', 'users', 'audit-logs', 'settings', 'process-map'
+  ],
+  'ERP Admin': [
+    'users', 'audit-logs', 'settings', 'dashboard', 'approvals', 'live-operations',
+    'procurement', 'gate', 'qc', 'inventory', 'production', 'pos', 'sales', 
+    'marketing', 'hr', 'payroll', 'finance', 'reports', 'process-map'
+  ],
 
-  if (role.includes('gate') || dept.includes('security')) return 'gate';
-  if (role.includes('qc') || dept.includes('quality')) return 'qc';
-  if (role.includes('store') || role.includes('delivery') || dept.includes('inventory') || dept.includes('logistics')) return 'inventory';
-  if (role.includes('production') || role.includes('breaking') || dept.includes('plant') || dept.includes('production')) return 'production';
-  if (role.includes('procurement') || dept.includes('purchasing')) return 'procurement';
-  if (role === 'sales officer' || role.includes('pos')) return 'pos';
-  if (role.includes('sales')) return 'sales';
-  if (role.includes('marketing') || role.includes('social media') || dept.includes('marketing')) return 'marketing';
-  if (role.includes('hr') || dept.includes('hr')) return 'hr';
-  if (role.includes('accounts') || dept.includes('finance')) return 'finance';
-  if (role.includes('admin') || dept.includes('it')) return 'users';
-  if (dept.includes('farm')) return 'live-operations';
-  return 'dashboard';
+  // 2. Finance & Accounts
+  'Director Finance': [
+    'finance', 'reports', 'payroll', 'procurement', 'sales', 'approvals', 'dashboard'
+  ],
+  'Accounts Officer': [
+    'finance', 'reports', 'payroll', 'pos'
+  ],
+
+  // 3. Operations, Plant & Farm
+  'Director Operations': [
+    'live-operations', 'production', 'inventory', 'qc', 'gate', 'procurement', 'approvals'
+  ],
+  'Plant Manager': [
+    'production', 'live-operations', 'inventory', 'qc', 'gate', 'approvals'
+  ],
+  'Production Manager': [
+    'production', 'live-operations'
+  ],
+  'Breaking Supervisor': [
+    'production', 'live-operations'
+  ],
+  'Poultry Farms': [
+    'live-operations', 'production', 'inventory'
+  ],
+
+  // 4. Security & Gate (Only Gate module)
+  'Gate Officer': [
+    'gate'
+  ],
+
+  // 5. Quality Inspection (Only QC module)
+  'QC Cell': [
+    'qc'
+  ],
+
+  // 6. Warehouses & Stores (Only Inventory module)
+  'Raw Material Store': [
+    'inventory'
+  ],
+  'Finish Store & Delivery': [
+    'inventory', 'gate'
+  ],
+
+  // 7. Purchasing & Procurement
+  'Procurement': [
+    'procurement', 'inventory', 'approvals'
+  ],
+
+  // 8. Sales
+  'Sales Manager': [
+    'sales', 'pos', 'marketing', 'approvals'
+  ],
+  'Sales Officer': [
+    'pos', 'sales', 'inventory'
+  ],
+
+  // 9. Marketing
+  'Head of Marketing': [
+    'marketing', 'approvals'
+  ],
+  'Social Media & Content': [
+    'marketing'
+  ],
+
+  // 10. Human Resources
+  'HR Manager': [
+    'hr', 'payroll', 'approvals'
+  ]
+};
+
+export function getEffectiveAllowedPages(user) {
+  if (!user) return ['dashboard'];
+
+  // 1. Direct role exact match
+  if (ROLE_ALLOWED_PAGES[user.role]) {
+    return ROLE_ALLOWED_PAGES[user.role];
+  }
+
+  // 2. Normalized partial match
+  const roleLower = (user.role || '').toLowerCase();
+  for (const [rName, pages] of Object.entries(ROLE_ALLOWED_PAGES)) {
+    if (roleLower === rName.toLowerCase() || roleLower.includes(rName.toLowerCase())) {
+      return pages;
+    }
+  }
+
+  // 3. Department fallback
+  const deptLower = (user.department || '').toLowerCase();
+  if (deptLower === 'security') return ['gate'];
+  if (deptLower === 'quality') return ['qc'];
+  if (deptLower === 'inventory') return ['inventory'];
+  if (deptLower === 'logistics') return ['inventory', 'gate'];
+  if (deptLower === 'purchasing') return ['procurement', 'inventory'];
+  if (deptLower === 'sales') return ['pos', 'sales'];
+  if (deptLower === 'marketing') return ['marketing'];
+  if (deptLower === 'hr') return ['hr', 'payroll'];
+  if (deptLower === 'finance') return ['finance', 'reports', 'payroll'];
+  if (deptLower === 'plant' || deptLower === 'production') return ['production', 'live-operations'];
+  if (deptLower === 'it') return ['users', 'audit-logs', 'settings'];
+  if (deptLower === 'executive') return ROLE_ALLOWED_PAGES['Chairman & CEO'];
+
+  return ['dashboard'];
+}
+
+export function getDefaultTabForUser(user) {
+  const allowed = getEffectiveAllowedPages(user);
+  return allowed[0] || 'dashboard';
 }
 
 export default function App() {
@@ -221,90 +329,75 @@ export default function App() {
     setCurrentUser(null);
   };
 
-  // Dynamic Role & Department permission matrix
-  const userRole = currentUser?.role || '';
-  const userDept = currentUser?.department || '';
+  // Get strict allowed pages for current user based on their exact role
+  const allowedTabIds = useMemo(() => getEffectiveAllowedPages(currentUser), [currentUser]);
 
-  const isSuperAdmin = userRole === 'ERP Admin' || userRole === 'Chairman & CEO';
-  const isExecutive = userRole === 'Chairman & CEO' || userRole === 'General Manager' || userDept === 'Executive';
-  const isITAdmin = userRole === 'ERP Admin' || userDept === 'IT';
-  const isGM = isExecutive || isSuperAdmin;
-  
-  const isFinance = userDept === 'Finance' || userRole.includes('Finance') || userRole.includes('Accounts') || isGM;
-  const isOperations = ['Operations', 'Plant', 'Production'].includes(userDept) || userRole.includes('Operations') || userRole.includes('Plant') || userRole.includes('Production') || isGM;
-  const isSecurity = userDept === 'Security' || userDept === 'Logistics' || userRole.includes('Gate') || userRole.includes('Security') || isGM;
-  const isQC = userDept === 'Quality' || userRole.includes('QC') || isGM;
-  const isInventory = userDept === 'Inventory' || userDept === 'Logistics' || userRole.includes('Store') || userRole.includes('Delivery') || isOperations || isGM;
-  const isPurchasing = userDept === 'Purchasing' || userRole.includes('Procurement') || isFinance || isGM;
-  const isSales = ['Sales', 'Marketing'].includes(userDept) || userRole.includes('Sales') || isGM;
-  const isMarketing = userDept === 'Marketing' || userRole.includes('Marketing') || userRole.includes('Social Media') || isSales || isGM;
-  const isHR = userDept === 'HR' || userRole.includes('HR') || isGM;
-  const isFarm = userDept === 'Farms' || userRole.includes('Poultry') || isOperations || isGM;
+  // Nav Groups strictly filtered to each user's specific job role
+  const navSections = useMemo(() => {
+    const rawSections = [
+      {
+        title: 'OVERVIEW',
+        items: [
+          { id: 'dashboard', label: 'Executive Dashboard', icon: LayoutDashboard },
+          { id: 'approvals', label: 'Approvals Inbox', icon: CheckSquare, badge: tasks.filter(t => t.status === 'pending').length },
+          { id: 'live-operations', label: 'Live Operations', icon: Activity },
+          { id: 'process-map', label: 'Process Map', icon: GitBranch }
+        ]
+      },
+      {
+        title: 'OPERATIONS',
+        items: [
+          { id: 'procurement', label: 'Procurement (POs)', icon: ShoppingBag },
+          { id: 'gate', label: 'Gate & Security', icon: Truck },
+          { id: 'qc', label: 'QC Goods Receipt', icon: CheckCircle2 },
+          { id: 'inventory', label: 'Inventory & Stock', icon: Package },
+          { id: 'production', label: 'Production Board', icon: Layers }
+        ]
+      },
+      {
+        title: 'SALES & MARKETING',
+        items: [
+          { id: 'pos', label: 'Point of Sale (POS)', icon: Store },
+          { id: 'sales', label: 'Sales Orders', icon: ShoppingCart },
+          { id: 'marketing', label: 'Marketing Campaigns', icon: Share2 }
+        ]
+      },
+      {
+        title: 'PEOPLE',
+        items: [
+          { id: 'hr', label: 'HR & Staff Directory', icon: Users },
+          { id: 'payroll', label: 'Payroll Management', icon: DollarSign }
+        ]
+      },
+      {
+        title: 'MONEY',
+        items: [
+          { id: 'finance', label: 'Accounts & Finance', icon: Building2 },
+          { id: 'reports', label: 'Financial Reports', icon: FileText }
+        ]
+      },
+      {
+        title: 'ADMIN & SETTINGS',
+        items: [
+          { id: 'users', label: 'User Management', icon: Shield },
+          { id: 'audit-logs', label: 'System Audit Logs', icon: History },
+          { id: 'settings', label: 'Approval Matrix', icon: Sliders }
+        ]
+      }
+    ];
 
-  // Nav Groups with Dynamic Role-Based Access Control
-  const navSections = [
-    {
-      title: 'OVERVIEW',
-      items: [
-        { id: 'dashboard', label: 'Executive Dashboard', icon: LayoutDashboard, visible: isGM || isFinance || isOperations },
-        { id: 'approvals', label: 'Approvals Inbox', icon: CheckSquare, badge: tasks.filter(t => t.status === 'pending').length, visible: isGM || isFinance || isOperations || isHR || isPurchasing || userRole === 'Sales Manager' || userRole === 'Head of Marketing' },
-        { id: 'live-operations', label: 'Live Operations', icon: Activity, visible: isOperations || isSecurity || isQC || isFarm || isGM },
-        { id: 'process-map', label: 'Process Map', icon: GitBranch, visible: true }
-      ].filter(item => item.visible)
-    },
-    {
-      title: 'OPERATIONS',
-      items: [
-        { id: 'procurement', label: 'Procurement (POs)', icon: ShoppingBag, visible: isPurchasing || isFinance || isGM },
-        { id: 'gate', label: 'Gate & Security', icon: Truck, visible: isSecurity || isOperations || isGM },
-        { id: 'qc', label: 'QC Goods Receipt', icon: CheckCircle2, visible: isQC || isOperations || isGM },
-        { id: 'inventory', label: 'Inventory & Stock', icon: Package, visible: isInventory || isPurchasing || isSales || isGM },
-        { id: 'production', label: 'Production Board', icon: Layers, visible: isOperations || isFarm || isGM }
-      ].filter(item => item.visible)
-    },
-    {
-      title: 'SALES & MARKETING',
-      items: [
-        { id: 'pos', label: 'Point of Sale (POS)', icon: Store, visible: isSales || isFinance || isGM },
-        { id: 'sales', label: 'Sales Orders', icon: ShoppingCart, visible: isSales || isFinance || isGM },
-        { id: 'marketing', label: 'Marketing Campaigns', icon: Share2, visible: isMarketing || isGM }
-      ].filter(item => item.visible)
-    },
-    {
-      title: 'PEOPLE',
-      items: [
-        { id: 'hr', label: 'HR & Staff Directory', icon: Users, visible: isHR || isGM },
-        { id: 'payroll', label: 'Payroll Management', icon: DollarSign, visible: isHR || isFinance || isGM }
-      ].filter(item => item.visible)
-    },
-    {
-      title: 'MONEY',
-      items: [
-        { id: 'finance', label: 'Accounts & Finance', icon: Building2, visible: isFinance || isGM },
-        { id: 'reports', label: 'Financial Reports', icon: FileText, visible: isFinance || isGM }
-      ].filter(item => item.visible)
-    },
-    {
-      title: 'ADMIN & SETTINGS',
-      items: [
-        { id: 'users', label: 'User Management', icon: Shield, visible: isSuperAdmin },
-        { id: 'audit-logs', label: 'System Audit Logs', icon: History, visible: isSuperAdmin || isGM },
-        { id: 'settings', label: 'Approval Matrix', icon: Sliders, visible: isSuperAdmin || isGM }
-      ].filter(item => item.visible)
-    }
-  ].filter(section => section.items.length > 0);
-
-  const allowedTabIds = navSections.flatMap(section => section.items.map(item => item.id));
+    return rawSections
+      .map(section => ({
+        ...section,
+        items: section.items.filter(item => allowedTabIds.includes(item.id))
+      }))
+      .filter(section => section.items.length > 0);
+  }, [allowedTabIds, tasks]);
 
   // Automatically ensure active tab is strictly allowed for current user role
   useEffect(() => {
     if (allowedTabIds.length > 0 && !allowedTabIds.includes(activeTab)) {
-      const defaultRoleTab = getDefaultTabForUser(currentUser);
-      if (allowedTabIds.includes(defaultRoleTab)) {
-        setActiveTab(defaultRoleTab);
-      } else {
-        setActiveTab(allowedTabIds[0]);
-      }
+      setActiveTab(allowedTabIds[0]);
     }
   }, [currentUser, allowedTabIds, activeTab]);
 
