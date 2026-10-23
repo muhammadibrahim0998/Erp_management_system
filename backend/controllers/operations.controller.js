@@ -78,16 +78,34 @@ const getApprovals = async (req, res) => {
 const actionApproval = async (req, res) => {
   const { id } = req.params;
   const { action } = req.body; // 'approved' | 'rejected' | 'completed'
+
+  const validActions = ['approved', 'rejected', 'completed'];
+  const normalizedAction = (typeof action === 'string') ? action.trim().toLowerCase() : 'completed';
+  if (!validActions.includes(normalizedAction)) {
+    return res.status(400).json({ error: `Invalid action "${action}". Allowed: ${validActions.join(', ')}` });
+  }
+
+  const actorName = req.user?.name || req.trustedUser?.name || 'Executive Officer';
+  const actorRole = req.user?.role || req.trustedUser?.role || 'Executive';
+
   try {
-    await db.query('UPDATE workflow_tasks SET status = ? WHERE id = ?', [action || 'completed', id]);
+    const [existing] = await db.query('SELECT id, status, title FROM workflow_tasks WHERE id = ?', [id]);
+    if (existing.length === 0) {
+      return res.status(404).json({ error: `Workflow task #${id} not found` });
+    }
+
+    await db.query('UPDATE workflow_tasks SET status = ? WHERE id = ?', [normalizedAction, id]);
     await logAudit({
       req,
-      action: `WORKFLOW_${(action || 'COMPLETED').toUpperCase()}`,
+      userId: req.user?.id,
+      userName: actorName,
+      role: actorRole,
+      action: `WORKFLOW_${normalizedAction.toUpperCase()}`,
       entityType: 'WORKFLOW',
       entityId: id,
-      details: `Workflow task #${id} updated to status: ${action || 'completed'}`
+      details: `${actorRole} (${actorName}) updated workflow task #${id} ("${existing[0].title}") to: ${normalizedAction}`
     });
-    res.json({ success: true, message: `Task ${action || 'processed'} successfully` });
+    res.json({ success: true, message: `Task ${normalizedAction} successfully by ${actorName}` });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -143,6 +161,8 @@ const getGatePasses = async (req, res) => {
 const createGatePass = async (req, res) => {
   const { pass_number, vehicle_number, supplier_customer, pass_type } = req.body;
   const passNo = pass_number || `GPI-2026-000${Math.floor(Math.random() * 90 + 10)}`;
+  const officerName = req.user?.name || req.trustedUser?.name || 'Gate Officer';
+  const officerRole = req.user?.role || req.trustedUser?.role || 'Security';
   try {
     const [result] = await db.query(
       'INSERT INTO gate_passes (pass_number, vehicle_number, supplier_customer, pass_type, since_time, status) VALUES (?, ?, ?, ?, "Just now", "At gate — waiting for QC")',
@@ -150,10 +170,13 @@ const createGatePass = async (req, res) => {
     );
     await logAudit({
       req,
+      userId: req.user?.id,
+      userName: officerName,
+      role: officerRole,
       action: 'CREATE_GATE_PASS',
       entityType: 'GATE_PASS',
       entityId: passNo,
-      details: `Issued ${pass_type || 'inward'} gate pass for vehicle ${vehicle_number} (${supplier_customer || 'General'})`
+      details: `${officerRole} (${officerName}) issued ${pass_type || 'inward'} gate pass for vehicle ${vehicle_number} (${supplier_customer || 'General'})`
     });
     res.json({ success: true, id: result.insertId, pass_number: passNo });
   } catch (err) {
@@ -175,18 +198,26 @@ const getProcurementPOs = async (req, res) => {
 
 const createProcurementPO = async (req, res) => {
   const { supplier, amount, items_count } = req.body;
+  if (!supplier || amount === undefined || isNaN(Number(amount))) {
+    return res.status(400).json({ error: 'Valid supplier name and amount are required' });
+  }
+  const creatorName = req.user?.name || req.trustedUser?.name || 'Procurement Officer';
+  const creatorRole = req.user?.role || req.trustedUser?.role || 'Procurement';
   const po_number = `PO-2026-09${Math.floor(Math.random() * 89 + 10)}`;
   try {
     await db.query(
-      'INSERT INTO purchase_orders (po_number, po_date, supplier, status, created_by, amount, items_count) VALUES (?, "29 Sep 2026", ?, "Draft", "Waqar Ahmad", ?, ?)',
-      [po_number, supplier, amount, items_count || 1]
+      'INSERT INTO purchase_orders (po_number, po_date, supplier, status, created_by, amount, items_count) VALUES (?, "29 Sep 2026", ?, "Draft", ?, ?, ?)',
+      [po_number, supplier, creatorName, amount, items_count || 1]
     );
     await logAudit({
       req,
+      userId: req.user?.id,
+      userName: creatorName,
+      role: creatorRole,
       action: 'CREATE_PO',
       entityType: 'PURCHASE_ORDER',
       entityId: po_number,
-      details: `Generated purchase order ${po_number} for supplier: ${supplier} (PKR ${Number(amount).toLocaleString()})`
+      details: `${creatorRole} (${creatorName}) generated purchase order ${po_number} for supplier: ${supplier} (PKR ${Number(amount).toLocaleString()})`
     });
     res.json({ success: true, po_number });
   } catch (err) {
@@ -503,11 +534,15 @@ const invoiceSalesOrder = async (req, res) => {
   }
 
   try {
-    // 1. Role verification
-    const userRole = req.user?.role;
-    if (userRole && !INVOICE_ROLES.includes(userRole)) {
+    // 1. Fail-closed Role & Identity verification
+    const authenticatedUserId = req.user?.id;
+    if (!authenticatedUserId) {
+      return res.status(401).json({ error: 'Authentication required. Please sign in.' });
+    }
+    const userRole = (typeof req.user?.role === 'string') ? req.user.role.trim() : '';
+    if (!userRole || !INVOICE_ROLES.includes(userRole)) {
       return res.status(403).json({
-        error: `Access Denied: Role "${userRole}" is not authorized to generate invoices.`
+        error: `Access Denied: Role "${userRole || 'Unassigned'}" is not authorized to generate invoices. Allowed roles: ${INVOICE_ROLES.join(', ')}.`
       });
     }
 
@@ -536,7 +571,8 @@ const invoiceSalesOrder = async (req, res) => {
     // 4. Generate invoice number from database sequence (no Math.random)
     const invoice_no = await getNextDocNumber('sales_invoice', 'INV-2026');
     const invoice_date = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
-    const created_by = req.user ? `${req.user.name} (${req.user.role})` : 'Accounts Officer (Hamza Khan)';
+    const officerName = req.user?.name || req.trustedUser?.name || 'Accounts Officer';
+    const created_by = `${officerName} (${userRole})`;
 
     await db.query(
       `INSERT INTO sales_invoices 
@@ -550,10 +586,13 @@ const invoiceSalesOrder = async (req, res) => {
 
     await logAudit({
       req,
+      userId: authenticatedUserId,
+      userName: officerName,
+      role: userRole,
       action: 'CREATE_SALES_INVOICE',
       entityType: 'SALES_INVOICE',
       entityId: invoice_no,
-      details: `Generated invoice ${invoice_no} for order ${so_number} (PKR ${Number(order.total_amount).toLocaleString()})`
+      details: `${userRole} (${officerName}) generated invoice ${invoice_no} for order ${so_number} (PKR ${Number(order.total_amount).toLocaleString()})`
     });
 
     const [invRows] = await db.query('SELECT * FROM sales_invoices WHERE invoice_no = ?', [invoice_no]);
@@ -575,11 +614,15 @@ const recordSalesPayment = async (req, res) => {
   }
 
   try {
-    // 1. Role verification
-    const userRole = req.user?.role;
-    if (userRole && !PAYMENT_ROLES.includes(userRole)) {
+    // 1. Fail-closed Role & Identity verification
+    const authenticatedUserId = req.user?.id;
+    if (!authenticatedUserId) {
+      return res.status(401).json({ error: 'Authentication required. Please sign in.' });
+    }
+    const userRole = (typeof req.user?.role === 'string') ? req.user.role.trim() : '';
+    if (!userRole || !PAYMENT_ROLES.includes(userRole)) {
       return res.status(403).json({
-        error: `Access Denied: Role "${userRole}" is not authorized to record payments.`
+        error: `Access Denied: Role "${userRole || 'Unassigned'}" is not authorized to record payments. Allowed roles: ${PAYMENT_ROLES.join(', ')}.`
       });
     }
 
@@ -608,7 +651,8 @@ const recordSalesPayment = async (req, res) => {
     const amount = Number(req.body.amount) || Number(order.total_amount);
     const payment_method = req.body.payment_method || 'Bank Transfer';
     const reference_no = req.body.reference_no || `TRX-${Date.now().toString().slice(-6)}`;
-    const received_by = req.user ? `${req.user.name} (${req.user.role})` : 'Accounts Officer (Hamza Khan)';
+    const officerName = req.user?.name || req.trustedUser?.name || 'Accounts Officer';
+    const received_by = `${officerName} (${userRole})`;
 
     await db.query(
       `INSERT INTO sales_payments 
@@ -674,18 +718,23 @@ const getPayroll = async (req, res) => {
 
 const generatePayroll = async (req, res) => {
   const { month } = req.body;
+  const preparerName = req.user?.name || req.trustedUser?.name || 'HR Officer';
+  const preparerRole = req.user?.role || req.trustedUser?.role || 'HR';
   const run_number = `PAY-2026-00${Math.floor(Math.random() * 89 + 10)}`;
   try {
     await db.query(
-      'INSERT INTO payroll_runs (run_number, run_date, month, status, prepared_by, net_pay) VALUES (?, "29 Sep 2026", ?, "Pending approval", "Nadia Shah", 4868088.00)',
-      [run_number, month || '2026-10']
+      'INSERT INTO payroll_runs (run_number, run_date, month, status, prepared_by, net_pay) VALUES (?, "29 Sep 2026", ?, "Pending approval", ?, 4868088.00)',
+      [run_number, month || '2026-10', preparerName]
     );
     await logAudit({
       req,
+      userId: req.user?.id,
+      userName: preparerName,
+      role: preparerRole,
       action: 'GENERATE_PAYROLL',
       entityType: 'PAYROLL',
       entityId: run_number,
-      details: `Generated payroll batch ${run_number} for period ${month || '2026-10'}`
+      details: `${preparerRole} (${preparerName}) generated payroll batch ${run_number} for period ${month || '2026-10'}`
     });
     res.json({ success: true, run_number });
   } catch (err) {
