@@ -147,7 +147,7 @@ export default function Auth({ onLogin }) {
                     type="button"
                     disabled={!hasLogin}
                     onClick={() => {
-                        const fillPass = u.email === 'ceo@gmail.com' ? 'ceo12345' : 'password';
+                        const fillPass = u.email === 'ceo@gmail.com' ? 'ceo12345' : '123456';
                         handleQuickFill(u.email, fillPass);
                         setSelectedEmail(u.email);
                     }}
@@ -170,7 +170,7 @@ export default function Auth({ onLogin }) {
               })}
             </div>
             <div className="text-[10px] text-[#6A947F] mt-2 text-center">
-              Click any post to autofill Email & Password (password: <code className="text-amber-300/80 font-mono">password</code>)
+              Click any role to autofill Email & Password (pass: <code className="text-amber-300/80 font-mono">123456</code> · CEO: <code className="text-amber-300/80 font-mono">ceo12345</code>)
             </div>
           </div>
         )}
