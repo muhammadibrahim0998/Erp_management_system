@@ -141,14 +141,16 @@ const login = async (req, res) => {
     }
 
     let isMatch = false;
-    if (user.password.startsWith('$2a$') || user.password.startsWith('$2b$')) {
-      isMatch = await bcrypt.compare(password, user.password);
-    } else {
-      isMatch = (password === user.password);
-      if (isMatch) {
-        const newHash = await bcrypt.hash(password, 10);
-        await db.query('UPDATE users SET password = ? WHERE id = ?', [newHash, user.id]);
+    const dbPassword = user.password;
+    if (typeof dbPassword === 'string' && /^\$2[aby]\$\d{2}\$[./A-Za-z0-9]{53}$/.test(dbPassword)) {
+      try {
+        isMatch = await bcrypt.compare(password, dbPassword);
+      } catch (bcryptErr) {
+        isMatch = false;
       }
+    } else {
+      // Legacy plaintext passwords and malformed hashes are strictly rejected
+      isMatch = false;
     }
 
     if (!isMatch) {

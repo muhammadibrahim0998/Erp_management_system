@@ -46,7 +46,7 @@ const optionalUserExtractor = (req, res, next) => {
 };
 
 /**
- * Enforces valid JWT token on protected routes
+ * Enforces valid JWT token and verifies active database account status on all protected routes
  */
 const authenticateToken = (req, res, next) => {
   const authHeader = req.headers['authorization'];
@@ -55,12 +55,48 @@ const authenticateToken = (req, res, next) => {
     return res.status(401).json({ error: 'Access denied. Token missing.' });
   }
 
-  jwt.verify(token, JWT_SECRET, (err, user) => {
+  jwt.verify(token, JWT_SECRET, async (err, decodedUser) => {
     if (err) {
       return res.status(403).json({ error: 'Invalid or expired token.' });
     }
-    req.user = user;
-    next();
+
+    const userId = decodedUser?.id || decodedUser?.userId;
+    if (!userId) {
+      return res.status(401).json({
+        error: 'Authentication failed: Missing or invalid user identity in authentication context.'
+      });
+    }
+
+    try {
+      const trustedUser = await getTrustedUser(userId);
+      if (!trustedUser) {
+        return res.status(403).json({
+          error: 'Access denied: User record does not exist. Authenticated user record does not exist.'
+        });
+      }
+
+      const normalizedStatus = (typeof trustedUser.status === 'string') ? trustedUser.status.trim().toLowerCase() : '';
+      if (normalizedStatus !== 'active') {
+        return res.status(403).json({
+          error: 'Access denied: Approver account is not active. User account is inactive or suspended.'
+        });
+      }
+
+      // Establish trusted context from database record; mutable token claims are strictly overridden
+      req.trustedUser = trustedUser;
+      req.user = {
+        id: trustedUser.id,
+        name: trustedUser.name,
+        email: trustedUser.email,
+        role: trustedUser.role,
+        department: trustedUser.department,
+        avatar: trustedUser.avatar,
+        status: trustedUser.status
+      };
+      next();
+    } catch (dbErr) {
+      return res.status(500).json({ error: 'Authentication error: Failed to verify account status.' });
+    }
   });
 };
 
@@ -76,11 +112,21 @@ const getTrustedUser = async (userId) => {
     [userId]
   );
   if (rows.length === 0) return null;
-  return rows[0];
+  const dbUser = rows[0];
+  return {
+    id: dbUser.id,
+    name: typeof dbUser.name === 'string' ? dbUser.name.trim() : '',
+    email: typeof dbUser.email === 'string' ? dbUser.email.trim().toLowerCase() : '',
+    role: typeof dbUser.role === 'string' ? dbUser.role.trim() : 'Staff',
+    department: typeof dbUser.department === 'string' ? dbUser.department.trim() : 'General',
+    avatar: dbUser.avatar || 'US',
+    status: typeof dbUser.status === 'string' ? dbUser.status.trim().toLowerCase() : 'inactive'
+  };
 };
 
 /**
  * Middleware factory to enforce specific roles based on current database state
+ * Reuses req.trustedUser established by authenticateToken to avoid duplicate DB lookups
  */
 const requireRoles = (allowedRoles = []) => {
   return async (req, res, next) => {
@@ -90,14 +136,17 @@ const requireRoles = (allowedRoles = []) => {
     }
 
     try {
-      const user = await getTrustedUser(userId);
+      // Reuse trusted user context if already established; otherwise query database
+      const user = req.trustedUser || (await getTrustedUser(userId));
       if (!user) {
-        return res.status(403).json({ error: 'Access denied: User record does not exist.' });
+        return res.status(403).json({ error: 'Access denied: User record does not exist. Authenticated user record does not exist.' });
       }
 
       const normalizedStatus = (typeof user.status === 'string') ? user.status.trim().toLowerCase() : '';
       if (normalizedStatus !== 'active') {
-        return res.status(403).json({ error: 'Access denied: User account is inactive or suspended.' });
+        return res.status(403).json({
+          error: 'Access denied: Approver account is not active. User account is inactive or suspended.'
+        });
       }
 
       const currentDbRole = (typeof user.role === 'string') ? user.role.trim() : '';
@@ -107,7 +156,6 @@ const requireRoles = (allowedRoles = []) => {
         });
       }
 
-      // Sync trusted database user data into request context
       req.trustedUser = user;
       req.user.name = user.name;
       req.user.role = currentDbRole;

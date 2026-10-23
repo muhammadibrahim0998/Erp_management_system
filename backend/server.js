@@ -11,23 +11,147 @@ const { apiLimiter } = require('./middlewares/rateLimiter');
 const { notFoundHandler, errorHandler } = require('./middlewares/errorHandler');
 const apiRoutes = require('./routes');
 
+// Helper to validate a single origin string
+function validateOrigin(rawOrigin) {
+  if (typeof rawOrigin !== 'string' || !rawOrigin.trim()) {
+    throw new Error('Origin must be a non-empty string');
+  }
+  const trimmed = rawOrigin.trim();
+  if (trimmed.includes('*')) {
+    throw new Error(`Wildcard origins ('*') are strictly prohibited: "${trimmed}"`);
+  }
+  let parsed;
+  try {
+    parsed = new URL(trimmed);
+  } catch (e) {
+    throw new Error(`Invalid origin URL format: "${trimmed}"`);
+  }
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    throw new Error(`Invalid origin protocol "${parsed.protocol}" in "${trimmed}": only http and https are permitted`);
+  }
+  if (parsed.username || parsed.password) {
+    throw new Error(`Origin must not contain credentials: "${trimmed}"`);
+  }
+  if (parsed.search || parsed.hash) {
+    throw new Error(`Origin must not contain query parameters or hashes: "${trimmed}"`);
+  }
+  if (parsed.pathname && parsed.pathname !== '/') {
+    throw new Error(`Origin must not contain a path component: "${trimmed}"`);
+  }
+  return parsed.origin;
+}
+
+// Helper to resolve allowed origins from environment
+function resolveAllowedOrigins(env = process.env) {
+  const isProduction = env.NODE_ENV === 'production';
+  const rawAllowed = env.ALLOWED_ORIGINS;
+
+  if (isProduction) {
+    if (!rawAllowed || typeof rawAllowed !== 'string' || !rawAllowed.trim()) {
+      throw new Error('ALLOWED_ORIGINS environment variable is required and must not be empty in production');
+    }
+    const origins = rawAllowed.split(',').map((s) => s.trim()).filter(Boolean);
+    if (origins.length === 0) {
+      throw new Error('ALLOWED_ORIGINS must contain at least one valid origin in production');
+    }
+    return origins.map(validateOrigin);
+  }
+
+  // Development / Test fallback
+  if (rawAllowed && typeof rawAllowed === 'string' && rawAllowed.trim()) {
+    const origins = rawAllowed.split(',').map((s) => s.trim()).filter(Boolean);
+    if (origins.length > 0) {
+      return origins.map(validateOrigin);
+    }
+  }
+
+  return [
+    'http://localhost:5173',
+    'http://127.0.0.1:5173',
+    'http://localhost:7001',
+    'http://127.0.0.1:7001'
+  ];
+}
+
+// Security headers middleware for all responses
+function securityHeadersMiddleware(req, res, next) {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('X-XSS-Protection', '0');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('Content-Security-Policy', "default-src 'none'; frame-ancestors 'none'");
+
+  if (req.secure || req.headers['x-forwarded-proto'] === 'https') {
+    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+  }
+  next();
+}
+
 const app = express();
 const PORT = process.env.PORT || 7001;
 
-// Core Middlewares
-app.use(cors());
+// Disable Express fingerprinting header
+app.disable('x-powered-by');
+
+// Enterprise Security Headers
+app.use(securityHeadersMiddleware);
+
+// CORS Configuration
+let allowedOrigins;
+try {
+  allowedOrigins = resolveAllowedOrigins(process.env);
+} catch (err) {
+  if (process.env.NODE_ENV === 'production') {
+    console.error('❌ Fatal CORS Configuration Error:', err.message);
+    throw err;
+  }
+  console.warn('⚠️ CORS configuration warning:', err.message, '- falling back to localhost defaults');
+  allowedOrigins = [
+    'http://localhost:5173',
+    'http://127.0.0.1:5173',
+    'http://localhost:7001',
+    'http://127.0.0.1:7001'
+  ];
+}
+
+const corsOptions = {
+  origin: (origin, callback) => {
+    // Allow non-browser clients (curl, mobile apps, server-to-server) where origin is undefined
+    if (!origin) {
+      return callback(null, true);
+    }
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    const err = new Error('CORS origin not allowed');
+    err.statusCode = 403;
+    return callback(err);
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept']
+};
+
+app.use(cors(corsOptions));
 app.use(express.json());
 
 // Request User Context Extractor (for audit trail)
 app.use(optionalUserExtractor);
 
-// Base Status Route
+// Base Status Route (sanitized - no internal DB name or port leaks)
 app.get('/', (req, res) => {
   res.json({
     status: 'online',
     system: 'AgenTech ERP — Yousafzai Agri Foods (Pvt) Ltd',
-    database: process.env.DB_NAME || 'Erp_management',
-    port: PORT,
+    timestamp: new Date().toISOString()
+  });
+});
+
+// Minimal Liveness Probe
+app.get('/health', (req, res) => {
+  res.json({
+    status: 'ok',
+    uptime: Math.floor(process.uptime()),
     timestamp: new Date().toISOString()
   });
 });
@@ -75,4 +199,10 @@ if (require.main === module) {
   startServer();
 }
 
-module.exports = { app, startServer };
+module.exports = {
+  app,
+  startServer,
+  resolveAllowedOrigins,
+  validateOrigin,
+  securityHeadersMiddleware
+};
