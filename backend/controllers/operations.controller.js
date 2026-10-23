@@ -392,21 +392,49 @@ const approveSalesOrder = async (req, res) => {
       });
     }
 
-    // 4. Resolve authenticated approver identity (client-supplied identity fields strictly ignored)
-    let approverName = (req.user?.name && typeof req.user.name === 'string' && req.user.name.trim() !== '')
-      ? req.user.name.trim()
-      : null;
-
-    if (!approverName && req.user?.id) {
-      const [userRows] = await db.query('SELECT name FROM users WHERE id = ?', [req.user.id]);
-      if (userRows.length > 0 && userRows[0].name && userRows[0].name.trim() !== '') {
-        approverName = userRows[0].name.trim();
-      }
+    // 4. Resolve and verify authenticated approver identity against trusted user record
+    // Client-supplied identity fields in body or query are strictly ignored
+    const authenticatedUserId = req.user?.id;
+    if (!authenticatedUserId) {
+      return res.status(401).json({
+        error: 'Authentication failed: Missing or invalid user identity in authentication context.'
+      });
     }
 
+    // Verify against trusted user record in database
+    const [userRows] = await db.query(
+      'SELECT id, name, role, status FROM users WHERE id = ?',
+      [authenticatedUserId]
+    );
+
+    if (userRows.length === 0) {
+      return res.status(403).json({
+        error: 'Unable to establish trusted approver identity: Authenticated user record does not exist.'
+      });
+    }
+
+    const trustedUser = userRows[0];
+    if (trustedUser.status && trustedUser.status.toLowerCase() !== 'active') {
+      return res.status(403).json({
+        error: 'Unable to establish trusted approver identity: Approver account is inactive or disabled.'
+      });
+    }
+
+    // Resolve verified name: prioritize trusted database user record, then verified JWT claim
+    let approverName = null;
+    if (typeof trustedUser.name === 'string' && trustedUser.name.trim() !== '') {
+      approverName = trustedUser.name.trim();
+    } else if (typeof req.user?.name === 'string' && req.user.name.trim() !== '') {
+      approverName = req.user.name.trim();
+    }
+
+    // Fail-closed: Never fabricate generic placeholder, never fall back to email
     if (!approverName) {
-      approverName = req.user?.email || 'Authorized Approver';
+      return res.status(403).json({
+        error: 'Unable to establish trusted approver identity: Approver has no verified name on record.'
+      });
     }
+
     req.user.name = approverName;
 
     // 5. Update order to Approved
@@ -418,7 +446,7 @@ const approveSalesOrder = async (req, res) => {
 
     await logAudit({
       req,
-      userId: req.user.id,
+      userId: trustedUser.id,
       userName: approverName,
       role: userRole,
       action: 'APPROVE_SALES_ORDER',
