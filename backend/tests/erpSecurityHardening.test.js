@@ -187,6 +187,31 @@ async function runSecurityTestSuite() {
       assert.strictEqual(rows[0].status, 'active');
     });
 
+    await test('Finding A: Public signup submitting explicit role "Staff" succeeds and sanitizes sensitive departments', async () => {
+      const email = `legit_staff_${Date.now()}@yaf-test.com`;
+      createdUserEmails.add(email);
+      const res = await fetch(`${BASE_URL}/auth/signup`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: 'Staff Employee',
+          email,
+          password: 'SafePassword123!',
+          role: 'Staff',
+          department: 'Executive'
+        })
+      });
+      assert.ok(res.status === 200 || res.status === 201, `Expected HTTP 200/201, got ${res.status}`);
+      const body = await res.json();
+      assert.strictEqual(body.user.role, 'Staff');
+      createdUserIds.add(body.user.id);
+
+      const [rows] = await db.query('SELECT role, department, status FROM users WHERE id = ?', [body.user.id]);
+      assert.strictEqual(rows[0].role, 'Staff');
+      assert.strictEqual(rows[0].department, 'General');
+      assert.strictEqual(rows[0].status, 'active');
+    });
+
     await test('Finding A: Admin creating user with authorized role succeeds; invalid role rejected', async () => {
       const legitEmail = `admin_created_${Date.now()}@yaf-test.com`;
       createdUserEmails.add(legitEmail);
