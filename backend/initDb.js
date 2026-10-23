@@ -181,32 +181,48 @@ async function initSchema(connection = db) {
     `);
 
     // Ensure UNIQUE constraint on sales_invoices(so_number) for existing tables idempotently
-    try {
-      const [invColIndexes] = await conn.query(`
+    const [invColIndexes] = await conn.query(`
+      SELECT INDEX_NAME, NON_UNIQUE 
+      FROM information_schema.STATISTICS 
+      WHERE TABLE_SCHEMA = DATABASE() 
+        AND TABLE_NAME = 'sales_invoices' 
+        AND COLUMN_NAME = 'so_number'
+    `);
+    const hasUniqueInvoiceSo = Array.isArray(invColIndexes) && invColIndexes.some(r => r.NON_UNIQUE === 0);
+    if (!hasUniqueInvoiceSo) {
+      const [dups] = await conn.query(`
+        SELECT so_number, COUNT(*) as cnt 
+        FROM sales_invoices 
+        GROUP BY so_number 
+        HAVING cnt > 1
+      `);
+      if (dups.length > 0) {
+        const dupDetails = dups.map(d => `${d.so_number} (${d.cnt} instances)`).join(', ');
+        throw new Error(
+          `FATAL MIGRATION FAILURE: Cannot apply UNIQUE constraint on sales_invoices(so_number). Found ${dups.length} duplicate so_number record(s): ${dupDetails}. Automatic startup blocked to prevent inconsistent financial state. Manual reconciliation required.`
+        );
+      }
+      try {
+        await conn.query('ALTER TABLE sales_invoices ADD UNIQUE KEY uq_sales_invoices_so (so_number)');
+      } catch (alterErr) {
+        if (!alterErr.message.includes('Duplicate key name') && !alterErr.message.includes('already exists') && alterErr.code !== 'ER_DUP_KEYNAME') {
+          throw alterErr;
+        }
+      }
+
+      // Explicit post-verification of uniqueness constraint
+      const [postIndexes] = await conn.query(`
         SELECT INDEX_NAME, NON_UNIQUE 
         FROM information_schema.STATISTICS 
         WHERE TABLE_SCHEMA = DATABASE() 
           AND TABLE_NAME = 'sales_invoices' 
           AND COLUMN_NAME = 'so_number'
       `);
-      const hasUniqueInvoiceSo = Array.isArray(invColIndexes) && invColIndexes.some(r => r.NON_UNIQUE === 0);
-      if (!hasUniqueInvoiceSo) {
-        const [dups] = await conn.query(`
-          SELECT so_number, COUNT(*) as cnt 
-          FROM sales_invoices 
-          GROUP BY so_number 
-          HAVING cnt > 1
-        `);
-        if (dups.length > 0) {
-          throw new Error(
-            `Cannot apply UNIQUE constraint on sales_invoices(so_number): found ${dups.length} duplicate so_number records.`
-          );
-        }
-        await conn.query('ALTER TABLE sales_invoices ADD UNIQUE KEY uq_sales_invoices_so (so_number)');
-      }
-    } catch (migErr) {
-      if (!migErr.message.includes('Duplicate key name') && !migErr.message.includes('already exists')) {
-        console.warn('⚠️ Note on sales_invoices uniqueness verification:', migErr.message);
+      const postUniqueEstablished = Array.isArray(postIndexes) && postIndexes.some(r => r.NON_UNIQUE === 0);
+      if (!postUniqueEstablished) {
+        throw new Error(
+          'FATAL MIGRATION FAILURE: Unique constraint uq_sales_invoices_so on sales_invoices(so_number) could not be verified after ALTER TABLE.'
+        );
       }
     }
 
@@ -651,7 +667,7 @@ async function initDatabase(options = {}) {
     }
   } catch (error) {
     console.error('❌ Database Initialization Error:', error.message);
-    if (isProduction) {
+    if (isProduction || error.message.includes('FATAL MIGRATION FAILURE')) {
       throw error;
     }
   }

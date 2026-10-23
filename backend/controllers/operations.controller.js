@@ -373,7 +373,7 @@ function resolveCustomerCreditPolicy(customerName) {
     credit_limit: defaultLimit,
     source: defaultLimit > 0 ? 'CONFIGURED_DEFAULT_ENV' : 'FAIL_CLOSED_ZERO_UNVETTED',
     isVetted: false,
-    canonicalName: clean
+    canonicalName: clean.replace(/\s+/g, ' ')
   };
 }
 
@@ -433,14 +433,17 @@ const createSalesOrder = async (req, res) => {
     // 3. Authoritative Customer Credit Limit (Never inferred from historical sales_orders)
     const creditPolicy = resolveCustomerCreditPolicy(cleanCustomer);
     const credit_limit = creditPolicy.credit_limit;
+    const canonicalCustomer = creditPolicy.canonicalName || cleanCustomer.replace(/\s+/g, ' ');
 
     // 4. Compute Ground-Truth Current Exposure from Database without double-counting liabilities:
+    // Dynamic matching matches exact names and internal/external whitespace variations without modifying historical records
     // a) Unpaid commercial invoices
     const [unpaidInvoices] = await connection.query(
       `SELECT COALESCE(SUM(total_amount - paid_amount), 0) as unpaid_total 
        FROM sales_invoices 
-       WHERE customer = ? AND status != 'Paid'`,
-      [cleanCustomer]
+       WHERE (customer = ? OR TRIM(REGEXP_REPLACE(customer, '[[:space:]]+', ' ')) = ?)
+         AND status != 'Paid'`,
+      [canonicalCustomer, canonicalCustomer]
     );
     const unpaidInvoiceBalance = Number(unpaidInvoices[0]?.unpaid_total || 0);
 
@@ -449,10 +452,10 @@ const createSalesOrder = async (req, res) => {
       `SELECT COALESCE(SUM(so.total_amount), 0) as uninvoiced_total
        FROM sales_orders so
        LEFT JOIN sales_invoices si ON so.so_number = si.so_number
-       WHERE so.customer = ?
+       WHERE (so.customer = ? OR TRIM(REGEXP_REPLACE(so.customer, '[[:space:]]+', ' ')) = ?)
          AND so.status IN ('Draft', 'Pending approval', 'Approved')
          AND si.id IS NULL`,
-      [cleanCustomer]
+      [canonicalCustomer, canonicalCustomer]
     );
     const uninvoicedOrderBalance = Number(uninvoicedOrders[0]?.uninvoiced_total || 0);
 
@@ -500,12 +503,12 @@ const createSalesOrder = async (req, res) => {
     const order_date = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
     const del_date = delivery_date || order_date;
 
-    // 8. Insert sales order header atomically
+    // 8. Insert sales order header atomically using canonical customer identity
     await connection.query(
       `INSERT INTO sales_orders 
        (so_number, order_date, delivery_date, customer, warehouse, total_amount, credit_limit, current_exposure, credit_breach, status, approval_step, created_by)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [so_number, order_date, del_date, cleanCustomer, warehouse, total_amount, credit_limit, totalExposure, creditBreach, status, approval_step, created_by]
+      [so_number, order_date, del_date, canonicalCustomer, warehouse, total_amount, credit_limit, totalExposure, creditBreach, status, approval_step, created_by]
     );
 
     // 9. Insert line items atomically
@@ -526,7 +529,7 @@ const createSalesOrder = async (req, res) => {
       action: 'CREATE_SALES_ORDER',
       entityType: 'SALES_ORDER',
       entityId: so_number,
-      details: `Created sales order ${so_number} for "${cleanCustomer}" (PKR ${total_amount.toLocaleString()}) [Credit limit: PKR ${credit_limit.toLocaleString()} (${creditPolicy.source}), Exposure: PKR ${totalExposure.toLocaleString()}, Breach: PKR ${creditBreach.toLocaleString()}]`,
+      details: `Created sales order ${so_number} for "${canonicalCustomer}" (PKR ${total_amount.toLocaleString()}) [Credit limit: PKR ${credit_limit.toLocaleString()} (${creditPolicy.source}), Exposure: PKR ${totalExposure.toLocaleString()}, Breach: PKR ${creditBreach.toLocaleString()}]`,
       connection
     });
 

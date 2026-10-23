@@ -30,11 +30,12 @@ const { db } = require('../config/db');
 const { JWT_SECRET, optionalUserExtractor } = require('../middlewares/auth');
 const { getNextDocNumber } = require('../utils/sequence');
 const { resolveCustomerCreditPolicy, CORPORATE_CUSTOMER_PROFILES } = require('../controllers/operations.controller');
+const { initSchema, initDatabase } = require('../initDb');
 const apiRoutes = require('../routes');
 
 async function runFinancialIntegrityTestSuite() {
   console.log('====================================================================');
-  console.log('YOUSAFZAI AGRI FOODS ERP — PHASE B.1 FINANCIAL INTEGRITY REGRESSION SUITE');
+  console.log('YOUSAFZAI AGRI FOODS ERP — PHASE B.2 FINANCIAL INTEGRITY REGRESSION SUITE');
   console.log('====================================================================');
   console.log(`[Safety Guard] Node Environment: ${nodeEnv}`);
   console.log(`[Safety Guard] Database Target:   ${currentDb} (ISOLATED TEST DATABASE)`);
@@ -1002,6 +1003,213 @@ async function runFinancialIntegrityTestSuite() {
       } finally {
         delete process.env.ERP_DEFAULT_UNVETTED_CREDIT_LIMIT;
       }
+    });
+
+    console.log('\n--- PART 4: PHASE B.2 MIGRATION SAFETY & CUSTOMER IDENTITY CONSISTENCY ---\n');
+
+    // T30: Migration fails closed when duplicate invoices exist for same so_number
+    await test('SEC-B2-01: initSchema fails closed and throws when duplicate invoice references exist', async () => {
+      const dupSo = `SO-TEST-DUP-${Date.now()}`;
+      const inv1 = `INV-DUP1-${Date.now()}`;
+      const inv2 = `INV-DUP2-${Date.now()}`;
+
+      // Temporarily drop uq_sales_invoices_so constraint to simulate pre-existing duplicate state
+      try {
+        await db.query('ALTER TABLE sales_invoices DROP INDEX uq_sales_invoices_so');
+      } catch (e) {
+        // May already be absent
+      }
+
+      try {
+        // Insert two duplicate invoices referencing the same sales order
+        await db.query(
+          `INSERT INTO sales_invoices (invoice_no, so_number, customer, invoice_date, subtotal, total_amount, paid_amount, status, created_by)
+           VALUES (?, ?, 'Charsadda Poultry Services', '23 Oct 2026', 50000.00, 50000.00, 0.00, 'Unpaid', 'Accounts Officer')`,
+          [inv1, dupSo]
+        );
+        await db.query(
+          `INSERT INTO sales_invoices (invoice_no, so_number, customer, invoice_date, subtotal, total_amount, paid_amount, status, created_by)
+           VALUES (?, ?, 'Charsadda Poultry Services', '23 Oct 2026', 50000.00, 50000.00, 0.00, 'Unpaid', 'Accounts Officer')`,
+          [inv2, dupSo]
+        );
+
+        // Attempting initSchema must throw FATAL MIGRATION FAILURE without modifying/deleting records
+        await assert.rejects(
+          async () => {
+            await initSchema(db);
+          },
+          (err) => {
+            assert.ok(err instanceof Error);
+            assert.ok(err.message.includes('FATAL MIGRATION FAILURE'));
+            assert.ok(err.message.includes('duplicate so_number record(s)'));
+            assert.ok(err.message.includes(dupSo));
+            return true;
+          },
+          'initSchema must fail closed when duplicate so_number invoices exist'
+        );
+
+        // Also verify initDatabase propagates this fatal migration failure
+        await assert.rejects(
+          async () => {
+            await initDatabase({ db, env: { NODE_ENV: 'development' } });
+          },
+          /FATAL MIGRATION FAILURE/,
+          'initDatabase must rethrow FATAL MIGRATION FAILURE even in development mode'
+        );
+
+        // Verify neither duplicate invoice was deleted or silently altered
+        const [dupCheck] = await db.query('SELECT COUNT(*) as c FROM sales_invoices WHERE so_number = ?', [dupSo]);
+        assert.strictEqual(dupCheck[0].c, 2, 'Financial records must never be modified or deleted automatically');
+      } finally {
+        // Clean up duplicate records
+        await db.query('DELETE FROM sales_invoices WHERE invoice_no IN (?, ?)', [inv1, inv2]);
+      }
+    });
+
+    // T31: Successful constraint establishment on clean data
+    await test('SEC-B2-02: initSchema successfully establishes uq_sales_invoices_so when table is clean', async () => {
+      // Ensure constraint is established
+      await initSchema(db);
+
+      const [indexes] = await db.query(`
+        SELECT INDEX_NAME, NON_UNIQUE 
+        FROM information_schema.STATISTICS 
+        WHERE TABLE_SCHEMA = DATABASE() 
+          AND TABLE_NAME = 'sales_invoices' 
+          AND COLUMN_NAME = 'so_number'
+      `);
+      const hasUnique = Array.isArray(indexes) && indexes.some(r => r.NON_UNIQUE === 0);
+      assert.strictEqual(hasUnique, true, 'uq_sales_invoices_so must be established on clean schema');
+    });
+
+    // T32: Repeat execution idempotency
+    await test('SEC-B2-03: Repeat initSchema execution is idempotent and succeeds without redundant ALTER TABLE', async () => {
+      // Executing initSchema multiple times must complete cleanly and idempotently
+      await initSchema(db);
+      await initSchema(db);
+
+      const [indexes] = await db.query(`
+        SELECT INDEX_NAME, NON_UNIQUE 
+        FROM information_schema.STATISTICS 
+        WHERE TABLE_SCHEMA = DATABASE() 
+          AND TABLE_NAME = 'sales_invoices' 
+          AND COLUMN_NAME = 'so_number'
+      `);
+      const hasUnique = Array.isArray(indexes) && indexes.some(r => r.NON_UNIQUE === 0);
+      assert.strictEqual(hasUnique, true, 'Unique index remains intact after multiple initSchema calls');
+    });
+
+    // T33: Exposure calculation aggregates prior orders with internal whitespace variations
+    await test('SEC-B2-04: Exposure calculation aggregates prior orders with internal whitespace variations', async () => {
+      const canonicalTarget = 'Mardan Retail Mart'; // Limit: PKR 1,000,000
+      // Clean baseline for this test
+      await db.query("DELETE FROM sales_invoices WHERE customer = ? OR TRIM(REGEXP_REPLACE(customer, '[[:space:]]+', ' ')) = ?", [canonicalTarget, canonicalTarget]);
+      await db.query("DELETE FROM sales_orders WHERE customer = ? OR TRIM(REGEXP_REPLACE(customer, '[[:space:]]+', ' ')) = ?", [canonicalTarget, canonicalTarget]);
+
+      // Seed an un-invoiced historical order with internal multiple whitespace
+      const historicalSo = `SO-SPACING-${Date.now()}`;
+      createdSoNumbers.add(historicalSo);
+      await db.query(
+        `INSERT INTO sales_orders 
+         (so_number, order_date, delivery_date, customer, warehouse, total_amount, credit_limit, current_exposure, credit_breach, status, approval_step, created_by)
+         VALUES (?, '23 Oct 2026', '30 Oct 2026', 'Mardan   Retail   Mart', 'Mardan Store', 600000.00, 1000000.00, 600000.00, 0.00, 'Draft', 'Not required', 'Old Operator')`,
+        [historicalSo]
+      );
+
+      // Submit new order using single-spaced lowercase customer name for PKR 500,000
+      // 600k + 500k = 1,100,000 > 1,000,000 -> breach 100k -> Pending approval / CEO Waiting
+      const res = await fetch(`${BASE_URL}/sales/orders`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${salesToken}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          customer: 'mardan retail mart',
+          items: [{ item_code: 'SE-01', item_name: 'Eggs', quantity: 500, rate: 1000, discount_percent: 0 }]
+        })
+      });
+
+      assert.strictEqual(res.status, 201);
+      const created = await res.json();
+      createdSoNumbers.add(created.so_number);
+
+      // Must detect previous 600k exposure despite spacing differences
+      assert.strictEqual(Number(created.current_exposure), 1100000.00);
+      assert.strictEqual(Number(created.credit_breach), 100000.00);
+      assert.strictEqual(created.status, 'Pending approval');
+      assert.strictEqual(created.approval_step, 'CEO Waiting');
+      assert.strictEqual(created.customer, canonicalTarget, 'Created order must be stored under canonical name');
+    });
+
+    // T34: Exposure calculation aggregates prior invoices with casing and whitespace variations
+    await test('SEC-B2-05: Exposure calculation aggregates prior unpaid invoices with casing and whitespace variations', async () => {
+      const canonicalTarget = 'Mardan Retail Mart';
+      await db.query("DELETE FROM sales_invoices WHERE customer = ? OR TRIM(REGEXP_REPLACE(customer, '[[:space:]]+', ' ')) = ?", [canonicalTarget, canonicalTarget]);
+      await db.query("DELETE FROM sales_orders WHERE customer = ? OR TRIM(REGEXP_REPLACE(customer, '[[:space:]]+', ' ')) = ?", [canonicalTarget, canonicalTarget]);
+
+      // Seed an order and unpaid invoice with mixed casing and extra whitespace
+      const invoicedSo = `SO-INV-SPACING-${Date.now()}`;
+      const invNum = `INV-SPACING-${Date.now()}`;
+      createdSoNumbers.add(invoicedSo);
+      createdInvoiceNumbers.add(invNum);
+
+      await db.query(
+        `INSERT INTO sales_orders 
+         (so_number, order_date, delivery_date, customer, warehouse, total_amount, credit_limit, current_exposure, credit_breach, status, approval_step, created_by)
+         VALUES (?, '23 Oct 2026', '30 Oct 2026', 'MARDAN   RETAIL   MART', 'Mardan Store', 750000.00, 1000000.00, 750000.00, 0.00, 'Invoiced', 'Approved', 'Old Operator')`,
+        [invoicedSo]
+      );
+
+      await db.query(
+        `INSERT INTO sales_invoices 
+         (invoice_no, so_number, customer, invoice_date, subtotal, total_amount, paid_amount, status, created_by)
+         VALUES (?, ?, '  mardan   retail mart  ', '23 Oct 2026', 750000.00, 750000.00, 0.00, 'Unpaid', 'Old Accounts')`,
+        [invNum, invoicedSo]
+      );
+
+      // Submit new order with standard name for PKR 300,000
+      // 750k + 300k = 1,050,000 > 1,000,000 -> breach 50k -> Pending approval / CEO Waiting
+      const res = await fetch(`${BASE_URL}/sales/orders`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${salesToken}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          customer: '  Mardan Retail Mart  ',
+          items: [{ item_code: 'SE-01', item_name: 'Eggs', quantity: 300, rate: 1000, discount_percent: 0 }]
+        })
+      });
+
+      assert.strictEqual(res.status, 201);
+      const created = await res.json();
+      createdSoNumbers.add(created.so_number);
+
+      assert.strictEqual(Number(created.current_exposure), 1050000.00);
+      assert.strictEqual(Number(created.credit_breach), 50000.00);
+      assert.strictEqual(created.status, 'Pending approval');
+      assert.strictEqual(created.approval_step, 'CEO Waiting');
+    });
+
+    // T35: Unvetted customer with arbitrary whitespace normalizes canonical name and fails closed to PKR 0.00
+    await test('SEC-B2-06: Unvetted customer with whitespace variations normalizes canonical name and fails closed to PKR 0.00', async () => {
+      const dirtyUnvetted = `   Bannu   Feed   and   Eggs   ${Date.now()}   `;
+      const expectedCanonical = dirtyUnvetted.trim().replace(/\s+/g, ' ');
+
+      const res = await fetch(`${BASE_URL}/sales/orders`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${salesToken}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          customer: dirtyUnvetted,
+          items: [{ item_code: 'SE-01', item_name: 'Eggs', quantity: 10, rate: 1000, discount_percent: 0 }]
+        })
+      });
+
+      assert.strictEqual(res.status, 201);
+      const created = await res.json();
+      createdSoNumbers.add(created.so_number);
+
+      assert.strictEqual(created.customer, expectedCanonical, 'Customer name must be single-spaced canonical form');
+      assert.strictEqual(Number(created.credit_limit), 0.00, 'Unvetted dealer must have 0.00 credit limit');
+      assert.strictEqual(Number(created.current_exposure), 10000.00);
+      assert.strictEqual(Number(created.credit_breach), 10000.00);
+      assert.strictEqual(created.status, 'Pending approval');
+      assert.strictEqual(created.approval_step, 'CEO Waiting');
     });
 
   } finally {
