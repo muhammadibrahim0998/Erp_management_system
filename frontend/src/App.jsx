@@ -26,6 +26,7 @@ import {
   LogOut,
   Menu,
   Shield,
+  History,
   Store,
   ShieldAlert
 } from 'lucide-react';
