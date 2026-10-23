@@ -1,5 +1,6 @@
 const { db } = require('../config/db');
-const { logAudit } = require('../utils/auditLogger');
+const auditLogger = require('../utils/auditLogger');
+const { logAudit } = auditLogger;
 const { getNextDocNumber } = require('../utils/sequence');
 
 /**
@@ -359,49 +360,24 @@ const createSalesOrder = async (req, res) => {
   }
 };
 
-// Stage 2: Approve Sales Order (enforces role check + allowed status order)
+// Stage 2: Approve Sales Order (enforces database role check, active status, atomic transaction)
 const approveSalesOrder = async (req, res) => {
   const so_number = req.params.so_number || req.body.so_number;
   if (!so_number) {
     return res.status(400).json({ error: 'so_number is required' });
   }
 
+  // 1. Authenticated User Identity Context (client-supplied identity strictly ignored)
+  const authenticatedUserId = req.user?.id;
+  if (!authenticatedUserId) {
+    return res.status(401).json({
+      error: 'Authentication failed: Missing or invalid user identity in authentication context.'
+    });
+  }
+
+  let connection = null;
   try {
-    // 1. Role verification
-    const userRole = req.user?.role;
-    if (!userRole) {
-      return res.status(401).json({ error: 'Authentication required. Please sign in with an approver account.' });
-    }
-    if (!APPROVER_ROLES.includes(userRole)) {
-      return res.status(403).json({
-        error: `Access Denied: Role "${userRole}" is not authorized to approve sales orders. Allowed roles: ${APPROVER_ROLES.join(', ')}.`
-      });
-    }
-
-    // 2. Fetch existing order
-    const [orders] = await db.query('SELECT * FROM sales_orders WHERE so_number = ?', [so_number]);
-    if (orders.length === 0) {
-      return res.status(404).json({ error: `Sales order ${so_number} not found` });
-    }
-    const order = orders[0];
-
-    // 3. Status order check: must be Pending approval or Draft
-    if (order.status !== 'Pending approval' && order.status !== 'Draft') {
-      return res.status(400).json({
-        error: `Cannot approve order ${so_number}: order is already in "${order.status}" status. Allowed transition to Approved only from "Pending approval" or "Draft".`
-      });
-    }
-
-    // 4. Resolve and verify authenticated approver identity against trusted user record
-    // Client-supplied identity fields in body or query are strictly ignored
-    const authenticatedUserId = req.user?.id;
-    if (!authenticatedUserId) {
-      return res.status(401).json({
-        error: 'Authentication failed: Missing or invalid user identity in authentication context.'
-      });
-    }
-
-    // Verify against trusted user record in database
+    // 2. Fetch current trusted user record from database
     const [userRows] = await db.query(
       'SELECT id, name, role, status FROM users WHERE id = ?',
       [authenticatedUserId]
@@ -414,9 +390,20 @@ const approveSalesOrder = async (req, res) => {
     }
 
     const trustedUser = userRows[0];
-    if (trustedUser.status && trustedUser.status.toLowerCase() !== 'active') {
+
+    // F-02: Require database account status to be valid, non-empty, exactly 'active'
+    const normalizedStatus = (typeof trustedUser.status === 'string') ? trustedUser.status.trim().toLowerCase() : '';
+    if (normalizedStatus !== 'active') {
       return res.status(403).json({
-        error: 'Unable to establish trusted approver identity: Approver account is inactive or disabled.'
+        error: 'Unable to establish trusted approver identity: Approver account is not active.'
+      });
+    }
+
+    // F-01: Check current database role against APPROVER_ROLES (not merely JWT claim)
+    const currentDbRole = (typeof trustedUser.role === 'string') ? trustedUser.role.trim() : '';
+    if (!currentDbRole || !APPROVER_ROLES.includes(currentDbRole)) {
+      return res.status(403).json({
+        error: `Access Denied: Current user role "${currentDbRole || 'Unassigned'}" is not authorized to approve sales orders. Allowed roles: ${APPROVER_ROLES.join(', ')}.`
       });
     }
 
@@ -437,32 +424,74 @@ const approveSalesOrder = async (req, res) => {
 
     req.user.name = approverName;
 
-    // 5. Update order to Approved
-    const approverText = `Approved by ${approverName} (${userRole})`;
-    await db.query(
+    // F-03: Atomic sales order approval and audit logging using dedicated connection & transaction
+    connection = await db.getConnection();
+    await connection.beginTransaction();
+
+    // Fetch and lock order for update
+    const [orders] = await connection.query(
+      'SELECT * FROM sales_orders WHERE so_number = ? FOR UPDATE',
+      [so_number]
+    );
+    if (orders.length === 0) {
+      await connection.rollback();
+      return res.status(404).json({ error: `Sales order ${so_number} not found` });
+    }
+    const order = orders[0];
+
+    // Status check: must be Pending approval or Draft
+    if (order.status !== 'Pending approval' && order.status !== 'Draft') {
+      await connection.rollback();
+      return res.status(400).json({
+        error: `Cannot approve order ${so_number}: order is already in "${order.status}" status. Allowed transition to Approved only from "Pending approval" or "Draft".`
+      });
+    }
+
+    // Update sales order within transaction
+    const approverText = `Approved by ${approverName} (${currentDbRole})`;
+    await connection.query(
       'UPDATE sales_orders SET status = "Approved", approval_step = ? WHERE so_number = ?',
       [approverText, so_number]
     );
 
-    await logAudit({
+    // Insert audit log within transaction (fails transaction if audit write fails)
+    await auditLogger.logAudit({
       req,
       userId: trustedUser.id,
       userName: approverName,
-      role: userRole,
+      role: currentDbRole,
       action: 'APPROVE_SALES_ORDER',
       entityType: 'SALES_ORDER',
       entityId: so_number,
-      details: `${userRole} (${approverName}) approved sales order ${so_number}`
+      details: `${currentDbRole} (${approverName}) approved sales order ${so_number}`,
+      connection
     });
 
-    const [updated] = await db.query('SELECT * FROM sales_orders WHERE so_number = ?', [so_number]);
+    await connection.commit();
+
+    const [updated] = await connection.query(
+      'SELECT * FROM sales_orders WHERE so_number = ?',
+      [so_number]
+    );
+
     res.json({
       success: true,
-      message: `Sales order ${so_number} approved successfully by ${userRole}`,
+      message: `Sales order ${so_number} approved successfully by ${currentDbRole}`,
       order: updated[0]
     });
   } catch (err) {
+    if (connection) {
+      try {
+        await connection.rollback();
+      } catch (rbErr) {
+        console.error('Error during transaction rollback:', rbErr.message);
+      }
+    }
     res.status(500).json({ error: err.message });
+  } finally {
+    if (connection) {
+      connection.release();
+    }
   }
 };
 

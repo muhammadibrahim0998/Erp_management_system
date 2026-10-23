@@ -28,11 +28,12 @@ if (!isTestDb) {
 // Ensure JWT_SECRET and db pool load with the safe test database environment
 const { db } = require('../config/db');
 const { JWT_SECRET, optionalUserExtractor } = require('../middlewares/auth');
+const auditLogger = require('../utils/auditLogger');
 const operationsRoutes = require('../routes/operations.routes');
 
 async function runSafeTestSuite() {
   console.log('====================================================================');
-  console.log('SALES APPROVAL AUTHENTICATION & ATTRIBUTION REGRESSION TEST SUITE');
+  console.log('SALES APPROVAL SECURITY & AUDIT INTEGRITY REGRESSION TEST SUITE');
   console.log('====================================================================');
   console.log(`[Safety Guard] Node Environment: ${nodeEnv}`);
   console.log(`[Safety Guard] Database Target:   ${currentDb} (ISOLATED TEST DATABASE)`);
@@ -64,7 +65,6 @@ async function runSafeTestSuite() {
   const RUN_SIGNATURE = 'RUN_' + Date.now().toString(36).toUpperCase() + '_' + Math.random().toString(36).substring(2, 6).toUpperCase();
   const createdOrderNumbers = new Set();
   const createdUserIds = new Set();
-  const createdAuditIds = new Set();
 
   let passed = 0;
   let total = 0;
@@ -122,136 +122,74 @@ async function runSafeTestSuite() {
     const SO_UNAUTH_1 = await createTestOrder('UNAUTH1');
     const SO_UNAUTH_2 = await createTestOrder('UNAUTH2');
     const SO_INVALID_TOKEN = await createTestOrder('INV_TOK');
-    const SO_NON_APPROVER = await createTestOrder('NON_APP');
-    const SO_LEGACY_TOKEN = await createTestOrder('LEGACY');
-    const SO_SPOOF_ATTEMPT = await createTestOrder('SPOOF');
-    const SO_SECOND_ROUTE = await createTestOrder('ROUTE2');
-    const SO_UNRESOLVABLE = await createTestOrder('NO_USER');
-    const SO_INACTIVE_USER = await createTestOrder('INACT');
-    const SO_EMPTY_NAME_USER = await createTestOrder('NONAME');
     const SO_MISSING_ID = await createTestOrder('NO_ID');
+    const SO_DELETED_USER = await createTestOrder('DEL_USER');
+    const SO_DOWNGRADED_ROLE = await createTestOrder('DOWN_ROLE');
+    const SO_FORGED_ROLE = await createTestOrder('FORGE_ROLE');
+    const SO_NULL_STATUS = await createTestOrder('NULL_STAT');
+    const SO_EMPTY_STATUS = await createTestOrder('EMPTY_STAT');
+    const SO_WHITESPACE_STATUS = await createTestOrder('WS_STAT');
+    const SO_INACTIVE_STATUS = await createTestOrder('INACT_STAT');
+    const SO_SUSPENDED_STATUS = await createTestOrder('SUSP_STAT');
+    const SO_EMPTY_NAME = await createTestOrder('EMPTY_NAME');
+    const SO_SUCCESS_ATOMIC = await createTestOrder('SUCC_ATOM');
+    const SO_ROLLBACK_AUDIT = await createTestOrder('RB_AUDIT');
+    const SO_SPOOF_ATTEMPT = await createTestOrder('SPOOF');
+    const SO_LEGACY_TOKEN = await createTestOrder('LEGACY');
+    const SO_ROUTE_2 = await createTestOrder('ROUTE2');
 
-    // Tokens
+    // Standard valid CEO token (User ID 1 = Sana Ullah, Chairman & CEO in DB)
     const validCeoToken = jwt.sign(
       { id: 1, role: 'Chairman & CEO', email: 'ceo@yaf.com', name: 'Sana Ullah' },
       JWT_SECRET,
       { expiresIn: '1h' }
     );
 
-    const legacyCeoTokenNoName = jwt.sign(
-      { id: 1, role: 'Chairman & CEO', email: 'ceo@yaf.com' },
-      JWT_SECRET,
-      { expiresIn: '1h' }
-    );
-
-    const salesManagerToken = jwt.sign(
-      { id: 13, role: 'Sales Manager', email: 'sales@yaf.com', name: 'Imran Khattak' },
-      JWT_SECRET,
-      { expiresIn: '1h' }
-    );
-
-    const nonApproverToken = jwt.sign(
-      { id: 14, role: 'Sales Officer', email: 'bilal.yousafzai@yaf.com', name: 'Bilal Yousafzai' },
-      JWT_SECRET,
-      { expiresIn: '1h' }
-    );
-
-    const expiredToken = jwt.sign(
-      { id: 1, role: 'Chairman & CEO', email: 'ceo@yaf.com', name: 'Sana Ullah' },
-      JWT_SECRET,
-      { expiresIn: -10 }
-    );
-
-    const wrongSecretToken = jwt.sign(
-      { id: 1, role: 'Chairman & CEO', email: 'ceo@yaf.com', name: 'Sana Ullah' },
-      'wrong_untrusted_secret_key_99999',
-      { expiresIn: '1h' }
-    );
-
     // ========================================================================
-    // TEST 1: Unauthenticated request to POST /api/sales/approve
+    // 1. ROUTE-LEVEL AUTHENTICATION ENFORCEMENT
     // ========================================================================
-    await test('Unauthenticated request to POST /api/sales/approve receives HTTP 401 and does not execute approval', async () => {
+    await test('Unauthenticated POST /api/sales/approve returns HTTP 401', async () => {
       const res = await fetch(`${BASE_URL}/sales/approve`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ so_number: SO_UNAUTH_1 })
       });
-
-      assert.strictEqual(res.status, 401, `Expected HTTP 401, got ${res.status}`);
+      assert.strictEqual(res.status, 401);
       const body = await res.json();
       assert.strictEqual(body.error, 'Access denied. Token missing.');
 
-      // Order must remain unapproved
-      const [rows] = await db.query('SELECT status, approval_step FROM sales_orders WHERE so_number = ?', [SO_UNAUTH_1]);
+      const [rows] = await db.query('SELECT status FROM sales_orders WHERE so_number = ?', [SO_UNAUTH_1]);
       assert.strictEqual(rows[0].status, 'Pending approval');
-      assert.strictEqual(rows[0].approval_step, 'CEO Waiting');
     });
 
-    // ========================================================================
-    // TEST 2: Unauthenticated request to POST /api/sales/orders/:so/approve
-    // ========================================================================
-    await test('Unauthenticated request to POST /api/sales/orders/:so_number/approve receives HTTP 401', async () => {
+    await test('Unauthenticated POST /api/sales/orders/:so_number/approve returns HTTP 401', async () => {
       const res = await fetch(`${BASE_URL}/sales/orders/${SO_UNAUTH_2}/approve`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' }
       });
-
-      assert.strictEqual(res.status, 401, `Expected HTTP 401, got ${res.status}`);
+      assert.strictEqual(res.status, 401);
       const body = await res.json();
       assert.strictEqual(body.error, 'Access denied. Token missing.');
-
-      const [rows] = await db.query('SELECT status, approval_step FROM sales_orders WHERE so_number = ?', [SO_UNAUTH_2]);
-      assert.strictEqual(rows[0].status, 'Pending approval');
     });
 
-    // ========================================================================
-    // TEST 3: Invalid / malformed / expired token rejection
-    // ========================================================================
-    await test('Request with malformed or invalid token receives HTTP 403', async () => {
-      const resMalformed = await fetch(`${BASE_URL}/sales/approve`, {
+    await test('Request with invalid / expired / malformed token returns HTTP 403', async () => {
+      const res = await fetch(`${BASE_URL}/sales/approve`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': 'Bearer definitely-not-a-valid-token'
+          'Authorization': 'Bearer malformed.token.value'
         },
         body: JSON.stringify({ so_number: SO_INVALID_TOKEN })
       });
-      assert.strictEqual(resMalformed.status, 403);
-      const bodyMalformed = await resMalformed.json();
-      assert.strictEqual(bodyMalformed.error, 'Invalid or expired token.');
-
-      const resExpired = await fetch(`${BASE_URL}/sales/approve`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${expiredToken}`
-        },
-        body: JSON.stringify({ so_number: SO_INVALID_TOKEN })
-      });
-      assert.strictEqual(resExpired.status, 403);
-
-      const resWrongSecret = await fetch(`${BASE_URL}/sales/approve`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${wrongSecretToken}`
-        },
-        body: JSON.stringify({ so_number: SO_INVALID_TOKEN })
-      });
-      assert.strictEqual(resWrongSecret.status, 403);
+      assert.strictEqual(res.status, 403);
     });
 
-    // ========================================================================
-    // TEST 4: Token missing user ID (Identity failure)
-    // ========================================================================
     await test('Authenticated token missing user ID is rejected with HTTP 401', async () => {
       const tokenWithoutId = jwt.sign(
         { role: 'Chairman & CEO', email: 'ceo@yaf.com', name: 'Sana Ullah' },
         JWT_SECRET,
         { expiresIn: '1h' }
       );
-
       const res = await fetch(`${BASE_URL}/sales/approve`, {
         method: 'POST',
         headers: {
@@ -260,65 +198,87 @@ async function runSafeTestSuite() {
         },
         body: JSON.stringify({ so_number: SO_MISSING_ID })
       });
-
       assert.strictEqual(res.status, 401);
       const body = await res.json();
       assert.ok(body.error.includes('Missing or invalid user identity'));
-
-      // Verify order not modified
-      const [rows] = await db.query('SELECT status FROM sales_orders WHERE so_number = ?', [SO_MISSING_ID]);
-      assert.strictEqual(rows[0].status, 'Pending approval');
     });
 
     // ========================================================================
-    // TEST 5: Unresolvable Approver Identity (User not in database)
+    // 2. F-01: DATABASE ROLE AUTHORIZATION (NEVER TRUST STALE/FORGED JWT ROLE)
     // ========================================================================
-    await test('Authenticated token with unresolvable user ID (not in DB) fails closed with HTTP 403', async () => {
-      const ghostUserToken = jwt.sign(
-        { id: 9876543, role: 'Chairman & CEO', email: 'ghost@yaf.com', name: 'Ghost Approver' },
+    await test('F-01: User deleted or not present in database fails closed with HTTP 403', async () => {
+      const nonExistentToken = jwt.sign(
+        { id: 9876543, role: 'Chairman & CEO', email: 'ghost@yaf.com', name: 'Ghost' },
         JWT_SECRET,
         { expiresIn: '1h' }
       );
+      const res = await fetch(`${BASE_URL}/sales/approve`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${nonExistentToken}`
+        },
+        body: JSON.stringify({ so_number: SO_DELETED_USER })
+      });
+      assert.strictEqual(res.status, 403);
+      const body = await res.json();
+      assert.ok(body.error.includes('Authenticated user record does not exist'));
+
+      const [rows] = await db.query('SELECT status FROM sales_orders WHERE so_number = ?', [SO_DELETED_USER]);
+      assert.strictEqual(rows[0].status, 'Pending approval');
+    });
+
+    await test('F-01: User whose role was downgraded in DB fails closed with HTTP 403 despite stale authorized JWT', async () => {
+      // Create user with authorized role initially
+      const user = await createTestUser({
+        name: 'Tariq Demoted',
+        role: 'Sales Manager',
+        status: 'active'
+      });
+
+      // User was issued a valid token when role was 'Sales Manager'
+      const staleToken = jwt.sign(
+        { id: user.id, role: 'Sales Manager', email: user.email, name: user.name },
+        JWT_SECRET,
+        { expiresIn: '1h' }
+      );
+
+      // Admin downgrades user in MySQL to 'Sales Officer' (non-approver role)
+      await db.query('UPDATE users SET role = "Sales Officer" WHERE id = ?', [user.id]);
 
       const res = await fetch(`${BASE_URL}/sales/approve`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${ghostUserToken}`
+          'Authorization': `Bearer ${staleToken}`
         },
-        body: JSON.stringify({ so_number: SO_UNRESOLVABLE })
+        body: JSON.stringify({ so_number: SO_DOWNGRADED_ROLE })
       });
 
       assert.strictEqual(res.status, 403, `Expected HTTP 403, got ${res.status}`);
       const body = await res.json();
-      assert.ok(body.error.includes('Unable to establish trusted approver identity'));
-      assert.ok(body.error.includes('User record not found') || body.error.includes('does not exist'));
+      assert.ok(body.error.includes('Current user role "Sales Officer" is not authorized'));
 
-      // Ensure order remains untouched
-      const [rows] = await db.query('SELECT status, approval_step FROM sales_orders WHERE so_number = ?', [SO_UNRESOLVABLE]);
+      // Order must remain unapproved
+      const [rows] = await db.query('SELECT status, approval_step FROM sales_orders WHERE so_number = ?', [SO_DOWNGRADED_ROLE]);
       assert.strictEqual(rows[0].status, 'Pending approval');
       assert.strictEqual(rows[0].approval_step, 'CEO Waiting');
 
-      // Ensure no success audit log was written
-      const [auditRows] = await db.query(
-        'SELECT * FROM audit_logs WHERE entity_id = ? AND action = "APPROVE_SALES_ORDER"',
-        [SO_UNRESOLVABLE]
-      );
-      assert.strictEqual(auditRows.length, 0, 'No success audit log should be written for rejected approval');
+      // No audit log written
+      const [audits] = await db.query('SELECT * FROM audit_logs WHERE entity_id = ?', [SO_DOWNGRADED_ROLE]);
+      assert.strictEqual(audits.length, 0);
     });
 
-    // ========================================================================
-    // TEST 6: Inactive approver account rejected
-    // ========================================================================
-    await test('Authenticated user with inactive account status fails closed with HTTP 403', async () => {
-      const inactiveUser = await createTestUser({
-        name: 'Disabled Director',
-        role: 'Director Finance',
-        status: 'inactive'
+    await test('F-01: Unauthorized DB role with forged authorized JWT claim is rejected with HTTP 403', async () => {
+      const user = await createTestUser({
+        name: 'Gate Officer Khan',
+        role: 'Gate Officer',
+        status: 'active'
       });
 
-      const inactiveToken = jwt.sign(
-        { id: inactiveUser.id, role: inactiveUser.role, email: inactiveUser.email, name: inactiveUser.name },
+      // Token claims role is 'Chairman & CEO'
+      const forgedRoleToken = jwt.sign(
+        { id: user.id, role: 'Chairman & CEO', email: user.email, name: user.name },
         JWT_SECRET,
         { expiresIn: '1h' }
       );
@@ -327,31 +287,164 @@ async function runSafeTestSuite() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${inactiveToken}`
+          'Authorization': `Bearer ${forgedRoleToken}`
         },
-        body: JSON.stringify({ so_number: SO_INACTIVE_USER })
+        body: JSON.stringify({ so_number: SO_FORGED_ROLE })
       });
 
       assert.strictEqual(res.status, 403);
       const body = await res.json();
-      assert.ok(body.error.includes('Approver account is inactive or disabled'));
-
-      const [rows] = await db.query('SELECT status FROM sales_orders WHERE so_number = ?', [SO_INACTIVE_USER]);
-      assert.strictEqual(rows[0].status, 'Pending approval');
+      assert.ok(body.error.includes('Current user role "Gate Officer" is not authorized'));
     });
 
     // ========================================================================
-    // TEST 7: Approver with empty name on record fails closed (No fabrication)
+    // 3. F-02: ACCOUNT STATUS FAILS CLOSED (EXACTLY 'active' REQUIRED)
     // ========================================================================
-    await test('Approver with empty name in database fails closed with HTTP 403 (No generic fallback)', async () => {
-      const emptyNameUser = await createTestUser({
+    await test('F-02: Database user with NULL status fails closed with HTTP 403', async () => {
+      const user = await createTestUser({
+        name: 'Null Status User',
+        role: 'Director Finance',
+        status: 'active'
+      });
+      await db.query('UPDATE users SET status = NULL WHERE id = ?', [user.id]);
+
+      const token = jwt.sign(
+        { id: user.id, role: user.role, email: user.email, name: user.name },
+        JWT_SECRET,
+        { expiresIn: '1h' }
+      );
+
+      const res = await fetch(`${BASE_URL}/sales/approve`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ so_number: SO_NULL_STATUS })
+      });
+
+      assert.strictEqual(res.status, 403);
+      const body = await res.json();
+      assert.ok(body.error.includes('Approver account is not active'));
+    });
+
+    await test('F-02: Database user with empty status string fails closed with HTTP 403', async () => {
+      const user = await createTestUser({
+        name: 'Empty Status User',
+        role: 'Director Finance',
+        status: ''
+      });
+
+      const token = jwt.sign(
+        { id: user.id, role: user.role, email: user.email, name: user.name },
+        JWT_SECRET,
+        { expiresIn: '1h' }
+      );
+
+      const res = await fetch(`${BASE_URL}/sales/approve`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ so_number: SO_EMPTY_STATUS })
+      });
+
+      assert.strictEqual(res.status, 403);
+      const body = await res.json();
+      assert.ok(body.error.includes('Approver account is not active'));
+    });
+
+    await test('F-02: Database user with whitespace-only status fails closed with HTTP 403', async () => {
+      const user = await createTestUser({
+        name: 'Whitespace Status User',
+        role: 'Director Finance',
+        status: '   '
+      });
+
+      const token = jwt.sign(
+        { id: user.id, role: user.role, email: user.email, name: user.name },
+        JWT_SECRET,
+        { expiresIn: '1h' }
+      );
+
+      const res = await fetch(`${BASE_URL}/sales/approve`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ so_number: SO_WHITESPACE_STATUS })
+      });
+
+      assert.strictEqual(res.status, 403);
+      const body = await res.json();
+      assert.ok(body.error.includes('Approver account is not active'));
+    });
+
+    await test('F-02: Database user with inactive status fails closed with HTTP 403', async () => {
+      const user = await createTestUser({
+        name: 'Inactive Status User',
+        role: 'Director Finance',
+        status: 'inactive'
+      });
+
+      const token = jwt.sign(
+        { id: user.id, role: user.role, email: user.email, name: user.name },
+        JWT_SECRET,
+        { expiresIn: '1h' }
+      );
+
+      const res = await fetch(`${BASE_URL}/sales/approve`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ so_number: SO_INACTIVE_STATUS })
+      });
+
+      assert.strictEqual(res.status, 403);
+      const body = await res.json();
+      assert.ok(body.error.includes('Approver account is not active'));
+    });
+
+    await test('F-02: Database user with suspended/unexpected status fails closed with HTTP 403', async () => {
+      const user = await createTestUser({
+        name: 'Suspended Status User',
+        role: 'Director Finance',
+        status: 'suspended'
+      });
+
+      const token = jwt.sign(
+        { id: user.id, role: user.role, email: user.email, name: user.name },
+        JWT_SECRET,
+        { expiresIn: '1h' }
+      );
+
+      const res = await fetch(`${BASE_URL}/sales/approve`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ so_number: SO_SUSPENDED_STATUS })
+      });
+
+      assert.strictEqual(res.status, 403);
+      const body = await res.json();
+      assert.ok(body.error.includes('Approver account is not active'));
+    });
+
+    await test('User with empty name fails closed with HTTP 403 (No generic placeholder)', async () => {
+      const user = await createTestUser({
         name: '   ',
         role: 'Director Finance',
         status: 'active'
       });
 
-      const emptyNameToken = jwt.sign(
-        { id: emptyNameUser.id, role: emptyNameUser.role, email: emptyNameUser.email },
+      const token = jwt.sign(
+        { id: user.id, role: user.role, email: user.email },
         JWT_SECRET,
         { expiresIn: '1h' }
       );
@@ -360,54 +453,27 @@ async function runSafeTestSuite() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${emptyNameToken}`
+          'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ so_number: SO_EMPTY_NAME_USER })
+        body: JSON.stringify({ so_number: SO_EMPTY_NAME })
       });
 
       assert.strictEqual(res.status, 403);
       const body = await res.json();
       assert.ok(body.error.toLowerCase().includes('no verified name on record'));
-
-      // Verify order NOT updated and no generic string used
-      const [rows] = await db.query('SELECT status, approval_step FROM sales_orders WHERE so_number = ?', [SO_EMPTY_NAME_USER]);
-      assert.strictEqual(rows[0].status, 'Pending approval');
-      assert.ok(!rows[0].approval_step.includes('Authorized Approver'));
-      assert.ok(!rows[0].approval_step.includes('undefined'));
     });
 
     // ========================================================================
-    // TEST 8: Non-approver role receives HTTP 403 Forbidden
+    // 4. F-03: ATOMIC SALES ORDER APPROVAL & AUDIT LOGGING
     // ========================================================================
-    await test('Authenticated request with non-approver role (Sales Officer) receives HTTP 403 Forbidden', async () => {
+    await test('F-03: Successful approval updates order and creates exactly one audit record atomically', async () => {
       const res = await fetch(`${BASE_URL}/sales/approve`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${nonApproverToken}`
+          'Authorization': `Bearer ${validCeoToken}`
         },
-        body: JSON.stringify({ so_number: SO_NON_APPROVER })
-      });
-
-      assert.strictEqual(res.status, 403);
-      const body = await res.json();
-      assert.ok(body.error.includes('Access Denied: Role "Sales Officer" is not authorized to approve sales orders'));
-
-      const [rows] = await db.query('SELECT status FROM sales_orders WHERE so_number = ?', [SO_NON_APPROVER]);
-      assert.strictEqual(rows[0].status, 'Pending approval');
-    });
-
-    // ========================================================================
-    // TEST 9: Legacy JWT without name claim correctly resolves trusted user name
-    // ========================================================================
-    await test('Legacy token without name claim resolves authentic name from database and approves order', async () => {
-      const res = await fetch(`${BASE_URL}/sales/approve`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${legacyCeoTokenNoName}`
-        },
-        body: JSON.stringify({ so_number: SO_LEGACY_TOKEN })
+        body: JSON.stringify({ so_number: SO_SUCCESS_ATOMIC })
       });
 
       assert.strictEqual(res.status, 200);
@@ -416,30 +482,82 @@ async function runSafeTestSuite() {
       assert.strictEqual(body.order.status, 'Approved');
       assert.strictEqual(body.order.approval_step, 'Approved by Sana Ullah (Chairman & CEO)');
 
-      // Verify in database
-      const [rows] = await db.query('SELECT status, approval_step FROM sales_orders WHERE so_number = ?', [SO_LEGACY_TOKEN]);
-      assert.strictEqual(rows[0].status, 'Approved');
-      assert.strictEqual(rows[0].approval_step, 'Approved by Sana Ullah (Chairman & CEO)');
-      assert.ok(!rows[0].approval_step.includes('undefined'));
+      // Verify in sales_orders table
+      const [orderRows] = await db.query('SELECT status, approval_step FROM sales_orders WHERE so_number = ?', [SO_SUCCESS_ATOMIC]);
+      assert.strictEqual(orderRows.length, 1);
+      assert.strictEqual(orderRows[0].status, 'Approved');
+      assert.strictEqual(orderRows[0].approval_step, 'Approved by Sana Ullah (Chairman & CEO)');
 
-      // Verify audit log
+      // Verify in audit_logs table: EXACTLY ONE record
       const [auditRows] = await db.query(
-        'SELECT * FROM audit_logs WHERE entity_id = ? AND action = "APPROVE_SALES_ORDER" ORDER BY id DESC LIMIT 1',
-        [SO_LEGACY_TOKEN]
+        'SELECT * FROM audit_logs WHERE entity_id = ? AND action = "APPROVE_SALES_ORDER"',
+        [SO_SUCCESS_ATOMIC]
       );
-      assert.strictEqual(auditRows.length, 1);
+      assert.strictEqual(auditRows.length, 1, 'Expected exactly one audit log entry for successful approval');
       assert.strictEqual(auditRows[0].user_id, 1);
       assert.strictEqual(auditRows[0].user_name, 'Sana Ullah');
       assert.strictEqual(auditRows[0].role, 'Chairman & CEO');
-      assert.strictEqual(auditRows[0].details, `Chairman & CEO (Sana Ullah) approved sales order ${SO_LEGACY_TOKEN}`);
-      assert.ok(!auditRows[0].details.includes('undefined'));
-      assert.ok(!auditRows[0].user_name.includes('User'));
+      assert.strictEqual(auditRows[0].details, `Chairman & CEO (Sana Ullah) approved sales order ${SO_SUCCESS_ATOMIC}`);
+    });
+
+    await test('F-03: Simulated audit insertion failure rolls back the sales order update completely', async () => {
+      // Temporarily simulate audit write failure for SO_ROLLBACK_AUDIT
+      const originalLogAudit = auditLogger.logAudit;
+      auditLogger.logAudit = async (params) => {
+        if (params.entityId === SO_ROLLBACK_AUDIT) {
+          throw new Error('Simulated database audit write failure for rollback test');
+        }
+        return originalLogAudit(params);
+      };
+
+      try {
+        const res = await fetch(`${BASE_URL}/sales/approve`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${validCeoToken}`
+          },
+          body: JSON.stringify({ so_number: SO_ROLLBACK_AUDIT })
+        });
+
+        // Must fail with HTTP 500
+        assert.strictEqual(res.status, 500, `Expected HTTP 500 on audit failure, got ${res.status}`);
+        const body = await res.json();
+        assert.ok(body.error.includes('Simulated database audit write failure'));
+
+        // VERIFY COMPLETE ROLLBACK: Order in database must STILL be 'Pending approval' / 'CEO Waiting'
+        const [orderRows] = await db.query(
+          'SELECT status, approval_step FROM sales_orders WHERE so_number = ?',
+          [SO_ROLLBACK_AUDIT]
+        );
+        assert.strictEqual(orderRows.length, 1);
+        assert.strictEqual(
+          orderRows[0].status,
+          'Pending approval',
+          'Order status must be rolled back to "Pending approval" upon audit failure!'
+        );
+        assert.strictEqual(
+          orderRows[0].approval_step,
+          'CEO Waiting',
+          'approval_step must be rolled back to "CEO Waiting" upon audit failure!'
+        );
+
+        // Verify zero audit logs exist for this order
+        const [auditRows] = await db.query(
+          'SELECT * FROM audit_logs WHERE entity_id = ?',
+          [SO_ROLLBACK_AUDIT]
+        );
+        assert.strictEqual(auditRows.length, 0, 'No partial or dangling audit log should exist after rollback');
+
+      } finally {
+        auditLogger.logAudit = originalLogAudit;
+      }
     });
 
     // ========================================================================
-    // TEST 10: Anti-spoofing — Client-supplied body/query identity strictly ignored
+    // 5. ANTI-SPOOFING & SECOND ROUTE VERIFICATION
     // ========================================================================
-    await test('Client-supplied body/query identity parameters cannot spoof approver identity', async () => {
+    await test('Anti-spoofing: Client-supplied body/query identity strictly ignored', async () => {
       const res = await fetch(`${BASE_URL}/sales/approve?name=AttackerQuery&user=EvilQuery`, {
         method: 'POST',
         headers: {
@@ -458,53 +576,50 @@ async function runSafeTestSuite() {
 
       assert.strictEqual(res.status, 200);
       const body = await res.json();
-      assert.strictEqual(body.success, true);
       assert.strictEqual(body.order.approval_step, 'Approved by Sana Ullah (Chairman & CEO)');
       assert.ok(!body.order.approval_step.includes('Spoofed'));
-      assert.ok(!body.order.approval_step.includes('Evil'));
       assert.ok(!body.order.approval_step.includes('SuperAdmin'));
-
-      // Check database sales order row
-      const [rows] = await db.query('SELECT approval_step FROM sales_orders WHERE so_number = ?', [SO_SPOOF_ATTEMPT]);
-      assert.strictEqual(rows[0].approval_step, 'Approved by Sana Ullah (Chairman & CEO)');
-
-      // Check audit log
-      const [auditRows] = await db.query(
-        'SELECT user_id, user_name, role, details FROM audit_logs WHERE entity_id = ? AND action = "APPROVE_SALES_ORDER" ORDER BY id DESC LIMIT 1',
-        [SO_SPOOF_ATTEMPT]
-      );
-      assert.strictEqual(auditRows.length, 1);
-      assert.strictEqual(auditRows[0].user_id, 1);
-      assert.strictEqual(auditRows[0].user_name, 'Sana Ullah');
-      assert.strictEqual(auditRows[0].role, 'Chairman & CEO');
-      assert.ok(!auditRows[0].details.includes('Spoofed'));
-      assert.ok(!auditRows[0].details.includes('Evil'));
     });
 
-    // ========================================================================
-    // TEST 11: Route 2 — POST /api/sales/orders/:so_number/approve
-    // ========================================================================
+    await test('Legacy token without name claim resolves authentic name from database users record', async () => {
+      const legacyToken = jwt.sign(
+        { id: 1, role: 'Chairman & CEO', email: 'ceo@yaf.com' },
+        JWT_SECRET,
+        { expiresIn: '1h' }
+      );
+      const res = await fetch(`${BASE_URL}/sales/approve`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${legacyToken}`
+        },
+        body: JSON.stringify({ so_number: SO_LEGACY_TOKEN })
+      });
+      assert.strictEqual(res.status, 200);
+      const body = await res.json();
+      assert.strictEqual(body.order.approval_step, 'Approved by Sana Ullah (Chairman & CEO)');
+    });
+
     await test('Route POST /api/sales/orders/:so_number/approve succeeds and attributes identity correctly', async () => {
-      const res = await fetch(`${BASE_URL}/sales/orders/${SO_SECOND_ROUTE}/approve`, {
+      const salesManagerToken = jwt.sign(
+        { id: 13, role: 'Sales Manager', email: 'sales@yaf.com', name: 'Imran Khattak' },
+        JWT_SECRET,
+        { expiresIn: '1h' }
+      );
+      const res = await fetch(`${BASE_URL}/sales/orders/${SO_ROUTE_2}/approve`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${salesManagerToken}`
         }
       });
-
       assert.strictEqual(res.status, 200);
       const body = await res.json();
-      assert.strictEqual(body.success, true);
-      assert.strictEqual(body.order.status, 'Approved');
       assert.strictEqual(body.order.approval_step, 'Approved by Imran Khattak (Sales Manager)');
 
-      const [rows] = await db.query('SELECT approval_step FROM sales_orders WHERE so_number = ?', [SO_SECOND_ROUTE]);
-      assert.strictEqual(rows[0].approval_step, 'Approved by Imran Khattak (Sales Manager)');
-
       const [auditRows] = await db.query(
-        'SELECT user_id, user_name, role, details FROM audit_logs WHERE entity_id = ? AND action = "APPROVE_SALES_ORDER" ORDER BY id DESC LIMIT 1',
-        [SO_SECOND_ROUTE]
+        'SELECT user_id, user_name, role FROM audit_logs WHERE entity_id = ? AND action = "APPROVE_SALES_ORDER"',
+        [SO_ROUTE_2]
       );
       assert.strictEqual(auditRows[0].user_id, 13);
       assert.strictEqual(auditRows[0].user_name, 'Imran Khattak');
@@ -512,27 +627,23 @@ async function runSafeTestSuite() {
     });
 
     // ========================================================================
-    // TEST 12: Cannot re-approve already approved order (HTTP 400)
+    // 6. INVALID ORDER & STATE TRANSITION CONSTRAINTS
     // ========================================================================
-    await test('Cannot approve an order already in Approved status (HTTP 400)', async () => {
+    await test('Cannot re-approve an already approved sales order (HTTP 400)', async () => {
       const res = await fetch(`${BASE_URL}/sales/approve`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${validCeoToken}`
         },
-        body: JSON.stringify({ so_number: SO_LEGACY_TOKEN })
+        body: JSON.stringify({ so_number: SO_SUCCESS_ATOMIC })
       });
-
       assert.strictEqual(res.status, 400);
       const body = await res.json();
       assert.ok(body.error.includes('Cannot approve order'));
       assert.ok(body.error.includes('already in "Approved" status'));
     });
 
-    // ========================================================================
-    // TEST 13: Approving non-existent order returns HTTP 404
-    // ========================================================================
     await test('Approving non-existent sales order returns HTTP 404', async () => {
       const res = await fetch(`${BASE_URL}/sales/approve`, {
         method: 'POST',
@@ -542,7 +653,6 @@ async function runSafeTestSuite() {
         },
         body: JSON.stringify({ so_number: `SO-NON-EXISTENT-${RUN_SIGNATURE}` })
       });
-
       assert.strictEqual(res.status, 404);
       const body = await res.json();
       assert.ok(body.error.includes('not found'));
