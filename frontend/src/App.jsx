@@ -606,7 +606,7 @@ export default function App() {
         </aside>
 
         {/* Gray Dashboard Background with Full White Content Views */}
-        <main className="flex-1 bg-gray-100 overflow-y-auto overflow-x-hidden p-8 relative [perspective:1400px]">
+        <main className="flex-1 bg-gray-100 overflow-y-auto overflow-x-hidden p-8 relative">
           <div key={activeTab} className="max-w-7xl mx-auto animate-page-slide-left">
             {activeTab === 'dashboard' && (
               <ChairmanDashboard

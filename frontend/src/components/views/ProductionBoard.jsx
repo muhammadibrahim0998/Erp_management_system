@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Layers,
   ArrowRight,
@@ -196,7 +197,7 @@ export default function ProductionBoard({ productionOrders, onMoveOrder }) {
       )}
 
       {/* Production Order Detail & Recipe Calculation Modal (Page 12) */}
-      {selectedOrder && (
+      {selectedOrder && createPortal(
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl border border-gray-200 shadow-2xl max-w-3xl w-full p-6 space-y-5 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-gray-100 pb-3">
@@ -286,7 +287,8 @@ export default function ProductionBoard({ productionOrders, onMoveOrder }) {
               </div>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
