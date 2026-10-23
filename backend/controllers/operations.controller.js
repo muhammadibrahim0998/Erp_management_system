@@ -392,8 +392,25 @@ const approveSalesOrder = async (req, res) => {
       });
     }
 
-    // 4. Update order to Approved
-    const approverText = `Approved by ${req.user.name} (${userRole})`;
+    // 4. Resolve authenticated approver identity (client-supplied identity fields strictly ignored)
+    let approverName = (req.user?.name && typeof req.user.name === 'string' && req.user.name.trim() !== '')
+      ? req.user.name.trim()
+      : null;
+
+    if (!approverName && req.user?.id) {
+      const [userRows] = await db.query('SELECT name FROM users WHERE id = ?', [req.user.id]);
+      if (userRows.length > 0 && userRows[0].name && userRows[0].name.trim() !== '') {
+        approverName = userRows[0].name.trim();
+      }
+    }
+
+    if (!approverName) {
+      approverName = req.user?.email || 'Authorized Approver';
+    }
+    req.user.name = approverName;
+
+    // 5. Update order to Approved
+    const approverText = `Approved by ${approverName} (${userRole})`;
     await db.query(
       'UPDATE sales_orders SET status = "Approved", approval_step = ? WHERE so_number = ?',
       [approverText, so_number]
@@ -401,10 +418,13 @@ const approveSalesOrder = async (req, res) => {
 
     await logAudit({
       req,
+      userId: req.user.id,
+      userName: approverName,
+      role: userRole,
       action: 'APPROVE_SALES_ORDER',
       entityType: 'SALES_ORDER',
       entityId: so_number,
-      details: `${userRole} (${req.user.name}) approved sales order ${so_number}`
+      details: `${userRole} (${approverName}) approved sales order ${so_number}`
     });
 
     const [updated] = await db.query('SELECT * FROM sales_orders WHERE so_number = ?', [so_number]);

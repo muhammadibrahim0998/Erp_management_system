@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const operationsController = require('../controllers/operations.controller');
+const { authenticateToken } = require('../middlewares/auth');
 
 // Executive Dashboard
 router.get('/dashboard/chairman', operationsController.getChairmanDashboard);
@@ -28,8 +29,8 @@ router.post('/production/move', operationsController.moveProduction);
 router.get('/sales/orders', operationsController.getSalesOrders);
 router.get('/sales/orders/:so_number', operationsController.getSalesOrderDetails);
 router.post('/sales/orders', operationsController.createSalesOrder);
-router.post('/sales/approve', operationsController.approveSalesOrder);
-router.post('/sales/orders/:so_number/approve', operationsController.approveSalesOrder);
+router.post('/sales/approve', authenticateToken, operationsController.approveSalesOrder);
+router.post('/sales/orders/:so_number/approve', authenticateToken, operationsController.approveSalesOrder);
 router.post('/sales/invoice', operationsController.invoiceSalesOrder);
 router.post('/sales/orders/:so_number/invoice', operationsController.invoiceSalesOrder);
 router.post('/sales/payment', operationsController.recordSalesPayment);
