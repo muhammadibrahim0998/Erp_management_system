@@ -1,12 +1,29 @@
 const { db } = require('./config/db');
 const bcrypt = require('bcryptjs');
 
-async function initDatabase() {
-  console.log('🔄 Initializing Yousafzai Agri Foods ERP Database Tables in MySQL...');
+/**
+ * Determines whether demonstration and mock data seeding is permitted.
+ * In production mode, demo seeding is strictly prohibited under all circumstances,
+ * even if SEED_DEMO_DATA=true is configured.
+ * In non-production environments (development/test), seeding is enabled by default unless SEED_DEMO_DATA === 'false'.
+ */
+const shouldSeedDemoData = (env = process.env) => {
+  const isProduction = env.NODE_ENV === 'production';
+  if (isProduction) {
+    return false;
+  }
+  return env.SEED_DEMO_DATA !== 'false';
+};
 
+/**
+ * Initializes all required database tables if they do not already exist.
+ * Does NOT insert any sample/demo data.
+ */
+async function initSchema(connection = db) {
+  const conn = connection || db;
   try {
     // 1. Users & Roles table
-    await db.query(`
+    await conn.query(`
       CREATE TABLE IF NOT EXISTS users (
         id INT AUTO_INCREMENT PRIMARY KEY,
         name VARCHAR(100) NOT NULL,
@@ -20,7 +37,7 @@ async function initDatabase() {
     `);
 
     // 2. Approvals & Workflow Tasks
-    await db.query(`
+    await conn.query(`
       CREATE TABLE IF NOT EXISTS workflow_tasks (
         id INT AUTO_INCREMENT PRIMARY KEY,
         doc_number VARCHAR(50) NOT NULL UNIQUE,
@@ -38,7 +55,7 @@ async function initDatabase() {
     `);
 
     // 3. Gate Passes & Vehicles
-    await db.query(`
+    await conn.query(`
       CREATE TABLE IF NOT EXISTS gate_passes (
         id INT AUTO_INCREMENT PRIMARY KEY,
         pass_number VARCHAR(50) NOT NULL UNIQUE,
@@ -52,7 +69,7 @@ async function initDatabase() {
     `);
 
     // 4. Procurement & Purchase Orders
-    await db.query(`
+    await conn.query(`
       CREATE TABLE IF NOT EXISTS purchase_orders (
         id INT AUTO_INCREMENT PRIMARY KEY,
         po_number VARCHAR(50) NOT NULL UNIQUE,
@@ -67,7 +84,7 @@ async function initDatabase() {
     `);
 
     // 5. Production Orders (Liquid Egg Plant)
-    await db.query(`
+    await conn.query(`
       CREATE TABLE IF NOT EXISTS production_orders (
         id INT AUTO_INCREMENT PRIMARY KEY,
         wo_number VARCHAR(50) NOT NULL UNIQUE,
@@ -87,7 +104,7 @@ async function initDatabase() {
     `);
 
     // 6. Stock on Hand / Inventory
-    await db.query(`
+    await conn.query(`
       CREATE TABLE IF NOT EXISTS inventory_items (
         id INT AUTO_INCREMENT PRIMARY KEY,
         code VARCHAR(50) NOT NULL UNIQUE,
@@ -109,7 +126,7 @@ async function initDatabase() {
     `);
 
     // 7. Sales Orders & Credit Control
-    await db.query(`
+    await conn.query(`
       CREATE TABLE IF NOT EXISTS sales_orders (
         id INT AUTO_INCREMENT PRIMARY KEY,
         so_number VARCHAR(50) NOT NULL UNIQUE,
@@ -128,7 +145,7 @@ async function initDatabase() {
     `);
 
     // 7b. Sales Order Items
-    await db.query(`
+    await conn.query(`
       CREATE TABLE IF NOT EXISTS sales_order_items (
         id INT AUTO_INCREMENT PRIMARY KEY,
         so_number VARCHAR(50) NOT NULL,
@@ -144,7 +161,7 @@ async function initDatabase() {
     `);
 
     // 7c. Sales Invoices (Order to Cash: Stage 3)
-    await db.query(`
+    await conn.query(`
       CREATE TABLE IF NOT EXISTS sales_invoices (
         id INT AUTO_INCREMENT PRIMARY KEY,
         invoice_no VARCHAR(50) NOT NULL UNIQUE,
@@ -164,7 +181,7 @@ async function initDatabase() {
     `);
 
     // 7d. Sales Payments (Order to Cash: Stage 4)
-    await db.query(`
+    await conn.query(`
       CREATE TABLE IF NOT EXISTS sales_payments (
         id INT AUTO_INCREMENT PRIMARY KEY,
         payment_no VARCHAR(50) NOT NULL UNIQUE,
@@ -183,7 +200,7 @@ async function initDatabase() {
     `);
 
     // 7e. Document Sequences (No Math.random)
-    await db.query(`
+    await conn.query(`
       CREATE TABLE IF NOT EXISTS document_sequences (
         seq_key VARCHAR(50) PRIMARY KEY,
         prefix VARCHAR(20) NOT NULL,
@@ -193,7 +210,7 @@ async function initDatabase() {
     `);
 
     // 8. Marketing Campaigns
-    await db.query(`
+    await conn.query(`
       CREATE TABLE IF NOT EXISTS marketing_campaigns (
         id INT AUTO_INCREMENT PRIMARY KEY,
         code VARCHAR(50) NOT NULL UNIQUE,
@@ -211,7 +228,7 @@ async function initDatabase() {
     `);
 
     // 9. Payroll Runs
-    await db.query(`
+    await conn.query(`
       CREATE TABLE IF NOT EXISTS payroll_runs (
         id INT AUTO_INCREMENT PRIMARY KEY,
         run_number VARCHAR(50) NOT NULL UNIQUE,
@@ -224,7 +241,7 @@ async function initDatabase() {
     `);
 
     // 10. Central Audit Trail & Activity Logs
-    await db.query(`
+    await conn.query(`
       CREATE TABLE IF NOT EXISTS audit_logs (
         id INT AUTO_INCREMENT PRIMARY KEY,
         user_id INT NULL,
@@ -245,7 +262,7 @@ async function initDatabase() {
     `);
 
     // 11. POS Orders (Sales Invoices)
-    await db.query(`
+    await conn.query(`
       CREATE TABLE IF NOT EXISTS pos_orders (
         id INT AUTO_INCREMENT PRIMARY KEY,
         invoice_no VARCHAR(50) UNIQUE NOT NULL,
@@ -268,7 +285,7 @@ async function initDatabase() {
     `);
 
     // 12. POS Order Items (Invoice Lines)
-    await db.query(`
+    await conn.query(`
       CREATE TABLE IF NOT EXISTS pos_order_items (
         id INT AUTO_INCREMENT PRIMARY KEY,
         order_id INT NOT NULL,
@@ -285,7 +302,7 @@ async function initDatabase() {
     `);
 
     // 13. Inventory Transactions Ledger
-    await db.query(`
+    await conn.query(`
       CREATE TABLE IF NOT EXISTS inventory_transactions (
         id INT AUTO_INCREMENT PRIMARY KEY,
         item_id INT NOT NULL,
@@ -304,9 +321,25 @@ async function initDatabase() {
     `);
 
     console.log('✅ Tables created or verified.');
+  } catch (err) {
+    console.error('❌ Schema initialization error:', err.message);
+    throw err;
+  }
+}
 
+/**
+ * Seeds initial demonstration data matching system specifications ONLY if tables are currently empty.
+ * In production mode, this routine is strictly prohibited and aborted.
+ */
+async function seedDemoData(connection = db, env = process.env) {
+  const conn = connection || db;
+  if (env.NODE_ENV === 'production') {
+    console.warn('⚠️ Demonstration data seeding is strictly prohibited in production mode.');
+    return;
+  }
+  try {
     // Seed Initial Data matching the PDF if empty
-    const [userRows] = await db.query('SELECT COUNT(*) as count FROM users');
+    const [userRows] = await conn.query('SELECT COUNT(*) as count FROM users');
     if (userRows[0].count === 0) {
       console.log('🌱 Seeding 19 Yousafzai Agri Foods ERP users from PDF Page 4...');
       const usersData = [
@@ -333,7 +366,7 @@ async function initDatabase() {
       ];
       const defaultPasswordHash = await bcrypt.hash('password', 10);
       for (const u of usersData) {
-        await db.query(
+        await conn.query(
           'INSERT INTO users (name, role, department, avatar, email, password) VALUES (?, ?, ?, ?, ?, ?)',
           [u[0], u[1], u[2], u[3], u[4], defaultPasswordHash]
         );
@@ -341,7 +374,7 @@ async function initDatabase() {
     }
 
     // Seed Workflow Tasks (PDF Page 6)
-    const [taskRows] = await db.query('SELECT COUNT(*) as count FROM workflow_tasks');
+    const [taskRows] = await conn.query('SELECT COUNT(*) as count FROM workflow_tasks');
     if (taskRows[0].count === 0) {
       console.log('🌱 Seeding Workflow Tasks from PDF Page 6...');
       const tasks = [
@@ -355,7 +388,7 @@ async function initDatabase() {
         ['PO-2026-0929', 'Purchase order', 'Peshawar Pulp Trays · 3-ply egg trays', 'Peshawar Pulp Trays', 2943392, 'high', 'Approve purchase order', 'waiting 3 d ago', 'pending', 'Sana Ullah']
       ];
       for (const t of tasks) {
-        await db.query(
+        await conn.query(
           'INSERT INTO workflow_tasks (doc_number, doc_type, title, party, amount, priority, action_label, waiting_since, status, assigned_role) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
           t
         );
@@ -363,7 +396,7 @@ async function initDatabase() {
     }
 
     // Seed Purchase Orders (PDF Page 10)
-    const [poRows] = await db.query('SELECT COUNT(*) as count FROM purchase_orders');
+    const [poRows] = await conn.query('SELECT COUNT(*) as count FROM purchase_orders');
     if (poRows[0].count === 0) {
       console.log('🌱 Seeding Purchase Orders from PDF Page 10...');
       const pos = [
@@ -376,12 +409,12 @@ async function initDatabase() {
         ['PO-2026-0932', '30 Aug 2026', 'Frontier Poultry Feeds', 'Received', 'Waqar Ahmad', 1534000, 4]
       ];
       for (const p of pos) {
-        await db.query('INSERT INTO purchase_orders (po_number, po_date, supplier, status, created_by, amount, items_count) VALUES (?, ?, ?, ?, ?, ?, ?)', p);
+        await conn.query('INSERT INTO purchase_orders (po_number, po_date, supplier, status, created_by, amount, items_count) VALUES (?, ?, ?, ?, ?, ?, ?)', p);
       }
     }
 
     // Seed Production Orders (PDF Page 11 & 12)
-    const [prodRows] = await db.query('SELECT COUNT(*) as count FROM production_orders');
+    const [prodRows] = await conn.query('SELECT COUNT(*) as count FROM production_orders');
     if (prodRows[0].count === 0) {
       console.log('🌱 Seeding Production Orders from PDF Page 11 & 12...');
       const prod = [
@@ -393,7 +426,7 @@ async function initDatabase() {
         ['WO-2026-0001', 'Completed', 'Barkat Frisian', 'Liquid whole egg', 1000.00, 20227, 674, '25 Sep 2026', 0.5, 'normal', 363.00]
       ];
       for (const pr of prod) {
-        await db.query(
+        await conn.query(
           'INSERT INTO production_orders (wo_number, stage, customer, product_name, quantity_kg, eggs_to_break, trays_count, due_date, duration_hours, priority, cost_per_kg) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
           pr
         );
@@ -401,7 +434,7 @@ async function initDatabase() {
     }
 
     // Seed Inventory items (PDF Page 13)
-    const [invRows] = await db.query('SELECT COUNT(*) as count FROM inventory_items');
+    const [invRows] = await conn.query('SELECT COUNT(*) as count FROM inventory_items');
     if (invRows[0].count === 0) {
       console.log('🌱 Seeding Inventory Stock from PDF Page 13...');
       const inv = [
@@ -415,7 +448,7 @@ async function initDatabase() {
         ['SE-03-02-01', 'Omega-3 eggs – Large', 'Eggs', 54, 23, 9, 4, 0, 0, 90, 60, 900.00, 81000, '3 d', 'OK']
       ];
       for (const i of inv) {
-        await db.query(
+        await conn.query(
           'INSERT INTO inventory_items (code, name, category, mrd_qty, atk_qty, ccf_qty, phf_qty, rsk_rm_qty, rsk_fg_qty, total_qty, reorder_at, avg_cost, total_value, cover_days, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
           i
         );
@@ -423,7 +456,7 @@ async function initDatabase() {
     }
 
     // Seed Gate passes (PDF Page 8)
-    const [gateRows] = await db.query('SELECT COUNT(*) as count FROM gate_passes');
+    const [gateRows] = await conn.query('SELECT COUNT(*) as count FROM gate_passes');
     if (gateRows[0].count === 0) {
       console.log('🌱 Seeding Gate Passes from PDF Page 8...');
       const gates = [
@@ -432,15 +465,15 @@ async function initDatabase() {
         ['GPO-2026-0001', 'Peshawar Dispatch #12', 'Mardan Sales Point', 'outward', '10 min ago', 'Cleared by Store']
       ];
       for (const g of gates) {
-        await db.query('INSERT INTO gate_passes (pass_number, vehicle_number, supplier_customer, pass_type, since_time, status) VALUES (?, ?, ?, ?, ?, ?)', g);
+        await conn.query('INSERT INTO gate_passes (pass_number, vehicle_number, supplier_customer, pass_type, since_time, status) VALUES (?, ?, ?, ?, ?, ?)', g);
       }
     }
 
     // Seed Sales orders (PDF Page 14)
-    const [salesRows] = await db.query('SELECT COUNT(*) as count FROM sales_orders');
+    const [salesRows] = await conn.query('SELECT COUNT(*) as count FROM sales_orders');
     if (salesRows[0].count === 0) {
       console.log('🌱 Seeding Sales Order from PDF Page 14...');
-      await db.query(`
+      await conn.query(`
         INSERT INTO sales_orders 
         (so_number, order_date, delivery_date, customer, warehouse, total_amount, credit_limit, current_exposure, credit_breach, status, approval_step)
         VALUES 
@@ -449,9 +482,9 @@ async function initDatabase() {
     }
 
     // Seed Sales Order Items for SO-2026-0418 (PDF Page 14)
-    const [soiRows] = await db.query('SELECT COUNT(*) as count FROM sales_order_items');
+    const [soiRows] = await conn.query('SELECT COUNT(*) as count FROM sales_order_items');
     if (soiRows[0].count === 0) {
-      await db.query(`
+      await conn.query(`
         INSERT INTO sales_order_items 
         (so_number, item_code, item_name, quantity, rate, discount_percent, total_amount)
         VALUES
@@ -461,9 +494,9 @@ async function initDatabase() {
     }
 
     // Seed Document Sequences (for sequence-backed doc numbers, no Math.random)
-    const [seqRows] = await db.query('SELECT COUNT(*) as count FROM document_sequences');
+    const [seqRows] = await conn.query('SELECT COUNT(*) as count FROM document_sequences');
     if (seqRows[0].count === 0) {
-      await db.query(`
+      await conn.query(`
         INSERT INTO document_sequences (seq_key, prefix, current_val) VALUES
         ('sales_order', 'SO-2026', 418),
         ('sales_invoice', 'INV-2026', 100),
@@ -474,10 +507,10 @@ async function initDatabase() {
     }
 
     // Seed Marketing campaigns (PDF Page 15 & 16)
-    const [campRows] = await db.query('SELECT COUNT(*) as count FROM marketing_campaigns');
+    const [campRows] = await conn.query('SELECT COUNT(*) as count FROM marketing_campaigns');
     if (campRows[0].count === 0) {
       console.log('🌱 Seeding Marketing Campaigns from PDF Page 15 & 16...');
-      await db.query(`
+      await conn.query(`
         INSERT INTO marketing_campaigns
         (code, title, dates, status, budget, spent, reach, engagement, leads, creatives, posts)
         VALUES
@@ -488,7 +521,7 @@ async function initDatabase() {
     }
 
     // Seed Payroll runs (PDF Page 17)
-    const [payRows] = await db.query('SELECT COUNT(*) as count FROM payroll_runs');
+    const [payRows] = await conn.query('SELECT COUNT(*) as count FROM payroll_runs');
     if (payRows[0].count === 0) {
       console.log('🌱 Seeding Payroll Runs from PDF Page 17...');
       const payrolls = [
@@ -500,12 +533,12 @@ async function initDatabase() {
         ['PAY-2026-0004', '30 Apr 2026', '2026-04', 'Paid', 'Nadia Shah', 4868088.00]
       ];
       for (const pr of payrolls) {
-        await db.query('INSERT INTO payroll_runs (run_number, run_date, month, status, prepared_by, net_pay) VALUES (?, ?, ?, ?, ?, ?)', pr);
+        await conn.query('INSERT INTO payroll_runs (run_number, run_date, month, status, prepared_by, net_pay) VALUES (?, ?, ?, ?, ?, ?)', pr);
       }
     }
 
     // Seed Initial Audit Logs if empty
-    const [auditRows] = await db.query('SELECT COUNT(*) as count FROM audit_logs');
+    const [auditRows] = await conn.query('SELECT COUNT(*) as count FROM audit_logs');
     if (auditRows[0].count === 0) {
       console.log('🌱 Seeding Enterprise Audit Trail Logs...');
       const auditSeeds = [
@@ -518,7 +551,7 @@ async function initDatabase() {
         [20, 'ERP Admin', 'ERP Admin', 'USER_STATUS_CHANGE', 'USER', '8', 'Gate Officer account role privileges verified & secured', '127.0.0.1', 'SUCCESS']
       ];
       for (const a of auditSeeds) {
-        await db.query(
+        await conn.query(
           'INSERT INTO audit_logs (user_id, user_name, role, action, entity_type, entity_id, details, ip_address, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
           a
         );
@@ -526,34 +559,34 @@ async function initDatabase() {
     }
 
     // Seed Initial POS Orders & Inventory Transactions
-    const [posRows] = await db.query('SELECT COUNT(*) as count FROM pos_orders');
+    const [posRows] = await conn.query('SELECT COUNT(*) as count FROM pos_orders');
     if (posRows[0].count === 0) {
       console.log('🌱 Seeding Initial Point of Sale (POS) Invoices & Ledger...');
-      const [order1] = await db.query(
+      const [order1] = await conn.query(
         `INSERT INTO pos_orders (invoice_no, customer_name, customer_phone, warehouse, subtotal, tax_amount, discount_amount, total_amount, paid_amount, change_amount, payment_method, cashier_name, status)
          VALUES ('YAF-INV-20260929-1001', 'Swat Valley Egg Dealers', '0300-9876543', 'Mardan Central Store', 28750.00, 0.00, 500.00, 28250.00, 30000.00, 1750.00, 'Cash', 'Bilal Yousafzai', 'Completed')`
       );
-      await db.query(
+      await conn.query(
         `INSERT INTO pos_order_items (order_id, item_id, item_code, item_name, quantity, unit_price, total_price)
          VALUES (?, 2, 'SE-01-01-02', 'White eggs Grade A – Large', 50, 575.00, 28750.00)`,
         [order1.insertId]
       );
-      await db.query(
+      await conn.query(
         `INSERT INTO inventory_transactions (item_id, ref_no, transaction_type, quantity_change, prev_qty, new_qty, warehouse, performed_by)
          VALUES (2, 'YAF-INV-20260929-1001', 'POS_SALE', -50, 3397, 3347, 'Mardan Central Store', 'Bilal Yousafzai')`
       );
 
-      const [order2] = await db.query(
+      const [order2] = await conn.query(
         `INSERT INTO pos_orders (invoice_no, customer_name, customer_phone, warehouse, subtotal, tax_amount, discount_amount, total_amount, paid_amount, change_amount, payment_method, cashier_name, status)
          VALUES ('YAF-INV-20260929-1002', 'Walk-in Retail Customer', '0345-1234567', 'Mardan Central Store', 9450.00, 0.00, 0.00, 9450.00, 10000.00, 550.00, 'Cash', 'Bilal Yousafzai', 'Completed')`
       );
-      await db.query(
+      await conn.query(
         `INSERT INTO pos_order_items (order_id, item_id, item_code, item_name, quantity, unit_price, total_price)
          VALUES (?, 1, 'SE-01-01-01', 'White eggs Grade A – Extra large', 10, 610.00, 6100.00),
                 (?, 5, 'SE-02-01-01', 'Brown farm eggs – Large', 5, 670.00, 3350.00)`,
         [order2.insertId, order2.insertId]
       );
-      await db.query(
+      await conn.query(
         `INSERT INTO inventory_transactions (item_id, ref_no, transaction_type, quantity_change, prev_qty, new_qty, warehouse, performed_by)
          VALUES (1, 'YAF-INV-20260929-1002', 'POS_SALE', -10, 550, 540, 'Mardan Central Store', 'Bilal Yousafzai'),
                 (5, 'YAF-INV-20260929-1002', 'POS_SALE', -5, 257, 252, 'Mardan Central Store', 'Bilal Yousafzai')`
@@ -562,8 +595,41 @@ async function initDatabase() {
 
     console.log('✨ All Yousafzai Agri Foods ERP tables and sample data seeded successfully!');
   } catch (error) {
-    console.error('❌ Database Initialization Error:', error.message);
+    console.error('❌ Demonstration Data Seeding Error:', error.message);
+    throw error;
   }
 }
 
-module.exports = { initDatabase };
+/**
+ * Master database initialization routine invoked during server startup.
+ * Strictly separates schema initialization from demonstration data seeding.
+ */
+async function initDatabase(options = {}) {
+  const conn = options.db || db;
+  const env = options.env || process.env;
+  const isProduction = env.NODE_ENV === 'production';
+  console.log('🔄 Initializing Yousafzai Agri Foods ERP Database Tables in MySQL...');
+
+  try {
+    await initSchema(conn);
+
+    const allowSeed = options.seed !== undefined ? options.seed : shouldSeedDemoData(env);
+    if (allowSeed) {
+      await seedDemoData(conn, env);
+    } else {
+      console.log('ℹ️ Demonstration data seeding skipped (disabled by policy).');
+    }
+  } catch (error) {
+    console.error('❌ Database Initialization Error:', error.message);
+    if (isProduction) {
+      throw error;
+    }
+  }
+}
+
+module.exports = {
+  initDatabase,
+  initSchema,
+  seedDemoData,
+  shouldSeedDemoData
+};

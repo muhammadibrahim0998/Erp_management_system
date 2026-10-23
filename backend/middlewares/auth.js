@@ -1,6 +1,31 @@
 const jwt = require('jsonwebtoken');
 
-const JWT_SECRET = process.env.JWT_SECRET || 'yaf_erp_secure_jwt_secret_key_2026_mardan';
+/**
+ * Resolves and validates JWT_SECRET based on runtime environment.
+ * In production mode (NODE_ENV === 'production'), a non-empty JWT_SECRET is strictly mandatory;
+ * fallback to hardcoded secrets is prohibited and triggers a fail-fast configuration error.
+ */
+const resolveJwtSecret = (env = process.env) => {
+  const isProduction = env.NODE_ENV === 'production';
+  const secret = env.JWT_SECRET;
+
+  if (isProduction) {
+    if (!secret || typeof secret !== 'string' || !secret.trim()) {
+      throw new Error(
+        'FATAL CONFIGURATION ERROR: JWT_SECRET environment variable is mandatory in production mode and cannot be empty.'
+      );
+    }
+    return secret.trim();
+  }
+
+  // In non-production environments (development, test), allow safe local development secret fallback
+  if (secret && typeof secret === 'string' && secret.trim()) {
+    return secret.trim();
+  }
+  return 'yaf_erp_secure_jwt_secret_key_2026_mardan';
+};
+
+const JWT_SECRET = resolveJwtSecret();
 
 /**
  * Optional user authentication extractor for general request context & audit logging
@@ -101,6 +126,7 @@ const requireAdmin = requireRoles(['ERP Admin', 'Chairman & CEO']);
 
 module.exports = {
   JWT_SECRET,
+  resolveJwtSecret,
   optionalUserExtractor,
   authenticateToken,
   requireRoles,
