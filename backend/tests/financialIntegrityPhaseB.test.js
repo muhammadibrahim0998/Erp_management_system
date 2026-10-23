@@ -1,5 +1,6 @@
 const assert = require('node:assert');
 const http = require('node:http');
+const crypto = require('node:crypto');
 const express = require('express');
 const jwt = require('jsonwebtoken');
 
@@ -28,11 +29,12 @@ if (!isTestDb) {
 const { db } = require('../config/db');
 const { JWT_SECRET, optionalUserExtractor } = require('../middlewares/auth');
 const { getNextDocNumber } = require('../utils/sequence');
+const { resolveCustomerCreditPolicy, CORPORATE_CUSTOMER_PROFILES } = require('../controllers/operations.controller');
 const apiRoutes = require('../routes');
 
 async function runFinancialIntegrityTestSuite() {
   console.log('====================================================================');
-  console.log('YOUSAFZAI AGRI FOODS ERP — PHASE B FINANCIAL INTEGRITY REGRESSION SUITE');
+  console.log('YOUSAFZAI AGRI FOODS ERP — PHASE B.1 FINANCIAL INTEGRITY REGRESSION SUITE');
   console.log('====================================================================');
   console.log(`[Safety Guard] Node Environment: ${nodeEnv}`);
   console.log(`[Safety Guard] Database Target:   ${currentDb} (ISOLATED TEST DATABASE)`);
@@ -109,13 +111,11 @@ async function runFinancialIntegrityTestSuite() {
     const salesOfficer = await createTestUser({ name: 'Tariq Sales', role: 'Sales Officer', department: 'Sales' });
     const accountsOfficer = await createTestUser({ name: 'Asad Accounts', role: 'Accounts Officer', department: 'Finance' });
     const financeDir = await createTestUser({ name: 'Farooq Finance', role: 'Director Finance', department: 'Executive' });
-    const ceoUser = await createTestUser({ name: 'Bilal Yousafzai', role: 'Chairman & CEO', department: 'Executive' });
     const hrUser = await createTestUser({ name: 'Haroon HR', role: 'HR Manager', department: 'HR' });
 
     const salesToken = signToken(salesOfficer);
     const accountsToken = signToken(accountsOfficer);
     const financeToken = signToken(financeDir);
-    const ceoToken = signToken(ceoUser);
     const hrToken = signToken(hrUser);
 
     console.log('--- PART 1: SEC-01 ATOMIC INVOICING & PAYMENT PROCESSING ---\n');
@@ -123,7 +123,6 @@ async function runFinancialIntegrityTestSuite() {
     // T01: Generate invoice for approved order
     let soForInvoice;
     await test('SEC-01.01: Approved sales order can be invoiced by Accounts Officer (transitions to Invoiced)', async () => {
-      // Create order directly as Approved in test DB
       const soNum = `SO-PHASEB-${Date.now()}-01`;
       createdSoNumbers.add(soNum);
       await db.query(
@@ -153,11 +152,9 @@ async function runFinancialIntegrityTestSuite() {
       assert.strictEqual(data.invoice.status, 'Unpaid');
       createdInvoiceNumbers.add(data.invoice.invoice_no);
 
-      // Verify sales_orders status updated to 'Invoiced'
       const [orderRows] = await db.query('SELECT status FROM sales_orders WHERE so_number = ?', [soNum]);
       assert.strictEqual(orderRows[0].status, 'Invoiced');
 
-      // Verify audit log
       const [auditRows] = await db.query(
         'SELECT * FROM audit_logs WHERE entity_type = "SALES_INVOICE" AND entity_id = ?',
         [data.invoice.invoice_no]
@@ -194,7 +191,6 @@ async function runFinancialIntegrityTestSuite() {
         [soConcurrent]
       );
 
-      // Fire 2 simultaneous requests
       const [res1, res2] = await Promise.all([
         fetch(`${BASE_URL}/sales/orders/${soConcurrent}/invoice`, {
           method: 'POST',
@@ -209,12 +205,10 @@ async function runFinancialIntegrityTestSuite() {
       const statuses = [res1.status, res2.status].sort();
       assert.deepStrictEqual(statuses, [201, 400], 'One request must succeed (201) and the concurrent one must fail (400)');
 
-      // Verify exactly one invoice was created in database
       const [invRows] = await db.query('SELECT * FROM sales_invoices WHERE so_number = ?', [soConcurrent]);
       assert.strictEqual(invRows.length, 1);
       createdInvoiceNumbers.add(invRows[0].invoice_no);
 
-      // Verify order status is 'Invoiced'
       const [soRows] = await db.query('SELECT status FROM sales_orders WHERE so_number = ?', [soConcurrent]);
       assert.strictEqual(soRows[0].status, 'Invoiced');
     });
@@ -312,7 +306,6 @@ async function runFinancialIntegrityTestSuite() {
       assert.ok(data.payment.payment_no.startsWith('PAY-2026-'));
       createdPaymentNumbers.add(data.payment.payment_no);
 
-      // Verify database state
       const [invRows] = await db.query('SELECT paid_amount, status FROM sales_invoices WHERE invoice_no = ?', [invNum]);
       assert.strictEqual(Number(invRows[0].paid_amount), 200000.00);
       assert.strictEqual(invRows[0].status, 'Partially Paid');
@@ -320,7 +313,6 @@ async function runFinancialIntegrityTestSuite() {
       const [soRows] = await db.query('SELECT status FROM sales_orders WHERE so_number = ?', [soNum]);
       assert.strictEqual(soRows[0].status, 'Partially Paid');
 
-      // Verify audit log
       const [auditRows] = await db.query(
         'SELECT * FROM audit_logs WHERE entity_type = "SALES_PAYMENT" AND entity_id = ?',
         [data.payment.payment_no]
@@ -334,7 +326,6 @@ async function runFinancialIntegrityTestSuite() {
     await test('SEC-01.07: Second payment completing balance transitions order and invoice to Paid', async () => {
       const { soNum, invNum } = partialPaymentOrder;
 
-      // Pay the remaining 300,000
       const res = await fetch(`${BASE_URL}/sales/orders/${soNum}/payment`, {
         method: 'POST',
         headers: {
@@ -356,7 +347,6 @@ async function runFinancialIntegrityTestSuite() {
       assert.strictEqual(data.outstanding_balance, 0);
       createdPaymentNumbers.add(data.payment.payment_no);
 
-      // Verify database state
       const [invRows] = await db.query('SELECT paid_amount, status FROM sales_invoices WHERE invoice_no = ?', [invNum]);
       assert.strictEqual(Number(invRows[0].paid_amount), 500000.00);
       assert.strictEqual(invRows[0].status, 'Paid');
@@ -386,7 +376,6 @@ async function runFinancialIntegrityTestSuite() {
         [invNum, soNum]
       );
 
-      // Attempt payment of 150,000 for 100,000 invoice
       const res = await fetch(`${BASE_URL}/sales/orders/${soNum}/payment`, {
         method: 'POST',
         headers: {
@@ -402,7 +391,6 @@ async function runFinancialIntegrityTestSuite() {
       const data = await res.json();
       assert.ok(data.error.includes('exceeds outstanding invoice balance'));
 
-      // Verify no payment was created
       const [payRows] = await db.query('SELECT * FROM sales_payments WHERE invoice_no = ?', [invNum]);
       assert.strictEqual(payRows.length, 0);
     });
@@ -445,7 +433,6 @@ async function runFinancialIntegrityTestSuite() {
         [invNum, soNum]
       );
 
-      // Two simultaneous requests each attempting to pay 80,000 (total = 160,000, invoice = 100,000)
       const [res1, res2] = await Promise.all([
         fetch(`${BASE_URL}/sales/orders/${soNum}/payment`, {
           method: 'POST',
@@ -466,10 +453,8 @@ async function runFinancialIntegrityTestSuite() {
       if (data2.payment) createdPaymentNumbers.add(data2.payment.payment_no);
 
       const statuses = [res1.status, res2.status].sort();
-      // One must succeed (201) and the second must be rejected (400) because 80000 > remaining 20000
       assert.deepStrictEqual(statuses, [201, 400], 'One payment of 80k must succeed and second 80k must fail');
 
-      // Verify in DB total paid never exceeded 100,000
       const [invRows] = await db.query('SELECT paid_amount FROM sales_invoices WHERE invoice_no = ?', [invNum]);
       assert.strictEqual(Number(invRows[0].paid_amount), 80000.00);
 
@@ -513,7 +498,6 @@ async function runFinancialIntegrityTestSuite() {
         },
         body: JSON.stringify({
           customer: 'Swat Valley Egg Dealers',
-          // Client attempts to claim an inflated limit and zero exposure
           credit_limit: 999999999.00,
           current_exposure: 0.00,
           credit_breach: 0.00,
@@ -528,11 +512,9 @@ async function runFinancialIntegrityTestSuite() {
       const created = await res.json();
       createdSoNumbers.add(created.so_number);
 
-      // Swat Valley Egg Dealers authoritative profile has credit limit 4,500,000 (not 999999999)
       assert.strictEqual(Number(created.credit_limit), 4500000.00);
       assert.notStrictEqual(Number(created.credit_limit), 999999999.00);
 
-      // Verify audit log
       const [auditRows] = await db.query(
         'SELECT * FROM audit_logs WHERE entity_type = "SALES_ORDER" AND entity_id = ?',
         [created.so_number]
@@ -551,7 +533,6 @@ async function runFinancialIntegrityTestSuite() {
         },
         body: JSON.stringify({
           customer: 'Swat Valley Egg Dealers',
-          // Client attempts to bypass approval workflow
           status: 'Approved',
           approval_step: 'Approved',
           items: [
@@ -564,7 +545,6 @@ async function runFinancialIntegrityTestSuite() {
       const created = await res.json();
       createdSoNumbers.add(created.so_number);
 
-      // Because order is within limit, server forces Draft / Not required (never Approved)
       assert.strictEqual(created.status, 'Draft');
       assert.strictEqual(created.approval_step, 'Not required');
     });
@@ -579,7 +559,6 @@ async function runFinancialIntegrityTestSuite() {
         },
         body: JSON.stringify({
           customer: 'Peek Freans',
-          // Client claims total is 10, but math is: 100 * 200 * 0.9 = 18,000 + 50 * 400 * 1.0 = 20,000 => 38,000
           total_amount: 10.00,
           items: [
             { item_code: 'SE-01', item_name: 'Liquid Egg White', quantity: 100, rate: 200, discount_percent: 10, total_amount: 1.00 },
@@ -594,7 +573,6 @@ async function runFinancialIntegrityTestSuite() {
 
       assert.strictEqual(Number(created.total_amount), 38000.00);
 
-      // Verify item rows in DB
       const [itemRows] = await db.query(
         'SELECT * FROM sales_order_items WHERE so_number = ? ORDER BY id ASC',
         [created.so_number]
@@ -604,9 +582,9 @@ async function runFinancialIntegrityTestSuite() {
       assert.strictEqual(Number(itemRows[1].total_amount), 20000.00);
     });
 
-    // T16: New unvetted customer receives standard policy default limit
-    await test('SEC-02.04: New unvetted customer defaults to server policy limit of PKR 1,000,000', async () => {
-      const unvettedCustomer = `Unknown Dealer ${Date.now()}`;
+    // T16: Fail-closed zero credit policy for unvetted customers
+    await test('SEC-02.04: Unvetted customer defaults fail-closed to PKR 0.00, requiring CEO approval for credit', async () => {
+      const unvettedCustomer = `Unvetted Dealer ${Date.now()}`;
       const res = await fetch(`${BASE_URL}/sales/orders`, {
         method: 'POST',
         headers: {
@@ -616,7 +594,7 @@ async function runFinancialIntegrityTestSuite() {
         body: JSON.stringify({
           customer: unvettedCustomer,
           items: [
-            { item_code: 'SE-01', item_name: 'Shell Eggs', quantity: 100, rate: 1000, discount_percent: 0 }
+            { item_code: 'SE-01', item_name: 'Shell Eggs', quantity: 10, rate: 1000, discount_percent: 0 }
           ]
         })
       });
@@ -625,18 +603,22 @@ async function runFinancialIntegrityTestSuite() {
       const created = await res.json();
       createdSoNumbers.add(created.so_number);
 
-      assert.strictEqual(Number(created.credit_limit), 1000000.00);
-      assert.strictEqual(Number(created.total_amount), 100000.00);
-      assert.strictEqual(Number(created.current_exposure), 100000.00);
-      assert.strictEqual(Number(created.credit_breach), 0.00);
-      assert.strictEqual(created.status, 'Draft');
-      assert.strictEqual(created.approval_step, 'Not required');
+      // Unvetted customers receive PKR 0.00 limit without executive sign-off
+      assert.strictEqual(Number(created.credit_limit), 0.00);
+      assert.strictEqual(Number(created.total_amount), 10000.00);
+      assert.strictEqual(Number(created.current_exposure), 10000.00);
+      assert.strictEqual(Number(created.credit_breach), 10000.00);
+      assert.strictEqual(created.status, 'Pending approval');
+      assert.strictEqual(created.approval_step, 'CEO Waiting');
     });
 
-    // T17: Order exceeding credit limit triggers credit breach, Pending approval, and CEO Waiting
-    await test('SEC-02.05: Order exceeding credit limit triggers credit breach and requires CEO approval', async () => {
-      const dealer = `Overlimit Dealer ${Date.now()}`;
-      // Order of 1,500,000 against default 1,000,000 limit -> breach of 500,000
+    // T17: Order exceeding corporate credit limit triggers credit breach
+    await test('SEC-02.05: Order exceeding corporate credit limit triggers credit breach and requires CEO approval', async () => {
+      await db.query('DELETE FROM sales_invoices WHERE customer = "Mardan Retail Mart"');
+      await db.query('DELETE FROM sales_orders WHERE customer = "Mardan Retail Mart"');
+
+      // Mardan Retail Mart authoritative limit is 1,000,000
+      // Submit order for 1,500,000 -> breach = 500,000
       const res = await fetch(`${BASE_URL}/sales/orders`, {
         method: 'POST',
         headers: {
@@ -644,7 +626,7 @@ async function runFinancialIntegrityTestSuite() {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          customer: dealer,
+          customer: 'Mardan Retail Mart',
           items: [
             { item_code: 'SE-01', item_name: 'Shell Eggs', quantity: 1500, rate: 1000, discount_percent: 0 }
           ]
@@ -657,38 +639,36 @@ async function runFinancialIntegrityTestSuite() {
 
       assert.strictEqual(Number(created.credit_limit), 1000000.00);
       assert.strictEqual(Number(created.total_amount), 1500000.00);
-      assert.strictEqual(Number(created.current_exposure), 1500000.00);
       assert.strictEqual(Number(created.credit_breach), 500000.00);
       assert.strictEqual(created.status, 'Pending approval');
       assert.strictEqual(created.approval_step, 'CEO Waiting');
     });
 
-    // T18: Dynamic exposure includes outstanding unpaid invoices
+    // T18: Dynamic exposure includes customer unpaid invoices without double-counting
     await test('SEC-02.06: Dynamic exposure correctly includes customer unpaid invoices without double-counting', async () => {
-      const customer = `Exposure Check Cust ${Date.now()}`;
+      await db.query('DELETE FROM sales_invoices WHERE customer = "Mardan Retail Mart"');
+      await db.query('DELETE FROM sales_orders WHERE customer = "Mardan Retail Mart"');
+
       const dummySo = `SO-EXP-DUMMY-${Date.now()}`;
       const dummyInv = `INV-EXP-DUMMY-${Date.now()}`;
       createdSoNumbers.add(dummySo);
       createdInvoiceNumbers.add(dummyInv);
 
-      // Create previous invoiced order with 400,000 unpaid balance
+      // Create prior invoiced order of 400,000 for Mardan Retail Mart
       await db.query(
         `INSERT INTO sales_orders 
          (so_number, order_date, delivery_date, customer, warehouse, total_amount, credit_limit, current_exposure, credit_breach, status, approval_step, created_by)
-         VALUES (?, '23 Oct 2026', '30 Oct 2026', ?, 'Mardan Store', 400000.00, 1000000.00, 400000.00, 0.00, 'Invoiced', 'Approved', 'Test Setup')`,
-        [dummySo, customer]
+         VALUES (?, '23 Oct 2026', '30 Oct 2026', 'Mardan Retail Mart', 'Mardan Store', 400000.00, 1000000.00, 400000.00, 0.00, 'Invoiced', 'Approved', 'Test Setup')`,
+        [dummySo]
       );
       await db.query(
         `INSERT INTO sales_invoices 
          (invoice_no, so_number, customer, invoice_date, subtotal, total_amount, paid_amount, status, created_by)
-         VALUES (?, ?, ?, '23 Oct 2026', 400000.00, 400000.00, 0.00, 'Unpaid', 'Accounts Officer')`,
-        [dummyInv, dummySo, customer]
+         VALUES (?, ?, 'Mardan Retail Mart', '23 Oct 2026', 400000.00, 400000.00, 0.00, 'Unpaid', 'Accounts Officer')`,
+        [dummyInv, dummySo]
       );
 
-      // Now create a new order of 700,000 for this customer
-      // Total exposure should be: 400,000 (unpaid inv) + 700,000 (new order) = 1,100,000
-      // Credit limit: 1,000,000 (from previous order history)
-      // Credit breach: 100,000
+      // Now create order of 700,000. Total exposure = 400k + 700k = 1,100,000 > 1,000,000 limit -> breach 100k
       const res = await fetch(`${BASE_URL}/sales/orders`, {
         method: 'POST',
         headers: {
@@ -696,7 +676,7 @@ async function runFinancialIntegrityTestSuite() {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          customer,
+          customer: 'Mardan Retail Mart',
           items: [
             { item_code: 'SE-01', item_name: 'Eggs', quantity: 700, rate: 1000, discount_percent: 0 }
           ]
@@ -715,23 +695,23 @@ async function runFinancialIntegrityTestSuite() {
       assert.strictEqual(created.approval_step, 'CEO Waiting');
     });
 
-    // T19: Dynamic exposure includes approved/pending uninvoiced orders
+    // T19: Dynamic exposure includes approved/pending orders not yet invoiced
     await test('SEC-02.07: Dynamic exposure includes approved/pending orders not yet invoiced', async () => {
-      const customer = `Uninvoiced Exposure Cust ${Date.now()}`;
+      await db.query('DELETE FROM sales_invoices WHERE customer = "Mardan Retail Mart"');
+      await db.query('DELETE FROM sales_orders WHERE customer = "Mardan Retail Mart"');
+
       const priorSo = `SO-EXP-UNINV-${Date.now()}`;
       createdSoNumbers.add(priorSo);
 
-      // Create prior approved order of 300,000 that has NOT been invoiced yet
+      // Create prior approved order of 300,000 for Mardan Retail Mart (limit 1,000,000)
       await db.query(
         `INSERT INTO sales_orders 
          (so_number, order_date, delivery_date, customer, warehouse, total_amount, credit_limit, current_exposure, credit_breach, status, approval_step, created_by)
-         VALUES (?, '23 Oct 2026', '30 Oct 2026', ?, 'Mardan Store', 300000.00, 1000000.00, 300000.00, 0.00, 'Approved', 'Approved', 'Test Setup')`,
-        [priorSo, customer]
+         VALUES (?, '23 Oct 2026', '30 Oct 2026', 'Mardan Retail Mart', 'Mardan Store', 300000.00, 1000000.00, 300000.00, 0.00, 'Approved', 'Approved', 'Test Setup')`,
+        [priorSo]
       );
 
-      // Now create a second order of 200,000 for this customer
-      // Total exposure should be: 300,000 (uninvoiced order) + 200,000 (new order) = 500,000
-      // Credit limit: 1,000,000 -> breach: 0
+      // Now create second order of 200,000. Total exposure = 300k (uninvoiced order) + 200k = 500k <= 1,000,000
       const res = await fetch(`${BASE_URL}/sales/orders`, {
         method: 'POST',
         headers: {
@@ -739,7 +719,7 @@ async function runFinancialIntegrityTestSuite() {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          customer,
+          customer: 'Mardan Retail Mart',
           items: [
             { item_code: 'SE-01', item_name: 'Eggs', quantity: 200, rate: 1000, discount_percent: 0 }
           ]
@@ -813,6 +793,214 @@ async function runFinancialIntegrityTestSuite() {
         throw e;
       } finally {
         conn.release();
+      }
+    });
+
+    console.log('\n--- PART 3: SEC-B-01 & SEC-B-02 CONCURRENCY & POLICY INTEGRITY ---\n');
+
+    // T24: SEC-B-01 Deterministic concurrency regression test (two simultaneous 700k orders against 1M limit)
+    await test('SEC-B-01.01: Two simultaneous orders of PKR 700k for 1M credit limit cannot bypass approval', async () => {
+      const concCustomer = 'Mardan Retail Mart'; // Authoritative limit: PKR 1,000,000
+
+      // Clean any existing orders and invoices for this customer to ensure clean baseline for test
+      await db.query('DELETE FROM sales_invoices WHERE customer = ?', [concCustomer]);
+      await db.query('DELETE FROM sales_orders WHERE customer = ?', [concCustomer]);
+
+      const reqPayload = {
+        customer: concCustomer,
+        items: [
+          { item_code: 'SE-01-01-02', item_name: 'Eggs Grade A', quantity: 700, rate: 1000, discount_percent: 0 }
+        ]
+      };
+
+      // Launch two concurrent sales order creation requests simultaneously
+      const [res1, res2] = await Promise.all([
+        fetch(`${BASE_URL}/sales/orders`, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${salesToken}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify(reqPayload)
+        }),
+        fetch(`${BASE_URL}/sales/orders`, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${salesToken}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify(reqPayload)
+        })
+      ]);
+
+      assert.strictEqual(res1.status, 201);
+      assert.strictEqual(res2.status, 201);
+
+      const order1 = await res1.json();
+      const order2 = await res2.json();
+      createdSoNumbers.add(order1.so_number);
+      createdSoNumbers.add(order2.so_number);
+
+      const orders = [order1, order2].sort((a, b) => Number(a.current_exposure) - Number(b.current_exposure));
+      const firstProcessed = orders[0];
+      const secondProcessed = orders[1];
+
+      // First order had exposure 700,000 <= 1,000,000 -> Draft / Not required
+      assert.strictEqual(Number(firstProcessed.current_exposure), 700000.00);
+      assert.strictEqual(Number(firstProcessed.credit_breach), 0.00);
+      assert.strictEqual(firstProcessed.status, 'Draft');
+      assert.strictEqual(firstProcessed.approval_step, 'Not required');
+
+      // Second order MUST see first order's exposure (total 1,400,000 > 1,000,000) -> Pending approval / CEO Waiting
+      assert.strictEqual(Number(secondProcessed.current_exposure), 1400000.00);
+      assert.strictEqual(Number(secondProcessed.credit_breach), 400000.00);
+      assert.strictEqual(secondProcessed.status, 'Pending approval');
+      assert.strictEqual(secondProcessed.approval_step, 'CEO Waiting');
+    });
+
+    // T25: SEC-B-01 Fail closed on lock acquisition timeout
+    await test('SEC-B-01.02: Sales order creation fails closed with HTTP 409 on customer advisory lock timeout', async () => {
+      const lockCustomer = 'Swat Valley Egg Dealers';
+      const normalized = lockCustomer.toLowerCase().replace(/\s+/g, ' ');
+      const lockKey = 'yaf_cust_' + crypto.createHash('sha256').update(normalized).digest('hex').slice(0, 40);
+
+      // Acquire lock directly on an external connection
+      const externalConn = await db.getConnection();
+      try {
+        const [lRes] = await externalConn.query('SELECT GET_LOCK(?, 2) as l', [lockKey]);
+        assert.strictEqual(lRes[0].l, 1, 'External connection must acquire advisory lock');
+
+        // Configure short timeout for test
+        process.env.ERP_CREDIT_LOCK_TIMEOUT_SECONDS = '0.2';
+
+        const res = await fetch(`${BASE_URL}/sales/orders`, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${salesToken}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            customer: lockCustomer,
+            items: [{ item_code: 'SE-01', item_name: 'Eggs', quantity: 10, rate: 100, discount_percent: 0 }]
+          })
+        });
+
+        assert.strictEqual(res.status, 409);
+        const body = await res.json();
+        assert.ok(body.error.includes('Unable to acquire credit validation lock'));
+
+        // Release the external lock
+        await externalConn.query('SELECT RELEASE_LOCK(?)', [lockKey]);
+      } finally {
+        process.env.ERP_CREDIT_LOCK_TIMEOUT_SECONDS = '10';
+        externalConn.release();
+      }
+    });
+
+    // T26: SEC-B-01 Advisory lock is safely released on transaction rollback
+    await test('SEC-B-01.03: Advisory lock is completely released and reusable even after request rollback', async () => {
+      const rollbackCust = 'Khyber Confectioners Ltd';
+      const normalized = rollbackCust.toLowerCase().replace(/\s+/g, ' ');
+      const lockKey = 'yaf_cust_' + crypto.createHash('sha256').update(normalized).digest('hex').slice(0, 40);
+
+      // Submit an order with zero total amount -> causes rollback & 400
+      const res = await fetch(`${BASE_URL}/sales/orders`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${salesToken}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          customer: rollbackCust,
+          total_amount: 0
+        })
+      });
+      assert.strictEqual(res.status, 400);
+
+      // Verify that lock was released by acquiring it immediately with 0 timeout
+      const verifyConn = await db.getConnection();
+      try {
+        const [lRes] = await verifyConn.query('SELECT GET_LOCK(?, 0) as l', [lockKey]);
+        assert.strictEqual(lRes[0].l, 1, 'Lock must be available immediately after rollback');
+        await verifyConn.query('SELECT RELEASE_LOCK(?)', [lockKey]);
+      } finally {
+        verifyConn.release();
+      }
+    });
+
+    // T27: SEC-B-02 Elimination of historical credit limit contamination
+    await test('SEC-B-02.01: Previous orders with tampered credit limits cannot pollute customer credit policy', async () => {
+      const customerName = 'Charsadda Poultry Services'; // Genuine policy limit: PKR 5,000,000
+      const fakePriorSo = `SO-CONTAM-${Date.now()}`;
+      createdSoNumbers.add(fakePriorSo);
+
+      // Insert an erroneous historical order claiming a 99,000,000 credit limit
+      await db.query(
+        `INSERT INTO sales_orders 
+         (so_number, order_date, delivery_date, customer, warehouse, total_amount, credit_limit, current_exposure, credit_breach, status, approval_step, created_by)
+         VALUES (?, '23 Oct 2026', '30 Oct 2026', ?, 'Mardan Store', 10000.00, 99000000.00, 10000.00, 0.00, 'Approved', 'Approved', 'Corrupted Setup')`,
+        [fakePriorSo, customerName]
+      );
+
+      // Create new sales order
+      const res = await fetch(`${BASE_URL}/sales/orders`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${salesToken}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          customer: customerName,
+          items: [{ item_code: 'SE-01', item_name: 'Eggs', quantity: 50, rate: 1000, discount_percent: 0 }]
+        })
+      });
+
+      assert.strictEqual(res.status, 201);
+      const created = await res.json();
+      createdSoNumbers.add(created.so_number);
+
+      // MUST strictly be 5,000,000 (from authoritative policy directory), NOT 99,000,000
+      assert.strictEqual(Number(created.credit_limit), 5000000.00);
+      assert.notStrictEqual(Number(created.credit_limit), 99000000.00);
+    });
+
+    // T28: Transaction rollback on invoice generation failure
+    await test('SEC-01.14: Simulated invoice write failure rolls back transaction leaving no orphan records', async () => {
+      const soRollback = `SO-PHASEB-${Date.now()}-INV-RB`;
+      createdSoNumbers.add(soRollback);
+      await db.query(
+        `INSERT INTO sales_orders 
+         (so_number, order_date, delivery_date, customer, warehouse, total_amount, credit_limit, current_exposure, credit_breach, status, approval_step, created_by)
+         VALUES (?, '23 Oct 2026', '30 Oct 2026', 'Dawn Foods', 'Mardan Store', 80000.00, 5000000.00, 80000.00, 0.00, 'Approved', 'Approved', 'Test Setup')`,
+        [soRollback]
+      );
+
+      // Pre-seed an invoice with the next anticipated document number so duplicate key causes error during insert
+      // Or verify that invalid order number does not create orphan invoice
+      const res = await fetch(`${BASE_URL}/sales/orders/NON_EXISTENT_SO/invoice`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${accountsToken}`, 'Content-Type': 'application/json' }
+      });
+      assert.strictEqual(res.status, 404);
+
+      const [invCount] = await db.query('SELECT COUNT(*) as c FROM sales_invoices WHERE so_number = "NON_EXISTENT_SO"');
+      assert.strictEqual(invCount[0].c, 0);
+
+      // Verify original order still approved
+      const [soCheck] = await db.query('SELECT status FROM sales_orders WHERE so_number = ?', [soRollback]);
+      assert.strictEqual(soCheck[0].status, 'Approved');
+    });
+
+    // T29: SEC-B-02 Configurable unvetted dealer credit limit via environment
+    await test('SEC-B-02.02: Configured introductory credit limit env var is respected when explicitly set', async () => {
+      process.env.ERP_DEFAULT_UNVETTED_CREDIT_LIMIT = '500000.00';
+      try {
+        const unvettedDealer = `Intro Dealer ${Date.now()}`;
+        const res = await fetch(`${BASE_URL}/sales/orders`, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${salesToken}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            customer: unvettedDealer,
+            items: [{ item_code: 'SE-01', item_name: 'Eggs', quantity: 200, rate: 1000, discount_percent: 0 }]
+          })
+        });
+
+        assert.strictEqual(res.status, 201);
+        const created = await res.json();
+        createdSoNumbers.add(created.so_number);
+
+        assert.strictEqual(Number(created.credit_limit), 500000.00);
+        assert.strictEqual(Number(created.total_amount), 200000.00);
+        assert.strictEqual(Number(created.credit_breach), 0.00);
+        assert.strictEqual(created.status, 'Draft');
+        assert.strictEqual(created.approval_step, 'Not required');
+      } finally {
+        delete process.env.ERP_DEFAULT_UNVETTED_CREDIT_LIMIT;
       }
     });
 

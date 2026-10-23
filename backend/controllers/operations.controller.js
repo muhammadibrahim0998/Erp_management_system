@@ -1,3 +1,4 @@
+const crypto = require('node:crypto');
 const { db } = require('../config/db');
 const auditLogger = require('../utils/auditLogger');
 const { logAudit } = auditLogger;
@@ -325,22 +326,58 @@ const getSalesOrderDetails = async (req, res) => {
   }
 };
 
-// Authoritative pre-approved corporate customer credit profiles
-const AUTHORITATIVE_CUSTOMER_PROFILES = {
-  'Swat Valley Egg Dealers': { credit_limit: 4500000.00 },
-  'Khyber Confectioners Ltd': { credit_limit: 3000000.00 },
-  'Charsadda Poultry Services': { credit_limit: 5000000.00 },
-  'Khyber Feed & Egg Traders': { credit_limit: 2500000.00 },
-  'Mardan Retail Mart': { credit_limit: 1000000.00 },
-  'Peek Freans': { credit_limit: 10000000.00 },
-  'Dawn Foods': { credit_limit: 5000000.00 },
-  'Barkat Frisian': { credit_limit: 7500000.00 },
-  'Karachi Egg Wholesalers': { credit_limit: 15000000.00 }
+// Provisional Corporate Customer Credit Directory (derived from ERP dossier specification)
+// NOTE FOR EXECUTIVE MANAGEMENT: Formal credit committee sign-off required for updates.
+const CORPORATE_CUSTOMER_PROFILES = {
+  'Swat Valley Egg Dealers': { credit_limit: 4500000.00, vetted: true },
+  'Khyber Confectioners Ltd': { credit_limit: 3000000.00, vetted: true },
+  'Charsadda Poultry Services': { credit_limit: 5000000.00, vetted: true },
+  'Khyber Feed & Egg Traders': { credit_limit: 2500000.00, vetted: true },
+  'Mardan Retail Mart': { credit_limit: 1000000.00, vetted: true },
+  'Peek Freans': { credit_limit: 10000000.00, vetted: true },
+  'Dawn Foods': { credit_limit: 5000000.00, vetted: true },
+  'Barkat Frisian': { credit_limit: 7500000.00, vetted: true },
+  'Karachi Egg Wholesalers': { credit_limit: 15000000.00, vetted: true }
 };
 
-const DEFAULT_NEW_CUSTOMER_CREDIT_LIMIT = 1000000.00; // PKR 1.0M standard policy limit for unvetted dealers
+// Fail-closed default for unvetted dealers: PKR 0.00 (Cash/Advance Only / CEO approval mandatory for any credit)
+// Configurable via process.env.ERP_DEFAULT_UNVETTED_CREDIT_LIMIT if management authorizes an introductory credit line.
+function getDefaultUnvettedCreditLimit() {
+  const envVal = process.env.ERP_DEFAULT_UNVETTED_CREDIT_LIMIT;
+  if (envVal !== undefined && !isNaN(Number(envVal))) {
+    return Math.max(0, Number(envVal));
+  }
+  return 0.00; // Fail-closed default
+}
 
-// Creates a new sales order with authoritative server-side credit validation and ACID transaction
+function resolveCustomerCreditPolicy(customerName) {
+  if (!customerName || typeof customerName !== 'string') {
+    return { credit_limit: 0.00, source: 'FAIL_CLOSED_EMPTY', isVetted: false };
+  }
+  const clean = customerName.trim();
+  const normalized = clean.toLowerCase().replace(/\s+/g, ' ');
+
+  for (const [name, profile] of Object.entries(CORPORATE_CUSTOMER_PROFILES)) {
+    if (name.toLowerCase().replace(/\s+/g, ' ') === normalized) {
+      return {
+        credit_limit: Number(profile.credit_limit),
+        source: 'CORPORATE_DIRECTORY',
+        isVetted: true,
+        canonicalName: name
+      };
+    }
+  }
+
+  const defaultLimit = getDefaultUnvettedCreditLimit();
+  return {
+    credit_limit: defaultLimit,
+    source: defaultLimit > 0 ? 'CONFIGURED_DEFAULT_ENV' : 'FAIL_CLOSED_ZERO_UNVETTED',
+    isVetted: false,
+    canonicalName: clean
+  };
+}
+
+// Creates a new sales order with authoritative server-side credit validation, per-customer locking, and ACID transaction
 const createSalesOrder = async (req, res) => {
   const {
     customer,
@@ -366,23 +403,38 @@ const createSalesOrder = async (req, res) => {
   }
 
   const cleanCustomer = customer.trim();
+  const normalizedCustomer = cleanCustomer.toLowerCase().replace(/\s+/g, ' ');
+  const lockKey = 'yaf_cust_' + crypto.createHash('sha256').update(normalizedCustomer).digest('hex').slice(0, 40);
+  const lockTimeout = Number(process.env.ERP_CREDIT_LOCK_TIMEOUT_SECONDS || 10);
+
   let connection = null;
+  let hasLock = false;
 
   try {
     connection = await db.getConnection();
+
+    // 2. Concurrency Control: Acquire scoped MySQL advisory lock for customer
+    // Fails closed if lock cannot be acquired within timeout.
+    const [lockRows] = await connection.query(
+      'SELECT GET_LOCK(?, ?) as lock_result',
+      [lockKey, lockTimeout]
+    );
+    const lockAcquired = lockRows[0]?.lock_result === 1;
+    if (!lockAcquired) {
+      return res.status(409).json({
+        error: `Unable to acquire credit validation lock for customer "${cleanCustomer}". A concurrent transaction is currently processing; please retry shortly.`
+      });
+    }
+    hasLock = true;
+
+    // Begin ACID transaction on the same dedicated connection
     await connection.beginTransaction();
 
-    // 1. Authoritative Customer Credit Limit (Priority: Database history -> Pre-approved profile -> Standard default)
-    // Client-supplied credit_limit is strictly ignored to prevent privilege/approval bypass.
-    const [custHistory] = await connection.query(
-      'SELECT credit_limit FROM sales_orders WHERE customer = ? ORDER BY id DESC LIMIT 1',
-      [cleanCustomer]
-    );
-    const credit_limit = custHistory.length > 0
-      ? Number(custHistory[0].credit_limit)
-      : (AUTHORITATIVE_CUSTOMER_PROFILES[cleanCustomer]?.credit_limit ?? DEFAULT_NEW_CUSTOMER_CREDIT_LIMIT);
+    // 3. Authoritative Customer Credit Limit (Never inferred from historical sales_orders)
+    const creditPolicy = resolveCustomerCreditPolicy(cleanCustomer);
+    const credit_limit = creditPolicy.credit_limit;
 
-    // 2. Compute Ground-Truth Current Exposure from Database without double-counting liabilities:
+    // 4. Compute Ground-Truth Current Exposure from Database without double-counting liabilities:
     // a) Unpaid commercial invoices
     const [unpaidInvoices] = await connection.query(
       `SELECT COALESCE(SUM(total_amount - paid_amount), 0) as unpaid_total 
@@ -398,7 +450,7 @@ const createSalesOrder = async (req, res) => {
        FROM sales_orders so
        LEFT JOIN sales_invoices si ON so.so_number = si.so_number
        WHERE so.customer = ?
-         AND so.status IN ('Pending approval', 'Approved')
+         AND so.status IN ('Draft', 'Pending approval', 'Approved')
          AND si.id IS NULL`,
       [cleanCustomer]
     );
@@ -406,7 +458,7 @@ const createSalesOrder = async (req, res) => {
 
     const priorExposure = unpaidInvoiceBalance + uninvoicedOrderBalance;
 
-    // 3. Compute New Order Total server-side (never trust client line item totals)
+    // 5. Compute New Order Total server-side (never trust client line item totals)
     let total_amount = 0;
     const validatedItems = [];
     if (Array.isArray(items) && items.length > 0) {
@@ -434,7 +486,7 @@ const createSalesOrder = async (req, res) => {
       return res.status(400).json({ error: 'Order total amount must be greater than zero' });
     }
 
-    // 4. Server-Side Credit Breach & Status Determination (Strictly ignores any client-supplied status or credit fields)
+    // 6. Server-Side Credit Breach & Status Determination (Strictly ignores any client-supplied status or credit fields)
     const totalExposure = priorExposure + total_amount;
     const creditBreach = totalExposure > credit_limit ? (totalExposure - credit_limit) : 0;
     const status = creditBreach > 0 ? 'Pending approval' : 'Draft';
@@ -443,12 +495,12 @@ const createSalesOrder = async (req, res) => {
     const officerName = req.user?.name || req.trustedUser?.name || 'Sales Officer';
     const created_by = `${officerName} (${userRole})`;
 
-    // 5. Concurrency-safe sequence number on same transaction connection
+    // 7. Concurrency-safe sequence number on same transaction connection
     const so_number = await getNextDocNumber('sales_order', 'SO-2026', connection);
     const order_date = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
     const del_date = delivery_date || order_date;
 
-    // 6. Insert sales order header atomically
+    // 8. Insert sales order header atomically
     await connection.query(
       `INSERT INTO sales_orders 
        (so_number, order_date, delivery_date, customer, warehouse, total_amount, credit_limit, current_exposure, credit_breach, status, approval_step, created_by)
@@ -456,7 +508,7 @@ const createSalesOrder = async (req, res) => {
       [so_number, order_date, del_date, cleanCustomer, warehouse, total_amount, credit_limit, totalExposure, creditBreach, status, approval_step, created_by]
     );
 
-    // 7. Insert line items atomically
+    // 9. Insert line items atomically
     for (const it of validatedItems) {
       await connection.query(
         `INSERT INTO sales_order_items (so_number, item_code, item_name, quantity, rate, discount_percent, total_amount)
@@ -465,7 +517,7 @@ const createSalesOrder = async (req, res) => {
       );
     }
 
-    // 8. Write audit record atomically using the transaction connection
+    // 10. Write audit record atomically using the transaction connection
     await logAudit({
       req,
       userId: authenticatedUserId,
@@ -474,7 +526,7 @@ const createSalesOrder = async (req, res) => {
       action: 'CREATE_SALES_ORDER',
       entityType: 'SALES_ORDER',
       entityId: so_number,
-      details: `Created sales order ${so_number} for "${cleanCustomer}" (PKR ${total_amount.toLocaleString()}) [Credit limit: PKR ${credit_limit.toLocaleString()}, Exposure: PKR ${totalExposure.toLocaleString()}, Breach: PKR ${creditBreach.toLocaleString()}]`,
+      details: `Created sales order ${so_number} for "${cleanCustomer}" (PKR ${total_amount.toLocaleString()}) [Credit limit: PKR ${credit_limit.toLocaleString()} (${creditPolicy.source}), Exposure: PKR ${totalExposure.toLocaleString()}, Breach: PKR ${creditBreach.toLocaleString()}]`,
       connection
     });
 
@@ -492,6 +544,13 @@ const createSalesOrder = async (req, res) => {
     }
     res.status(500).json({ error: err.message });
   } finally {
+    if (hasLock && connection) {
+      try {
+        await connection.query('SELECT RELEASE_LOCK(?)', [lockKey]);
+      } catch (relErr) {
+        console.error('Error releasing advisory lock:', relErr.message);
+      }
+    }
     if (connection) {
       connection.release();
     }
@@ -1057,5 +1116,8 @@ module.exports = {
   generatePayroll,
   getFinanceOverview,
   getPnlReport,
-  getSettingsMatrix
+  getSettingsMatrix,
+  CORPORATE_CUSTOMER_PROFILES,
+  resolveCustomerCreditPolicy,
+  getDefaultUnvettedCreditLimit
 };
