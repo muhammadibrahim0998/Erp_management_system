@@ -8,10 +8,13 @@ const { db } = require('../config/db');
  * @param {string} defaultPrefix - e.g. 'SO-2026', 'INV-2026', 'PAY-2026'
  * @returns {Promise<string>} - formatted document number e.g. 'SO-2026-0419'
  */
-async function getNextDocNumber(seqKey, defaultPrefix = 'DOC') {
-  const connection = await db.getConnection();
+async function getNextDocNumber(seqKey, defaultPrefix = 'DOC', externalConnection = null) {
+  const isInternal = !externalConnection;
+  const connection = externalConnection || await db.getConnection();
   try {
-    await connection.beginTransaction();
+    if (isInternal) {
+      await connection.beginTransaction();
+    }
 
     // Lock sequence record for update to prevent race conditions
     const [rows] = await connection.query(
@@ -37,13 +40,19 @@ async function getNextDocNumber(seqKey, defaultPrefix = 'DOC') {
       );
     }
 
-    await connection.commit();
+    if (isInternal) {
+      await connection.commit();
+    }
     return `${prefix}-${String(nextVal).padStart(4, '0')}`;
   } catch (err) {
-    await connection.rollback();
+    if (isInternal) {
+      await connection.rollback();
+    }
     throw err;
   } finally {
-    connection.release();
+    if (isInternal) {
+      connection.release();
+    }
   }
 }
 

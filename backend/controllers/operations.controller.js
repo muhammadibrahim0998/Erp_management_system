@@ -282,6 +282,15 @@ const PAYMENT_ROLES = [
   'ERP Admin'
 ];
 
+const SALES_CREATE_ROLES = [
+  'Sales Officer',
+  'Sales Manager',
+  'Director Operations',
+  'General Manager',
+  'Chairman & CEO',
+  'ERP Admin'
+];
+
 // Returns ALL sales orders
 const getSalesOrders = async (req, res) => {
   try {
@@ -316,78 +325,176 @@ const getSalesOrderDetails = async (req, res) => {
   }
 };
 
-// Creates a new sales order with document number from sequence (no Math.random)
-const createSalesOrder = async (req, res) => {
-  try {
-    const {
-      customer,
-      delivery_date,
-      warehouse = 'Mardan sales point & store',
-      items = [],
-      credit_limit = 4500000.00,
-      current_exposure = 0.00
-    } = req.body;
+// Authoritative pre-approved corporate customer credit profiles
+const AUTHORITATIVE_CUSTOMER_PROFILES = {
+  'Swat Valley Egg Dealers': { credit_limit: 4500000.00 },
+  'Khyber Confectioners Ltd': { credit_limit: 3000000.00 },
+  'Charsadda Poultry Services': { credit_limit: 5000000.00 },
+  'Khyber Feed & Egg Traders': { credit_limit: 2500000.00 },
+  'Mardan Retail Mart': { credit_limit: 1000000.00 },
+  'Peek Freans': { credit_limit: 10000000.00 },
+  'Dawn Foods': { credit_limit: 5000000.00 },
+  'Barkat Frisian': { credit_limit: 7500000.00 },
+  'Karachi Egg Wholesalers': { credit_limit: 15000000.00 }
+};
 
-    if (!customer) {
-      return res.status(400).json({ error: 'Customer name is required' });
+const DEFAULT_NEW_CUSTOMER_CREDIT_LIMIT = 1000000.00; // PKR 1.0M standard policy limit for unvetted dealers
+
+// Creates a new sales order with authoritative server-side credit validation and ACID transaction
+const createSalesOrder = async (req, res) => {
+  const {
+    customer,
+    delivery_date,
+    warehouse = 'Mardan sales point & store',
+    items = []
+  } = req.body;
+
+  if (!customer || typeof customer !== 'string' || !customer.trim()) {
+    return res.status(400).json({ error: 'Customer name is required' });
+  }
+
+  // 1. Fail-closed Role & Identity verification
+  const authenticatedUserId = req.user?.id;
+  if (!authenticatedUserId) {
+    return res.status(401).json({ error: 'Authentication required. Please sign in.' });
+  }
+  const userRole = (typeof req.user?.role === 'string') ? req.user.role.trim() : '';
+  if (!userRole || !SALES_CREATE_ROLES.includes(userRole)) {
+    return res.status(403).json({
+      error: `Access Denied: Role "${userRole || 'Unassigned'}" is not authorized to create sales orders. Allowed roles: ${SALES_CREATE_ROLES.join(', ')}.`
+    });
+  }
+
+  const cleanCustomer = customer.trim();
+  let connection = null;
+
+  try {
+    connection = await db.getConnection();
+    await connection.beginTransaction();
+
+    // 1. Authoritative Customer Credit Limit (Priority: Database history -> Pre-approved profile -> Standard default)
+    // Client-supplied credit_limit is strictly ignored to prevent privilege/approval bypass.
+    const [custHistory] = await connection.query(
+      'SELECT credit_limit FROM sales_orders WHERE customer = ? ORDER BY id DESC LIMIT 1',
+      [cleanCustomer]
+    );
+    const credit_limit = custHistory.length > 0
+      ? Number(custHistory[0].credit_limit)
+      : (AUTHORITATIVE_CUSTOMER_PROFILES[cleanCustomer]?.credit_limit ?? DEFAULT_NEW_CUSTOMER_CREDIT_LIMIT);
+
+    // 2. Compute Ground-Truth Current Exposure from Database without double-counting liabilities:
+    // a) Unpaid commercial invoices
+    const [unpaidInvoices] = await connection.query(
+      `SELECT COALESCE(SUM(total_amount - paid_amount), 0) as unpaid_total 
+       FROM sales_invoices 
+       WHERE customer = ? AND status != 'Paid'`,
+      [cleanCustomer]
+    );
+    const unpaidInvoiceBalance = Number(unpaidInvoices[0]?.unpaid_total || 0);
+
+    // b) Approved/Pending orders that have NOT yet been converted into invoices
+    const [uninvoicedOrders] = await connection.query(
+      `SELECT COALESCE(SUM(so.total_amount), 0) as uninvoiced_total
+       FROM sales_orders so
+       LEFT JOIN sales_invoices si ON so.so_number = si.so_number
+       WHERE so.customer = ?
+         AND so.status IN ('Pending approval', 'Approved')
+         AND si.id IS NULL`,
+      [cleanCustomer]
+    );
+    const uninvoicedOrderBalance = Number(uninvoicedOrders[0]?.uninvoiced_total || 0);
+
+    const priorExposure = unpaidInvoiceBalance + uninvoicedOrderBalance;
+
+    // 3. Compute New Order Total server-side (never trust client line item totals)
+    let total_amount = 0;
+    const validatedItems = [];
+    if (Array.isArray(items) && items.length > 0) {
+      for (const it of items) {
+        const qty = Math.max(0, Number(it.quantity) || 0);
+        const rate = Math.max(0, Number(it.rate) || 0);
+        const disc = Math.min(100, Math.max(0, Number(it.discount_percent) || 0));
+        const lineTotal = Math.round(qty * rate * (1 - disc / 100) * 100) / 100;
+        total_amount += lineTotal;
+        validatedItems.push({
+          item_code: it.item_code || 'SE-01-01-02',
+          item_name: it.item_name || 'Liquid/Shell Eggs',
+          quantity: qty,
+          rate,
+          discount_percent: disc,
+          total_amount: lineTotal
+        });
+      }
+    } else {
+      total_amount = Math.max(0, Number(req.body.total_amount) || 0);
     }
 
-    const so_number = await getNextDocNumber('sales_order', 'SO-2026');
+    if (total_amount <= 0) {
+      await connection.rollback();
+      return res.status(400).json({ error: 'Order total amount must be greater than zero' });
+    }
+
+    // 4. Server-Side Credit Breach & Status Determination (Strictly ignores any client-supplied status or credit fields)
+    const totalExposure = priorExposure + total_amount;
+    const creditBreach = totalExposure > credit_limit ? (totalExposure - credit_limit) : 0;
+    const status = creditBreach > 0 ? 'Pending approval' : 'Draft';
+    const approval_step = creditBreach > 0 ? 'CEO Waiting' : 'Not required';
+
+    const officerName = req.user?.name || req.trustedUser?.name || 'Sales Officer';
+    const created_by = `${officerName} (${userRole})`;
+
+    // 5. Concurrency-safe sequence number on same transaction connection
+    const so_number = await getNextDocNumber('sales_order', 'SO-2026', connection);
     const order_date = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
     const del_date = delivery_date || order_date;
 
-    let total_amount = Number(req.body.total_amount) || 0;
-    if (items && items.length > 0) {
-      total_amount = items.reduce((sum, it) => {
-        const qty = Number(it.quantity) || 1;
-        const rate = Number(it.rate) || 0;
-        const disc = Number(it.discount_percent) || 0;
-        const lineTotal = Number(it.total_amount) || (qty * rate * (1 - disc / 100));
-        return sum + lineTotal;
-      }, 0);
-    } else {
-      total_amount = total_amount || 1500000.00;
-    }
-
-    const totalExposure = Number(current_exposure) + total_amount;
-    const creditBreach = totalExposure > Number(credit_limit) ? (totalExposure - Number(credit_limit)) : 0;
-    const status = creditBreach > 0 ? 'Pending approval' : 'Draft';
-    const approval_step = creditBreach > 0 ? 'CEO Waiting' : 'Not required';
-    const created_by = req.user ? `${req.user.name} (${req.user.role})` : 'Sales Officer (Bilal Yousafzai)';
-
-    await db.query(
+    // 6. Insert sales order header atomically
+    await connection.query(
       `INSERT INTO sales_orders 
        (so_number, order_date, delivery_date, customer, warehouse, total_amount, credit_limit, current_exposure, credit_breach, status, approval_step, created_by)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [so_number, order_date, del_date, customer, warehouse, total_amount, credit_limit, totalExposure, creditBreach, status, approval_step, created_by]
+      [so_number, order_date, del_date, cleanCustomer, warehouse, total_amount, credit_limit, totalExposure, creditBreach, status, approval_step, created_by]
     );
 
-    if (items && items.length > 0) {
-      for (const it of items) {
-        const qty = Number(it.quantity) || 1;
-        const rate = Number(it.rate) || 0;
-        const disc = Number(it.discount_percent) || 0;
-        const lineTotal = Number(it.total_amount) || (qty * rate * (1 - disc / 100));
-        await db.query(
-          `INSERT INTO sales_order_items (so_number, item_code, item_name, quantity, rate, discount_percent, total_amount)
-           VALUES (?, ?, ?, ?, ?, ?, ?)`,
-          [so_number, it.item_code || 'SE-01-01-02', it.item_name || 'Liquid/Shell Eggs', qty, rate, disc, lineTotal]
-        );
-      }
+    // 7. Insert line items atomically
+    for (const it of validatedItems) {
+      await connection.query(
+        `INSERT INTO sales_order_items (so_number, item_code, item_name, quantity, rate, discount_percent, total_amount)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [so_number, it.item_code, it.item_name, it.quantity, it.rate, it.discount_percent, it.total_amount]
+      );
     }
 
+    // 8. Write audit record atomically using the transaction connection
     await logAudit({
       req,
+      userId: authenticatedUserId,
+      userName: officerName,
+      role: userRole,
       action: 'CREATE_SALES_ORDER',
       entityType: 'SALES_ORDER',
       entityId: so_number,
-      details: `Created sales order ${so_number} for "${customer}" (PKR ${total_amount.toLocaleString()})`
+      details: `Created sales order ${so_number} for "${cleanCustomer}" (PKR ${total_amount.toLocaleString()}) [Credit limit: PKR ${credit_limit.toLocaleString()}, Exposure: PKR ${totalExposure.toLocaleString()}, Breach: PKR ${creditBreach.toLocaleString()}]`,
+      connection
     });
 
-    const [created] = await db.query('SELECT * FROM sales_orders WHERE so_number = ?', [so_number]);
+    await connection.commit();
+
+    const [created] = await connection.query('SELECT * FROM sales_orders WHERE so_number = ?', [so_number]);
     res.status(201).json(created[0]);
   } catch (err) {
+    if (connection) {
+      try {
+        await connection.rollback();
+      } catch (rbErr) {
+        console.error('Rollback error on sales order creation:', rbErr.message);
+      }
+    }
     res.status(500).json({ error: err.message });
+  } finally {
+    if (connection) {
+      connection.release();
+    }
   }
 };
 
@@ -526,64 +633,82 @@ const approveSalesOrder = async (req, res) => {
   }
 };
 
-// Stage 3: Generate Commercial Invoice (enforces status check + sequence)
+// Stage 3: Generate Commercial Invoice (ACID transaction + row locking + sequence safety)
 const invoiceSalesOrder = async (req, res) => {
   const so_number = req.params.so_number || req.body.so_number;
   if (!so_number) {
     return res.status(400).json({ error: 'so_number is required' });
   }
 
-  try {
-    // 1. Fail-closed Role & Identity verification
-    const authenticatedUserId = req.user?.id;
-    if (!authenticatedUserId) {
-      return res.status(401).json({ error: 'Authentication required. Please sign in.' });
-    }
-    const userRole = (typeof req.user?.role === 'string') ? req.user.role.trim() : '';
-    if (!userRole || !INVOICE_ROLES.includes(userRole)) {
-      return res.status(403).json({
-        error: `Access Denied: Role "${userRole || 'Unassigned'}" is not authorized to generate invoices. Allowed roles: ${INVOICE_ROLES.join(', ')}.`
-      });
-    }
+  // 1. Fail-closed Role & Identity verification
+  const authenticatedUserId = req.user?.id;
+  if (!authenticatedUserId) {
+    return res.status(401).json({ error: 'Authentication required. Please sign in.' });
+  }
+  const userRole = (typeof req.user?.role === 'string') ? req.user.role.trim() : '';
+  if (!userRole || !INVOICE_ROLES.includes(userRole)) {
+    return res.status(403).json({
+      error: `Access Denied: Role "${userRole || 'Unassigned'}" is not authorized to generate invoices. Allowed roles: ${INVOICE_ROLES.join(', ')}.`
+    });
+  }
 
-    // 2. Fetch order
-    const [orders] = await db.query('SELECT * FROM sales_orders WHERE so_number = ?', [so_number]);
+  let connection = null;
+  try {
+    connection = await db.getConnection();
+    await connection.beginTransaction();
+
+    // 2. Fetch and lock sales order
+    const [orders] = await connection.query(
+      'SELECT * FROM sales_orders WHERE so_number = ? FOR UPDATE',
+      [so_number]
+    );
     if (orders.length === 0) {
+      await connection.rollback();
       return res.status(404).json({ error: `Sales order ${so_number} not found` });
     }
     const order = orders[0];
 
-    // 3. Status order check: MUST be 'Approved'
+    // 3. Status check: MUST be 'Approved'
     if (order.status !== 'Approved') {
+      await connection.rollback();
       return res.status(400).json({
         error: `Cannot generate invoice: sales order must be in "Approved" status (current status: "${order.status}"). Follow allowed order-to-cash flow: Order -> Approval -> Invoice -> Payment.`
       });
     }
 
-    // Check if invoice already exists
-    const [existing] = await db.query('SELECT * FROM sales_invoices WHERE so_number = ?', [so_number]);
+    // 4. Check if invoice already exists (locked)
+    const [existing] = await connection.query(
+      'SELECT * FROM sales_invoices WHERE so_number = ? FOR UPDATE',
+      [so_number]
+    );
     if (existing.length > 0) {
+      await connection.rollback();
       return res.status(400).json({
         error: `Invoice already exists for sales order ${so_number} (${existing[0].invoice_no})`
       });
     }
 
-    // 4. Generate invoice number from database sequence (no Math.random)
-    const invoice_no = await getNextDocNumber('sales_invoice', 'INV-2026');
+    // 5. Generate invoice number on same transaction connection (no Math.random, no separate connection)
+    const invoice_no = await getNextDocNumber('sales_invoice', 'INV-2026', connection);
     const invoice_date = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
     const officerName = req.user?.name || req.trustedUser?.name || 'Accounts Officer';
     const created_by = `${officerName} (${userRole})`;
 
-    await db.query(
+    // 6. Insert invoice atomically
+    await connection.query(
       `INSERT INTO sales_invoices 
        (invoice_no, so_number, customer, invoice_date, due_date, subtotal, tax_amount, total_amount, paid_amount, status, created_by)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0.00, 'Unpaid', ?)`,
       [invoice_no, so_number, order.customer, invoice_date, order.delivery_date, order.total_amount, 0.00, order.total_amount, created_by]
     );
 
-    // 5. Update sales order status to Invoiced
-    await db.query('UPDATE sales_orders SET status = "Invoiced" WHERE so_number = ?', [so_number]);
+    // 7. Update sales order status to 'Invoiced' atomically
+    await connection.query(
+      'UPDATE sales_orders SET status = "Invoiced" WHERE so_number = ?',
+      [so_number]
+    );
 
+    // 8. Write audit record atomically using the transaction connection
     await logAudit({
       req,
       userId: authenticatedUserId,
@@ -592,102 +717,194 @@ const invoiceSalesOrder = async (req, res) => {
       action: 'CREATE_SALES_INVOICE',
       entityType: 'SALES_INVOICE',
       entityId: invoice_no,
-      details: `${userRole} (${officerName}) generated invoice ${invoice_no} for order ${so_number} (PKR ${Number(order.total_amount).toLocaleString()})`
+      details: `${userRole} (${officerName}) generated invoice ${invoice_no} for order ${so_number} (PKR ${Number(order.total_amount).toLocaleString()})`,
+      connection
     });
 
-    const [invRows] = await db.query('SELECT * FROM sales_invoices WHERE invoice_no = ?', [invoice_no]);
+    await connection.commit();
+
+    const [invRows] = await connection.query('SELECT * FROM sales_invoices WHERE invoice_no = ?', [invoice_no]);
     res.status(201).json({
       success: true,
       message: `Commercial invoice ${invoice_no} generated for sales order ${so_number}`,
       invoice: invRows[0]
     });
   } catch (err) {
+    if (connection) {
+      try {
+        await connection.rollback();
+      } catch (rbErr) {
+        console.error('Rollback error on invoice generation:', rbErr.message);
+      }
+    }
+    // Handle concurrent duplicate key race condition gracefully
+    if (err.code === 'ER_DUP_ENTRY' || err.message?.includes('Duplicate entry')) {
+      return res.status(409).json({
+        error: `Conflict: Invoice already exists or is currently being created for sales order ${so_number}.`
+      });
+    }
     res.status(500).json({ error: err.message });
+  } finally {
+    if (connection) {
+      connection.release();
+    }
   }
 };
 
-// Stage 4: Record Payment (enforces status check + sequence)
+// Stage 4: Record Payment (ACID transaction + consistent row locking + partial payment support)
 const recordSalesPayment = async (req, res) => {
   const so_number = req.params.so_number || req.body.so_number;
   if (!so_number) {
     return res.status(400).json({ error: 'so_number is required' });
   }
 
-  try {
-    // 1. Fail-closed Role & Identity verification
-    const authenticatedUserId = req.user?.id;
-    if (!authenticatedUserId) {
-      return res.status(401).json({ error: 'Authentication required. Please sign in.' });
-    }
-    const userRole = (typeof req.user?.role === 'string') ? req.user.role.trim() : '';
-    if (!userRole || !PAYMENT_ROLES.includes(userRole)) {
-      return res.status(403).json({
-        error: `Access Denied: Role "${userRole || 'Unassigned'}" is not authorized to record payments. Allowed roles: ${PAYMENT_ROLES.join(', ')}.`
-      });
-    }
+  // 1. Fail-closed Role & Identity verification
+  const authenticatedUserId = req.user?.id;
+  if (!authenticatedUserId) {
+    return res.status(401).json({ error: 'Authentication required. Please sign in.' });
+  }
+  const userRole = (typeof req.user?.role === 'string') ? req.user.role.trim() : '';
+  if (!userRole || !PAYMENT_ROLES.includes(userRole)) {
+    return res.status(403).json({
+      error: `Access Denied: Role "${userRole || 'Unassigned'}" is not authorized to record payments. Allowed roles: ${PAYMENT_ROLES.join(', ')}.`
+    });
+  }
 
-    // 2. Fetch order
-    const [orders] = await db.query('SELECT * FROM sales_orders WHERE so_number = ?', [so_number]);
+  let connection = null;
+  try {
+    connection = await db.getConnection();
+    await connection.beginTransaction();
+
+    // 2. Consistent lock hierarchy: sales_orders first, then sales_invoices
+    const [orders] = await connection.query(
+      'SELECT * FROM sales_orders WHERE so_number = ? FOR UPDATE',
+      [so_number]
+    );
     if (orders.length === 0) {
+      await connection.rollback();
       return res.status(404).json({ error: `Sales order ${so_number} not found` });
     }
     const order = orders[0];
 
-    // 3. Status order check: MUST be 'Invoiced'
-    if (order.status !== 'Invoiced') {
+    // Status check: must be Invoiced or already partially paid
+    if (order.status !== 'Invoiced' && order.status !== 'Partially Paid') {
+      await connection.rollback();
       return res.status(400).json({
-        error: `Cannot record payment: order must be in "Invoiced" status (current status: "${order.status}"). Follow allowed order-to-cash flow: Order -> Approval -> Invoice -> Payment.`
+        error: `Cannot record payment: order must be in "Invoiced" or "Partially Paid" status (current status: "${order.status}"). Follow allowed order-to-cash flow: Order -> Approval -> Invoice -> Payment.`
       });
     }
 
-    // Find the associated invoice
-    const [invoices] = await db.query('SELECT * FROM sales_invoices WHERE so_number = ?', [so_number]);
+    // 3. Lock associated invoice
+    const [invoices] = await connection.query(
+      'SELECT * FROM sales_invoices WHERE so_number = ? FOR UPDATE',
+      [so_number]
+    );
+    if (invoices.length === 0) {
+      await connection.rollback();
+      return res.status(404).json({ error: `No commercial invoice found for sales order ${so_number}` });
+    }
     const invoice = invoices[0];
-    const invoice_no = invoice ? invoice.invoice_no : 'DIRECT';
 
-    // 4. Generate payment number from database sequence (no Math.random)
-    const payment_no = await getNextDocNumber('sales_payment', 'PAY-2026');
+    // 4. Authoritative calculation of payments & remaining balance
+    const [paymentAgg] = await connection.query(
+      'SELECT COALESCE(SUM(amount), 0) as total_paid FROM sales_payments WHERE invoice_no = ? FOR UPDATE',
+      [invoice.invoice_no]
+    );
+    const totalPaidSoFar = Number(paymentAgg[0].total_paid);
+    const invoiceTotal = Number(invoice.total_amount);
+    const remainingBalance = Math.max(0, invoiceTotal - totalPaidSoFar);
+
+    if (remainingBalance <= 0 || invoice.status === 'Paid') {
+      await connection.rollback();
+      return res.status(400).json({
+        error: `Cannot record payment: invoice ${invoice.invoice_no} is already fully paid.`
+      });
+    }
+
+    // 5. Validate payment amount
+    const rawAmount = req.body.amount;
+    const paymentAmount = rawAmount !== undefined ? Number(rawAmount) : remainingBalance;
+    if (isNaN(paymentAmount) || paymentAmount <= 0) {
+      await connection.rollback();
+      return res.status(400).json({ error: 'Valid positive payment amount is required.' });
+    }
+    if (paymentAmount > remainingBalance) {
+      await connection.rollback();
+      return res.status(400).json({
+        error: `Payment amount (${paymentAmount.toLocaleString()}) exceeds outstanding invoice balance (${remainingBalance.toLocaleString()}).`
+      });
+    }
+
+    // 6. Generate payment document sequence on same transaction connection
+    const payment_no = await getNextDocNumber('sales_payment', 'PAY-2026', connection);
     const payment_date = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
-    const amount = Number(req.body.amount) || Number(order.total_amount);
     const payment_method = req.body.payment_method || 'Bank Transfer';
     const reference_no = req.body.reference_no || `TRX-${Date.now().toString().slice(-6)}`;
     const officerName = req.user?.name || req.trustedUser?.name || 'Accounts Officer';
     const received_by = `${officerName} (${userRole})`;
 
-    await db.query(
+    // 7. Insert payment record atomically
+    await connection.query(
       `INSERT INTO sales_payments 
        (payment_no, invoice_no, so_number, customer, payment_date, amount, payment_method, reference_no, received_by)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [payment_no, invoice_no, so_number, order.customer, payment_date, amount, payment_method, reference_no, received_by]
+      [payment_no, invoice.invoice_no, so_number, order.customer, payment_date, paymentAmount, payment_method, reference_no, received_by]
     );
 
-    // 5. Update invoice to Paid
-    if (invoice) {
-      await db.query(
-        'UPDATE sales_invoices SET paid_amount = total_amount, status = "Paid" WHERE invoice_no = ?',
-        [invoice_no]
-      );
-    }
+    // 8. Update invoice paid amount and status
+    const newTotalPaid = totalPaidSoFar + paymentAmount;
+    const isFullyPaid = newTotalPaid >= invoiceTotal;
+    const invoiceStatus = isFullyPaid ? 'Paid' : 'Partially Paid';
+    const orderStatus = isFullyPaid ? 'Paid' : 'Partially Paid';
 
-    // 6. Update sales order status to Paid
-    await db.query('UPDATE sales_orders SET status = "Paid" WHERE so_number = ?', [so_number]);
+    await connection.query(
+      'UPDATE sales_invoices SET paid_amount = ?, status = ? WHERE invoice_no = ?',
+      [newTotalPaid, invoiceStatus, invoice.invoice_no]
+    );
 
+    // 9. Update sales order status
+    await connection.query(
+      'UPDATE sales_orders SET status = ? WHERE so_number = ?',
+      [orderStatus, so_number]
+    );
+
+    // 10. Audit log atomically
     await logAudit({
       req,
+      userId: authenticatedUserId,
+      userName: officerName,
+      role: userRole,
       action: 'RECORD_SALES_PAYMENT',
       entityType: 'SALES_PAYMENT',
       entityId: payment_no,
-      details: `Recorded payment ${payment_no} of PKR ${amount.toLocaleString()} for order ${so_number}`
+      details: `Recorded ${isFullyPaid ? 'full' : 'partial'} payment ${payment_no} of PKR ${paymentAmount.toLocaleString()} for order ${so_number} (Outstanding balance: PKR ${(remainingBalance - paymentAmount).toLocaleString()})`,
+      connection
     });
 
-    const [payRows] = await db.query('SELECT * FROM sales_payments WHERE payment_no = ?', [payment_no]);
+    await connection.commit();
+
+    const [payRows] = await connection.query('SELECT * FROM sales_payments WHERE payment_no = ?', [payment_no]);
     res.status(201).json({
       success: true,
       message: `Payment ${payment_no} recorded successfully for sales order ${so_number}`,
-      payment: payRows[0]
+      payment: payRows[0],
+      outstanding_balance: remainingBalance - paymentAmount,
+      invoice_status: invoiceStatus,
+      order_status: orderStatus
     });
   } catch (err) {
+    if (connection) {
+      try {
+        await connection.rollback();
+      } catch (rbErr) {
+        console.error('Rollback error on payment recording:', rbErr.message);
+      }
+    }
     res.status(500).json({ error: err.message });
+  } finally {
+    if (connection) {
+      connection.release();
+    }
   }
 };
 

@@ -165,7 +165,7 @@ async function initSchema(connection = db) {
       CREATE TABLE IF NOT EXISTS sales_invoices (
         id INT AUTO_INCREMENT PRIMARY KEY,
         invoice_no VARCHAR(50) NOT NULL UNIQUE,
-        so_number VARCHAR(50) NOT NULL,
+        so_number VARCHAR(50) NOT NULL UNIQUE,
         customer VARCHAR(255) NOT NULL,
         invoice_date VARCHAR(50) NOT NULL,
         due_date VARCHAR(50),
@@ -179,6 +179,36 @@ async function initSchema(connection = db) {
         INDEX idx_inv_so (so_number)
       ) ENGINE=InnoDB;
     `);
+
+    // Ensure UNIQUE constraint on sales_invoices(so_number) for existing tables idempotently
+    try {
+      const [invColIndexes] = await conn.query(`
+        SELECT INDEX_NAME, NON_UNIQUE 
+        FROM information_schema.STATISTICS 
+        WHERE TABLE_SCHEMA = DATABASE() 
+          AND TABLE_NAME = 'sales_invoices' 
+          AND COLUMN_NAME = 'so_number'
+      `);
+      const hasUniqueInvoiceSo = Array.isArray(invColIndexes) && invColIndexes.some(r => r.NON_UNIQUE === 0);
+      if (!hasUniqueInvoiceSo) {
+        const [dups] = await conn.query(`
+          SELECT so_number, COUNT(*) as cnt 
+          FROM sales_invoices 
+          GROUP BY so_number 
+          HAVING cnt > 1
+        `);
+        if (dups.length > 0) {
+          throw new Error(
+            `Cannot apply UNIQUE constraint on sales_invoices(so_number): found ${dups.length} duplicate so_number records.`
+          );
+        }
+        await conn.query('ALTER TABLE sales_invoices ADD UNIQUE KEY uq_sales_invoices_so (so_number)');
+      }
+    } catch (migErr) {
+      if (!migErr.message.includes('Duplicate key name') && !migErr.message.includes('already exists')) {
+        console.warn('⚠️ Note on sales_invoices uniqueness verification:', migErr.message);
+      }
+    }
 
     // 7d. Sales Payments (Order to Cash: Stage 4)
     await conn.query(`
