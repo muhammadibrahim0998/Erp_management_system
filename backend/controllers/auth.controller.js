@@ -36,6 +36,14 @@ const signup = async (req, res) => {
       return res.status(400).json({ error: 'Password must be at least 6 characters long' });
     }
 
+    // Finding A: Public signup privilege escalation prevention.
+    // Unauthenticated self-registration must never accept or assign privileged roles.
+    if (role && role !== 'Staff') {
+      return res.status(403).json({
+        error: 'Privileged or custom roles cannot be self-assigned during public registration. Contact an ERP Administrator.'
+      });
+    }
+
     const cleanEmail = email.trim().toLowerCase();
     const [existing] = await db.query('SELECT id FROM users WHERE email = ?', [cleanEmail]);
     if (existing.length > 0) {
@@ -45,8 +53,9 @@ const signup = async (req, res) => {
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
     const avatar = name.trim().slice(0, 2).toUpperCase() || 'US';
-    const userRole = role || 'Staff';
-    const userDept = department || 'General';
+    // Always assign safe least-privilege default role
+    const userRole = 'Staff';
+    const userDept = (department && department !== 'Executive' && department !== 'IT') ? department : 'General';
 
     const [result] = await db.query(
       'INSERT INTO users (name, email, password, role, department, avatar, status) VALUES (?, ?, ?, ?, ?, ?, ?)',

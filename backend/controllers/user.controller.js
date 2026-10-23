@@ -2,6 +2,30 @@ const bcrypt = require('bcryptjs');
 const { db } = require('../config/db');
 const { logAudit } = require('../utils/auditLogger');
 
+const VALID_ERP_ROLES = [
+  'Chairman & CEO',
+  'General Manager',
+  'Director Operations',
+  'Director Finance',
+  'Plant Manager',
+  'Production Manager',
+  'Breaking Supervisor',
+  'Gate Officer',
+  'QC Cell',
+  'Raw Material Store',
+  'Finish Store & Delivery',
+  'Procurement',
+  'Sales Manager',
+  'Sales Officer',
+  'Head of Marketing',
+  'Social Media & Content',
+  'Accounts Officer',
+  'HR Manager',
+  'Poultry Farms',
+  'ERP Admin',
+  'Staff'
+];
+
 /**
  * Fetch all users (Passwords strictly excluded)
  */
@@ -24,6 +48,9 @@ const createUser = async (req, res) => {
     const { name, email, password, role, department } = req.body;
     if (!name || !email || !password || !role || !department) {
       return res.status(400).json({ error: 'Name, email, password, role, and department are required' });
+    }
+    if (!VALID_ERP_ROLES.includes(role)) {
+      return res.status(400).json({ error: `Invalid role "${role}". Must be an authorized ERP role.` });
     }
 
     const cleanEmail = email.trim().toLowerCase();
@@ -70,6 +97,10 @@ const updateUser = async (req, res) => {
     const [existing] = await db.query('SELECT id, name FROM users WHERE id = ?', [id]);
     if (existing.length === 0) {
       return res.status(404).json({ error: 'User not found' });
+    }
+
+    if (role && !VALID_ERP_ROLES.includes(role)) {
+      return res.status(400).json({ error: `Invalid role "${role}". Must be an authorized ERP role.` });
     }
 
     const avatar = name ? name.trim().slice(0, 2).toUpperCase() : undefined;
