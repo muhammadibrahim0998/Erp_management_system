@@ -331,6 +331,61 @@ async function runPreStagingHardeningTestSuite() {
     recordPass('productionResponseSanitizer does not touch 4xx responses in production');
   }
 
+  // Test 14: productionResponseSanitizer strips extra fields (sql, detail, stack) completely
+  {
+    const prevNodeEnv = process.env.NODE_ENV;
+    process.env.NODE_ENV = 'production';
+
+    let capturedBody = null;
+    const mockRes = {
+      statusCode: 500,
+      headersSent: false,
+      json(body) {
+        capturedBody = body;
+        return this;
+      }
+    };
+
+    productionResponseSanitizer({}, mockRes, () => {});
+
+    // Controller calls res.json with internal error message and sensitive SQL/schema/stack fields
+    mockRes.json({
+      error: 'Query execution failed',
+      sql: 'SELECT password_hash FROM users WHERE id = 1',
+      detail: 'Table Erp_management.users corrupted',
+      stack: 'Error: Query execution failed\n    at MySQLConnection.query (/app/db.js:42:15)'
+    });
+    process.env.NODE_ENV = prevNodeEnv;
+
+    assert.deepStrictEqual(capturedBody, { error: 'Internal Server Error' });
+    assert.strictEqual(capturedBody.sql, undefined);
+    assert.strictEqual(capturedBody.detail, undefined);
+    assert.strictEqual(capturedBody.stack, undefined);
+    recordPass('productionResponseSanitizer strips extra fields (sql, detail, stack) from production 500 responses');
+  }
+
+  // Test 15: productionResponseSanitizer safely ignores response if headers are already sent
+  {
+    const prevNodeEnv = process.env.NODE_ENV;
+    process.env.NODE_ENV = 'production';
+
+    let sendCalled = false;
+    const mockRes = {
+      statusCode: 500,
+      headersSent: true,
+      json() {
+        sendCalled = true;
+      }
+    };
+
+    productionResponseSanitizer({}, mockRes, () => {});
+    mockRes.json({ error: 'Should be ignored' });
+    process.env.NODE_ENV = prevNodeEnv;
+
+    assert.strictEqual(sendCalled, false);
+    recordPass('productionResponseSanitizer safely ignores response if headers are already sent');
+  }
+
   // --------------------------------------------------------------------------
   // SECTION 3: REVERSE PROXY INTEGRATION & HSTS
   // --------------------------------------------------------------------------

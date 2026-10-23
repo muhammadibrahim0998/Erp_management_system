@@ -46,11 +46,11 @@ const productionResponseSanitizer = (req, res, next) => {
   if (isProduction) {
     const originalJson = res.json.bind(res);
     res.json = function (body) {
-      if (res.statusCode >= 500 && body && typeof body === 'object' && body.error) {
-        return originalJson({
-          ...body,
-          error: 'Internal Server Error'
-        });
+      if (res.headersSent) {
+        return;
+      }
+      if (res.statusCode >= 500) {
+        return originalJson({ error: 'Internal Server Error' });
       }
       return originalJson(body);
     };
