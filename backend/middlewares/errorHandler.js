@@ -16,6 +16,10 @@ const notFoundHandler = (req, res, next) => {
 
 // Global Express Error Middleware
 const errorHandler = (err, req, res, next) => {
+  if (res.headersSent) {
+    return next(err);
+  }
+
   const statusCode = err.statusCode || (res.statusCode >= 400 ? res.statusCode : 500);
 
   if (statusCode >= 500) {
@@ -24,14 +28,39 @@ const errorHandler = (err, req, res, next) => {
     console.warn(`⚠️ Client Error [${statusCode}]:`, err.message);
   }
 
+  const isProduction = process.env.NODE_ENV === 'production';
+  const clientMessage = (statusCode >= 500 && isProduction)
+    ? 'Internal Server Error'
+    : (err.message || 'Internal Server Error');
+
   res.status(statusCode).json({
-    error: err.message || 'Internal Server Error',
+    error: clientMessage,
     ...(process.env.NODE_ENV === 'development' ? { stack: err.stack } : {})
   });
+};
+
+// Production response sanitizer to ensure direct 5xx json responses in controllers
+// do not leak internal database details or error stacks to external clients
+const productionResponseSanitizer = (req, res, next) => {
+  const isProduction = process.env.NODE_ENV === 'production';
+  if (isProduction) {
+    const originalJson = res.json.bind(res);
+    res.json = function (body) {
+      if (res.statusCode >= 500 && body && typeof body === 'object' && body.error) {
+        return originalJson({
+          ...body,
+          error: 'Internal Server Error'
+        });
+      }
+      return originalJson(body);
+    };
+  }
+  next();
 };
 
 module.exports = {
   asyncHandler,
   notFoundHandler,
-  errorHandler
+  errorHandler,
+  productionResponseSanitizer
 };

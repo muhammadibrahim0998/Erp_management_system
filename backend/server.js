@@ -8,7 +8,7 @@ const { testConnection } = require('./config/db');
 const { initDatabase } = require('./initDb');
 const { optionalUserExtractor } = require('./middlewares/auth');
 const { apiLimiter } = require('./middlewares/rateLimiter');
-const { notFoundHandler, errorHandler } = require('./middlewares/errorHandler');
+const { notFoundHandler, errorHandler, productionResponseSanitizer } = require('./middlewares/errorHandler');
 const apiRoutes = require('./routes');
 
 // Helper to validate a single origin string
@@ -73,6 +73,56 @@ function resolveAllowedOrigins(env = process.env) {
   ];
 }
 
+// Helper to safely resolve reverse-proxy trust configuration
+function resolveTrustProxy(env = process.env) {
+  const isProduction = env.NODE_ENV === 'production';
+  const raw = env.TRUST_PROXY;
+
+  // Default: no proxy trust (secure default)
+  if (raw === undefined || raw === null || raw === '') {
+    return false;
+  }
+
+  const trimmed = typeof raw === 'string' ? raw.trim() : String(raw).trim();
+
+  if (trimmed === 'false' || trimmed === '0') {
+    return false;
+  }
+
+  if (trimmed === 'true') {
+    if (isProduction) {
+      throw new Error(
+        'TRUST_PROXY cannot be set to "true" in production because trusting arbitrary reverse proxies allows rate-limiting bypass and IP spoofing. Specify "loopback", explicit subnets/CIDRs, or hop count.'
+      );
+    }
+    return true;
+  }
+
+  // Pre-defined standard keywords supported by Express / proxy-addr
+  const standardKeywords = ['loopback', 'linklocal', 'uniquelocal'];
+  if (standardKeywords.includes(trimmed.toLowerCase())) {
+    return trimmed.toLowerCase();
+  }
+
+  // Positive integer hop count (e.g. "1")
+  if (/^\d+$/.test(trimmed)) {
+    const hops = parseInt(trimmed, 10);
+    if (hops > 0) {
+      return hops;
+    }
+    return false;
+  }
+
+  // Validate IP address or CIDR list via temporary express app / proxy-addr
+  try {
+    const dummyApp = express();
+    dummyApp.set('trust proxy', trimmed);
+    return trimmed;
+  } catch (err) {
+    throw new Error(`Invalid TRUST_PROXY configuration "${trimmed}": ${err.message}`);
+  }
+}
+
 // Security headers middleware for all responses
 function securityHeadersMiddleware(req, res, next) {
   res.setHeader('X-Content-Type-Options', 'nosniff');
@@ -99,11 +149,28 @@ function securityHeadersMiddleware(req, res, next) {
 const app = express();
 const PORT = process.env.PORT || 7001;
 
+// Reverse-Proxy Trust Configuration (safely validated)
+let trustProxySetting;
+try {
+  trustProxySetting = resolveTrustProxy(process.env);
+} catch (err) {
+  if (process.env.NODE_ENV === 'production') {
+    console.error('❌ Fatal Trust Proxy Configuration Error:', err.message);
+    throw err;
+  }
+  console.warn('⚠️ Trust proxy configuration warning:', err.message, '- defaulting to false');
+  trustProxySetting = false;
+}
+app.set('trust proxy', trustProxySetting);
+
 // Disable Express fingerprinting header
 app.disable('x-powered-by');
 
 // Enterprise Security Headers
 app.use(securityHeadersMiddleware);
+
+// Production HTTP 500 error sanitization
+app.use(productionResponseSanitizer);
 
 // CORS Configuration
 let allowedOrigins;
@@ -213,5 +280,6 @@ module.exports = {
   startServer,
   resolveAllowedOrigins,
   validateOrigin,
+  resolveTrustProxy,
   securityHeadersMiddleware
 };
