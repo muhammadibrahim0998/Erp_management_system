@@ -180,15 +180,18 @@ async function initSchema(connection = db) {
       ) ENGINE=InnoDB;
     `);
 
-    // Ensure UNIQUE constraint on sales_invoices(so_number) for existing tables idempotently
+    // Ensure UNIQUE constraint on sales_invoices(so_number) alone for existing tables idempotently
     const [invColIndexes] = await conn.query(`
-      SELECT INDEX_NAME, NON_UNIQUE 
+      SELECT INDEX_NAME 
       FROM information_schema.STATISTICS 
       WHERE TABLE_SCHEMA = DATABASE() 
         AND TABLE_NAME = 'sales_invoices' 
-        AND COLUMN_NAME = 'so_number'
+        AND NON_UNIQUE = 0 
+      GROUP BY INDEX_NAME 
+      HAVING COUNT(*) = 1 
+         AND MAX(COLUMN_NAME) = 'so_number'
     `);
-    const hasUniqueInvoiceSo = Array.isArray(invColIndexes) && invColIndexes.some(r => r.NON_UNIQUE === 0);
+    const hasUniqueInvoiceSo = Array.isArray(invColIndexes) && invColIndexes.length > 0;
     if (!hasUniqueInvoiceSo) {
       const [dups] = await conn.query(`
         SELECT so_number, COUNT(*) as cnt 
@@ -210,15 +213,18 @@ async function initSchema(connection = db) {
         }
       }
 
-      // Explicit post-verification of uniqueness constraint
+      // Explicit post-verification of uniqueness constraint on so_number alone
       const [postIndexes] = await conn.query(`
-        SELECT INDEX_NAME, NON_UNIQUE 
+        SELECT INDEX_NAME 
         FROM information_schema.STATISTICS 
         WHERE TABLE_SCHEMA = DATABASE() 
           AND TABLE_NAME = 'sales_invoices' 
-          AND COLUMN_NAME = 'so_number'
+          AND NON_UNIQUE = 0 
+        GROUP BY INDEX_NAME 
+        HAVING COUNT(*) = 1 
+           AND MAX(COLUMN_NAME) = 'so_number'
       `);
-      const postUniqueEstablished = Array.isArray(postIndexes) && postIndexes.some(r => r.NON_UNIQUE === 0);
+      const postUniqueEstablished = Array.isArray(postIndexes) && postIndexes.length > 0;
       if (!postUniqueEstablished) {
         throw new Error(
           'FATAL MIGRATION FAILURE: Unique constraint uq_sales_invoices_so on sales_invoices(so_number) could not be verified after ALTER TABLE.'

@@ -1072,13 +1072,16 @@ async function runFinancialIntegrityTestSuite() {
       await initSchema(db);
 
       const [indexes] = await db.query(`
-        SELECT INDEX_NAME, NON_UNIQUE 
+        SELECT INDEX_NAME 
         FROM information_schema.STATISTICS 
         WHERE TABLE_SCHEMA = DATABASE() 
           AND TABLE_NAME = 'sales_invoices' 
-          AND COLUMN_NAME = 'so_number'
+          AND NON_UNIQUE = 0 
+        GROUP BY INDEX_NAME 
+        HAVING COUNT(*) = 1 
+           AND MAX(COLUMN_NAME) = 'so_number'
       `);
-      const hasUnique = Array.isArray(indexes) && indexes.some(r => r.NON_UNIQUE === 0);
+      const hasUnique = Array.isArray(indexes) && indexes.length > 0;
       assert.strictEqual(hasUnique, true, 'uq_sales_invoices_so must be established on clean schema');
     });
 
@@ -1089,13 +1092,16 @@ async function runFinancialIntegrityTestSuite() {
       await initSchema(db);
 
       const [indexes] = await db.query(`
-        SELECT INDEX_NAME, NON_UNIQUE 
+        SELECT INDEX_NAME 
         FROM information_schema.STATISTICS 
         WHERE TABLE_SCHEMA = DATABASE() 
           AND TABLE_NAME = 'sales_invoices' 
-          AND COLUMN_NAME = 'so_number'
+          AND NON_UNIQUE = 0 
+        GROUP BY INDEX_NAME 
+        HAVING COUNT(*) = 1 
+           AND MAX(COLUMN_NAME) = 'so_number'
       `);
-      const hasUnique = Array.isArray(indexes) && indexes.some(r => r.NON_UNIQUE === 0);
+      const hasUnique = Array.isArray(indexes) && indexes.length > 0;
       assert.strictEqual(hasUnique, true, 'Unique index remains intact after multiple initSchema calls');
     });
 
@@ -1210,6 +1216,78 @@ async function runFinancialIntegrityTestSuite() {
       assert.strictEqual(Number(created.credit_breach), 10000.00);
       assert.strictEqual(created.status, 'Pending approval');
       assert.strictEqual(created.approval_step, 'CEO Waiting');
+    });
+
+    // T36: Composite unique index on (so_number, customer) does not falsely satisfy so_number single-column uniqueness
+    await test('SEC-B2-07: initSchema establishes single-column uq_sales_invoices_so even when composite unique index exists', async () => {
+      // Temporarily drop uq_sales_invoices_so if present
+      try {
+        await db.query('ALTER TABLE sales_invoices DROP INDEX uq_sales_invoices_so');
+      } catch (e) {
+        // Ignored
+      }
+      try {
+        await db.query('ALTER TABLE sales_invoices DROP INDEX uq_composite_test');
+      } catch (e) {
+        // Ignored
+      }
+
+      try {
+        // Add composite unique index on (so_number, customer)
+        await db.query('ALTER TABLE sales_invoices ADD CONSTRAINT uq_composite_test UNIQUE (so_number, customer)');
+
+        // Run initSchema - must NOT be satisfied by uq_composite_test, and must add uq_sales_invoices_so
+        await initSchema(db);
+
+        // Verify single-column unique index exists on so_number alone
+        const [singleColIndexes] = await db.query(`
+          SELECT INDEX_NAME 
+          FROM information_schema.STATISTICS 
+          WHERE TABLE_SCHEMA = DATABASE() 
+            AND TABLE_NAME = 'sales_invoices' 
+            AND NON_UNIQUE = 0 
+          GROUP BY INDEX_NAME 
+          HAVING COUNT(*) = 1 
+             AND MAX(COLUMN_NAME) = 'so_number'
+        `);
+        assert.ok(
+          Array.isArray(singleColIndexes) && singleColIndexes.length > 0,
+          'Single-column unique constraint on so_number must be established despite pre-existing composite unique index'
+        );
+
+        // Verify that inserting duplicate so_number for DIFFERENT customers is rejected by uq_sales_invoices_so
+        const testSo = `SO-COMPOSITE-TEST-${Date.now()}`;
+        const invA = `INV-COMP-A-${Date.now()}`;
+        const invB = `INV-COMP-B-${Date.now()}`;
+        createdInvoiceNumbers.add(invA);
+        createdInvoiceNumbers.add(invB);
+
+        await db.query(
+          `INSERT INTO sales_invoices (invoice_no, so_number, customer, invoice_date, subtotal, total_amount, paid_amount, status, created_by)
+           VALUES (?, ?, 'Charsadda Poultry Services', '23 Oct 2026', 1000.00, 1000.00, 0.00, 'Unpaid', 'Tester')`,
+          [invA, testSo]
+        );
+
+        await assert.rejects(
+          async () => {
+            await db.query(
+              `INSERT INTO sales_invoices (invoice_no, so_number, customer, invoice_date, subtotal, total_amount, paid_amount, status, created_by)
+               VALUES (?, ?, 'Mardan Retail Mart', '23 Oct 2026', 1000.00, 1000.00, 0.00, 'Unpaid', 'Tester')`,
+              [invB, testSo]
+            );
+          },
+          (err) => {
+            return err.code === 'ER_DUP_ENTRY' || /Duplicate entry/.test(err.message);
+          },
+          'Duplicate so_number across different customers must be rejected by single-column unique constraint'
+        );
+      } finally {
+        try {
+          await db.query('ALTER TABLE sales_invoices DROP INDEX uq_composite_test');
+        } catch (e) {
+          // Ignored
+        }
+      }
     });
 
   } finally {
