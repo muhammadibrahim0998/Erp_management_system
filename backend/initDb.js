@@ -3,13 +3,14 @@ const bcrypt = require('bcryptjs');
 
 /**
  * Determines whether demonstration and mock data seeding is permitted.
- * In production mode, seeding is disabled by default and requires explicit opt-in (SEED_DEMO_DATA === 'true').
+ * In production mode, demo seeding is strictly prohibited under all circumstances,
+ * even if SEED_DEMO_DATA=true is configured.
  * In non-production environments (development/test), seeding is enabled by default unless SEED_DEMO_DATA === 'false'.
  */
 const shouldSeedDemoData = (env = process.env) => {
   const isProduction = env.NODE_ENV === 'production';
   if (isProduction) {
-    return env.SEED_DEMO_DATA === 'true';
+    return false;
   }
   return env.SEED_DEMO_DATA !== 'false';
 };
@@ -328,10 +329,14 @@ async function initSchema(connection = db) {
 
 /**
  * Seeds initial demonstration data matching system specifications ONLY if tables are currently empty.
- * In production mode, this routine is strictly gated and skipped by default.
+ * In production mode, this routine is strictly prohibited and aborted.
  */
-async function seedDemoData(connection = db) {
+async function seedDemoData(connection = db, env = process.env) {
   const conn = connection || db;
+  if (env.NODE_ENV === 'production') {
+    console.warn('⚠️ Demonstration data seeding is strictly prohibited in production mode.');
+    return;
+  }
   try {
     // Seed Initial Data matching the PDF if empty
     const [userRows] = await conn.query('SELECT COUNT(*) as count FROM users');
@@ -601,19 +606,24 @@ async function seedDemoData(connection = db) {
  */
 async function initDatabase(options = {}) {
   const conn = options.db || db;
+  const env = options.env || process.env;
+  const isProduction = env.NODE_ENV === 'production';
   console.log('🔄 Initializing Yousafzai Agri Foods ERP Database Tables in MySQL...');
 
   try {
     await initSchema(conn);
 
-    const allowSeed = options.seed !== undefined ? options.seed : shouldSeedDemoData();
+    const allowSeed = options.seed !== undefined ? options.seed : shouldSeedDemoData(env);
     if (allowSeed) {
-      await seedDemoData(conn);
+      await seedDemoData(conn, env);
     } else {
       console.log('ℹ️ Demonstration data seeding skipped (disabled by policy).');
     }
   } catch (error) {
     console.error('❌ Database Initialization Error:', error.message);
+    if (isProduction) {
+      throw error;
+    }
   }
 }
 

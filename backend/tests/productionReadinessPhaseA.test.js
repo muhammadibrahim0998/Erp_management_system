@@ -27,7 +27,7 @@ if (!isTestDb) {
 
 const { db } = require('../config/db');
 const { JWT_SECRET, optionalUserExtractor, resolveJwtSecret } = require('../middlewares/auth');
-const { shouldSeedDemoData, initSchema } = require('../initDb');
+const { shouldSeedDemoData, initSchema, seedDemoData, initDatabase } = require('../initDb');
 const apiRoutes = require('../routes');
 
 async function runProductionReadinessTestSuite() {
@@ -193,16 +193,21 @@ async function runProductionReadinessTestSuite() {
     });
 
     // ========================================================================
-    // 2. FINDING H-02: PRODUCTION DEMO-DATA SEEDING SAFEGUARDS
+    // 2. FINDING H-02: PRODUCTION DEMO-DATA SEEDING SAFEGUARDS & FAIL-CLOSED INIT
     // ========================================================================
-    await test('Finding H-02: shouldSeedDemoData strictly defaults to false when NODE_ENV=production', async () => {
+    await test('Finding H-02: shouldSeedDemoData strictly returns false when NODE_ENV=production (unset)', async () => {
       const shouldSeed = shouldSeedDemoData({ NODE_ENV: 'production' });
       assert.strictEqual(shouldSeed, false, 'Production mode must not seed demo data by default');
     });
 
-    await test('Finding H-02: shouldSeedDemoData allows explicit opt-in in production when SEED_DEMO_DATA=true', async () => {
+    await test('Finding H-02: shouldSeedDemoData strictly returns false in production even with SEED_DEMO_DATA=true', async () => {
       const shouldSeed = shouldSeedDemoData({ NODE_ENV: 'production', SEED_DEMO_DATA: 'true' });
-      assert.strictEqual(shouldSeed, true, 'Explicit opt-in must be honored in production');
+      assert.strictEqual(shouldSeed, false, 'Production mode must strictly prohibit seeding even with SEED_DEMO_DATA=true');
+    });
+
+    await test('Finding H-02: shouldSeedDemoData strictly returns false in production with SEED_DEMO_DATA=false', async () => {
+      const shouldSeed = shouldSeedDemoData({ NODE_ENV: 'production', SEED_DEMO_DATA: 'false' });
+      assert.strictEqual(shouldSeed, false, 'Production mode must return false when explicitly false');
     });
 
     await test('Finding H-02: shouldSeedDemoData defaults to true in development mode for seamless local setup', async () => {
@@ -213,6 +218,43 @@ async function runProductionReadinessTestSuite() {
     await test('Finding H-02: shouldSeedDemoData allows opt-out in development when SEED_DEMO_DATA=false', async () => {
       const shouldSeed = shouldSeedDemoData({ NODE_ENV: 'development', SEED_DEMO_DATA: 'false' });
       assert.strictEqual(shouldSeed, false, 'Explicit opt-out in development must disable seeding');
+    });
+
+    await test('Finding H-02: seedDemoData aborts immediately in production mode without querying database', async () => {
+      let queryExecuted = false;
+      const mockConn = {
+        query: async () => {
+          queryExecuted = true;
+          throw new Error('Database query should never be called when seedDemoData aborts');
+        }
+      };
+      await seedDemoData(mockConn, { NODE_ENV: 'production' });
+      assert.strictEqual(queryExecuted, false, 'seedDemoData must not execute queries in production');
+    });
+
+    await test('Finding H-02: initDatabase propagates and rethrows schema error when NODE_ENV=production (fail-closed)', async () => {
+      const mockFailingConn = {
+        query: async () => {
+          throw new Error('Simulated DDL table creation failure');
+        }
+      };
+      await assert.rejects(
+        async () => {
+          await initDatabase({ db: mockFailingConn, env: { NODE_ENV: 'production' } });
+        },
+        /Simulated DDL table creation failure/,
+        'initDatabase must rethrow initialization errors in production'
+      );
+    });
+
+    await test('Finding H-02: initDatabase catches and suppresses schema error in development mode (graceful degradation)', async () => {
+      const mockFailingConn = {
+        query: async () => {
+          throw new Error('Simulated DDL table creation failure');
+        }
+      };
+      // In development mode, should not throw
+      await initDatabase({ db: mockFailingConn, env: { NODE_ENV: 'development' } });
     });
 
     await test('Finding H-02: initSchema executes cleanly and idempotently on isolated database', async () => {

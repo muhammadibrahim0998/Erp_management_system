@@ -44,9 +44,35 @@ app.use(notFoundHandler);
 // Global Centralized Error Handler
 app.use(errorHandler);
 
-// Start server
-app.listen(PORT, async () => {
-  console.log(`🚀 AgenTech ERP Server is running on http://localhost:${PORT}`);
-  await testConnection();
-  await initDatabase();
-});
+// Server startup orchestration
+async function startServer() {
+  const isProduction = process.env.NODE_ENV === 'production';
+  try {
+    const connResult = await testConnection();
+    if (!connResult.success && isProduction) {
+      throw new Error(`Database connection check failed: ${connResult.error}`);
+    }
+    await initDatabase();
+
+    const server = app.listen(PORT, () => {
+      console.log(`🚀 AgenTech ERP Server is running on http://localhost:${PORT}`);
+    });
+    return server;
+  } catch (error) {
+    console.error('❌ Fatal server startup failure:', error.message);
+    if (isProduction) {
+      process.exit(1);
+    }
+    // In local development, still allow server to bind so developers can debug or inspect health routes
+    const server = app.listen(PORT, () => {
+      console.log(`🚀 AgenTech ERP Server is running on http://localhost:${PORT} (DEGRADED - DB Initialization Failed)`);
+    });
+    return server;
+  }
+}
+
+if (require.main === module) {
+  startServer();
+}
+
+module.exports = { app, startServer };
