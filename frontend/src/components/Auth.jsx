@@ -147,10 +147,9 @@ export default function Auth({ onLogin }) {
                     type="button"
                     disabled={!hasLogin}
                     onClick={() => {
-                      if (hasLogin) {
-                        handleQuickFill(u.email, 'password');
+                        const fillPass = u.email === 'ceo@gmail.com' ? 'ceo12345' : 'password';
+                        handleQuickFill(u.email, fillPass);
                         setSelectedEmail(u.email);
-                      }
                     }}
                     className={`px-2 py-1.5 rounded-lg text-left transition border ${
                       !hasLogin

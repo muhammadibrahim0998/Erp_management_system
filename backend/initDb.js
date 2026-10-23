@@ -245,7 +245,7 @@ async function initDatabase() {
     if (userRows[0].count === 0) {
       console.log('🌱 Seeding 19 Yousafzai Agri Foods ERP users from PDF Page 4...');
       const usersData = [
-        ['Sana Ullah', 'Chairman & CEO', 'Executive', 'SU', 'ceo@yaf.com', 'password'],
+        ['Sana Ullah', 'Chairman & CEO', 'Executive', 'SU', 'ceo@gmail.com', 'ceo12345'],
         ['Khalid Mehmood', 'General Manager', 'Executive', 'KM', 'gm@yaf.com', 'password'],
         ['Saeed ur Rehman', 'Director Operations', 'Operations', 'SR', 'operations@yaf.com', 'password'],
         ['Mujeeb Ullah', 'Director Finance', 'Finance', 'MU', 'finance@yaf.com', 'password'],
@@ -266,11 +266,12 @@ async function initDatabase() {
         ['Zahid Afridi', 'Poultry Farms', 'Farms', 'ZA', 'zahid.afridi@yaf.com', 'password'],
         ['Kamran Ali', 'ERP Admin', 'IT', 'KA', 'admin@yaf.com', 'password']
       ];
-      const defaultPasswordHash = await bcrypt.hash('password', 10);
       for (const u of usersData) {
+        const passwordToHash = u[5] || 'password';
+        const userPasswordHash = await bcrypt.hash(passwordToHash, 10);
         await db.query(
           'INSERT INTO users (name, role, department, avatar, email, password) VALUES (?, ?, ?, ?, ?, ?)',
-          [u[0], u[1], u[2], u[3], u[4], defaultPasswordHash]
+          [u[0], u[1], u[2], u[3], u[4], userPasswordHash]
         );
       }
     }
