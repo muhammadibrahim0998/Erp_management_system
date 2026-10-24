@@ -6,12 +6,9 @@ import DemoBadge from '../DemoBadge';
 export default function FinanceView({ financeData, onNavigate }) {
   const [notice, setNotice] = useState(null);
 
-  const cashAccounts = financeData?.cashAndBank || [
-    { name: 'Cash in hand', balance: '800,000', account: 'Cash' },
-    { name: 'Bank — Current A/C ••4410', balance: '14,905,300', account: 'Meezan Bank' },
-    { name: 'Bank — Current A/C ••2231', balance: '10,713,825', account: 'HBL Mardan' },
-    { name: 'Bank — Payroll A/C ••7702', balance: '3,000,000', account: 'MCB' }
-  ];
+  const cashAccounts = financeData?.cashAndBank || [];
+  const debtors = financeData?.receivables?.topDebtors || [];
+  const creditors = financeData?.payables?.topCreditors || [];
 
   const handleExportPDF = () => {
     exportToPDF({
@@ -172,7 +169,6 @@ export default function FinanceView({ financeData, onNavigate }) {
               <span className="font-bold text-gray-800">{financeData?.payables?.d31_60 || '0.0M'}</span>
             </div>
           </div>
-
             <div>
               <h4 className="text-xs font-bold text-gray-800 mb-2">Top Creditors</h4>
               <div className="space-y-2 text-xs font-medium">

@@ -142,6 +142,53 @@ export default function SettingsMatrix() {
           </table>
         </div>
       </div>
+
+      {/* Structured Approval Matrix Policy Table */}
+      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+        <div className="p-4 border-b border-gray-100 flex items-center justify-between">
+          <h3 className="text-xs font-bold text-gray-900 uppercase tracking-wider">
+            Approval Routing Matrix & Delegation of Authority Table
+          </h3>
+          <span className="text-xs text-gray-500 font-medium">Configured by Admin (Kamran Ali)</span>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs">
+            <thead>
+              <tr className="border-b border-gray-200 text-gray-400 font-semibold bg-gray-50/70">
+                <th className="py-3.5 px-4">MODULE / DOCUMENT TYPE</th>
+                <th className="py-3.5 px-4">AMOUNT THRESHOLD</th>
+                <th className="py-3.5 px-4">1ST APPROVER</th>
+                <th className="py-3.5 px-4">2ND APPROVER</th>
+                <th className="py-3.5 px-4">FINAL SIGN-OFF</th>
+                <th className="py-3.5 px-4 text-right">POLICY STATUS</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100 font-medium">
+              {[
+                { doc: 'Purchase Order (Band 1)', threshold: 'Up to PKR 500,000', first: 'Department Head', second: 'Finance Officer', final: 'Director Finance', status: 'Active' },
+                { doc: 'Purchase Order (Band 2)', threshold: 'PKR 500K – 2,500,000', first: 'Department Head', second: 'Director Finance', final: 'General Manager', status: 'Active' },
+                { doc: 'Purchase Order (Band 3)', threshold: 'Above PKR 2,500,000', first: 'Department Head', second: 'Director Finance', final: 'Chairman & CEO', status: 'Active' },
+                { doc: 'Sales Credit Limit Breach', threshold: 'Any limit breach > 0', first: 'Sales Manager', second: 'Director Finance', final: 'Chairman & CEO', status: 'Active' },
+                { doc: 'Monthly Payroll Run', threshold: 'Total net salary run', first: 'HR Manager', second: 'Director Finance', final: 'Chairman & CEO', status: 'Active' },
+                { doc: 'Inventory Stock Adjustment', threshold: '> 50 units or PKR 50K', first: 'Store Incharge', second: 'Operations Director', final: 'Director Finance', status: 'Active' }
+              ].map((row, idx) => (
+                <tr key={idx} className="hover:bg-gray-50/80 transition">
+                  <td className="py-3.5 px-4 font-bold text-gray-900">{row.doc}</td>
+                  <td className="py-3.5 px-4 font-mono text-gray-700">{row.threshold}</td>
+                  <td className="py-3.5 px-4 text-gray-600">{row.first}</td>
+                  <td className="py-3.5 px-4 text-gray-600">{row.second}</td>
+                  <td className="py-3.5 px-4 font-bold text-gray-900">{row.final}</td>
+                  <td className="py-3.5 px-4 text-right">
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                      {row.status}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
   );
 }

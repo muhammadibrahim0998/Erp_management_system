@@ -100,7 +100,7 @@ export default function MarketingView({ campaigns }) {
               </span>
             </div>
             <h3 className="text-lg font-bold text-gray-900 mt-1">
-              Always-on social — farm fresh since 1960
+              Always-on social — premium quality since 1960
             </h3>
             <p className="text-xs text-gray-500">
               Grow the brand on social media every week and bring new dealers through lead ads · 16 Jul 2026 – 14 Oct 2026

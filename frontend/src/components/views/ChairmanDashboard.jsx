@@ -83,7 +83,7 @@ export default function ChairmanDashboard({ data, onNavigate, onApproveTask, cur
         <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex flex-col justify-between">
           <span className="text-[11px] font-medium text-gray-500 uppercase tracking-wider">Revenue · {revenueMonthYear}</span>
           <div className="my-2">
-            <div className="text-2xl font-black text-gray-900">{kpis.revenue || 'PKR 50.3M'}</div>
+            <div className="text-2xl font-black text-gray-900">{kpis.revenue || 'PKR 0.0M'}</div>
           </div>
           <div className="flex items-center gap-1 text-[11px] text-emerald-700 font-semibold">
             <ArrowUpRight className="w-3.5 h-3.5" />
@@ -96,12 +96,12 @@ export default function ChairmanDashboard({ data, onNavigate, onApproveTask, cur
         <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex flex-col justify-between">
           <span className="text-[11px] font-medium text-gray-500 uppercase tracking-wider">Gross margin</span>
           <div className="my-2">
-            <div className="text-2xl font-black text-gray-900">{kpis.grossMargin || '21.9%'}</div>
+            <div className="text-2xl font-black text-gray-900">{kpis.grossMargin || '0.0%'}</div>
           </div>
           <div className="flex items-center gap-1 text-[11px] text-rose-700 font-semibold">
             <ArrowDownRight className="w-3.5 h-3.5" />
             <span>{kpis.marginChange || '▼ 0.1 pts'}</span>
-            <span className="text-gray-400 font-normal ml-1">vs last month</span>
+            <span className="text-gray-400 font-normal ml-1">{kpis.marginNote || 'vs last month'}</span>
           </div>
         </div>
 
@@ -109,7 +109,7 @@ export default function ChairmanDashboard({ data, onNavigate, onApproveTask, cur
         <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex flex-col justify-between">
           <span className="text-[11px] font-medium text-gray-500 uppercase tracking-wider">Cash & bank</span>
           <div className="my-2">
-            <div className="text-2xl font-black text-gray-900">{kpis.cashAndBank || 'PKR 29.4M'}</div>
+            <div className="text-2xl font-black text-gray-900">{kpis.cashAndBank || 'PKR 0.0M'}</div>
           </div>
           <div className="text-[11px] text-gray-400">{kpis.cashAccounts || '4 accounts'}</div>
         </div>
@@ -118,16 +118,16 @@ export default function ChairmanDashboard({ data, onNavigate, onApproveTask, cur
         <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex flex-col justify-between">
           <span className="text-[11px] font-medium text-gray-500 uppercase tracking-wider">Receivables</span>
           <div className="my-2">
-            <div className="text-2xl font-black text-gray-900">{kpis.receivables || 'PKR 45.7M'}</div>
+            <div className="text-2xl font-black text-gray-900">{kpis.receivables || 'PKR 0.0M'}</div>
           </div>
           <div className="text-[11px] text-amber-700 font-semibold">{kpis.receivablesOverdue || 'PKR 3.2M over 30 days'}</div>
         </div>
 
-        {/* Eggs sold */}
+        {/* Products sold */}
         <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex flex-col justify-between">
-          <span className="text-[11px] font-medium text-gray-500 uppercase tracking-wider">Eggs sold · last 7 days</span>
+          <span className="text-[11px] font-medium text-gray-500 uppercase tracking-wider">Products sold · last 7 days</span>
           <div className="my-2">
-            <div className="text-2xl font-black text-gray-900">{kpis.eggsSold || '572K'}</div>
+            <div className="text-2xl font-black text-gray-900">{kpis.productsSold || '0'}</div>
           </div>
           <div className="flex items-center gap-1 text-[11px] text-emerald-700 font-semibold">
             <ArrowUpRight className="w-3.5 h-3.5" />
@@ -162,21 +162,9 @@ export default function ChairmanDashboard({ data, onNavigate, onApproveTask, cur
 
             {/* Custom SVG Bar & Trend Chart */}
             <div className="mt-6 h-56 w-full flex items-end justify-between gap-2 px-2 pt-4 border-b border-gray-200">
-              {(data?.revenueChart || [
-                { month: 'Oct', actual: 44, target: 46 },
-                { month: 'Nov', actual: 48, target: 49 },
-                { month: 'Dec', actual: 52, target: 51 },
-                { month: 'Jan', actual: 55, target: 53 },
-                { month: 'Feb', actual: 45, target: 47 },
-                { month: 'Mar', actual: 42, target: 44 },
-                { month: 'Apr', actual: 46, target: 45 },
-                { month: 'May', actual: 49, target: 48 },
-                { month: 'Jun', actual: 51, target: 50 },
-                { month: 'Jul', actual: 54, target: 52 },
-                { month: 'Aug', actual: 53, target: 51 },
-                { month: 'Sep', actual: 50.3, target: 50.8 }
-              ]).map((bar, i) => {
-                const heightPct = (bar.actual / 60) * 100;
+              {chartData.map((bar, i) => {
+                const heightPct = Math.min(100, Math.max(5, (Number(bar.actual) / maxVal) * 100));
+                const targetPct = Math.min(100, Math.max(5, (Number(bar.target) / maxVal) * 100));
                 return (
                   <div key={i} className="flex-1 flex flex-col items-center gap-1 group relative">
                     {/* Tooltip */}
@@ -186,7 +174,7 @@ export default function ChairmanDashboard({ data, onNavigate, onApproveTask, cur
                     {/* Target marker */}
                     <div
                       className="w-full h-0.5 bg-amber-400 absolute"
-                      style={{ bottom: `${(bar.target / 60) * 100}%` }}
+                      style={{ bottom: `${targetPct}%` }}
                     ></div>
                     {/* Actual bar */}
                     <div
@@ -260,12 +248,12 @@ export default function ChairmanDashboard({ data, onNavigate, onApproveTask, cur
             onClick={() => onNavigate('approvals')}
             className="w-full mt-4 py-2 px-3 text-xs font-semibold text-center text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition"
           >
-            Open approvals inbox
+            Open approvals inbox ({pendingCount})
           </button>
         </div>
       </div>
 
-      {/* Bottom Grid: Receivables Aging, Budget vs Actual, Exceptions (Page 5) */}
+      {/* Bottom Grid: Receivables Aging, Budget vs Actual, Exceptions */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* Receivables aging */}
         <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm">
@@ -281,7 +269,7 @@ export default function ChairmanDashboard({ data, onNavigate, onApproveTask, cur
                 <span className="font-bold text-gray-900">{data?.receivablesAging?.current || '31.0M'}</span>
               </div>
               <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
-                <div className="h-full bg-emerald-600 rounded-full" style={{ width: '68%' }}></div>
+                <div className="h-full bg-emerald-600 rounded-full transition-all duration-500" style={{ width: '68%' }}></div>
               </div>
             </div>
             <div>
@@ -290,7 +278,7 @@ export default function ChairmanDashboard({ data, onNavigate, onApproveTask, cur
                 <span className="font-bold text-gray-900">{data?.receivablesAging?.d1_30 || '11.4M'}</span>
               </div>
               <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
-                <div className="h-full bg-amber-500 rounded-full" style={{ width: '25%' }}></div>
+                <div className="h-full bg-amber-500 rounded-full transition-all duration-500" style={{ width: '25%' }}></div>
               </div>
             </div>
             <div>
@@ -299,7 +287,7 @@ export default function ChairmanDashboard({ data, onNavigate, onApproveTask, cur
                 <span className="font-bold text-rose-600">{data?.receivablesAging?.d31_60 || '3.2M'}</span>
               </div>
               <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
-                <div className="h-full bg-rose-500 rounded-full" style={{ width: '7%' }}></div>
+                <div className="h-full bg-rose-500 rounded-full transition-all duration-500" style={{ width: '7%' }}></div>
               </div>
             </div>
           </div>

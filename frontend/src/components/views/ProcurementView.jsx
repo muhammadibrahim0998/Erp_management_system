@@ -74,7 +74,7 @@ export default function ProcurementView({ purchaseOrders, onAddPo, isLoading, er
         <div>
           <h2 className="text-xl font-bold text-gray-900 tracking-tight">Procurement</h2>
           <p className="text-xs text-gray-500 mt-1">
-            Egg purchases from partner farms, feed, vet supplies and packing — with quotation comparison to approved order.
+            Raw material & inventory purchases, packaging, equipment and supplies — with quotation comparison to approved order.
           </p>
         </div>
         <div className="flex items-center gap-2">

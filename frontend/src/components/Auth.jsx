@@ -121,10 +121,12 @@ export default function Auth({ onLogin }) {
                     type="button"
                     disabled={!hasLogin}
                     onClick={() => {
-                      if (hasLogin) {
-                        handleQuickFill(u.email, 'password');
+                        let fillPass = '123456';
+                        if (u.email === 'ceo@gmail.com') fillPass = 'ceo12345';
+                        else if (u.email === 'kamranali@gmail.com') fillPass = 'superadmin12345';
+                        else if (u.email === 'tariqgate@gmail.com') fillPass = 'tariq123';
+                        handleQuickFill(u.email, fillPass);
                         setSelectedEmail(u.email);
-                      }
                     }}
                     className={`px-2 py-1.5 rounded-lg text-left transition border ${
                       !hasLogin
@@ -143,9 +145,6 @@ export default function Auth({ onLogin }) {
                   </button>
                 );
               })}
-            </div>
-            <div className="text-[10px] text-[#6A947F] mt-2 text-center">
-              Click any post to autofill Email & Password (password: <code className="text-amber-300/80 font-mono">password</code>)
             </div>
           </div>
         )}

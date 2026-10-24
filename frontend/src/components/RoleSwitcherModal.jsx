@@ -17,7 +17,7 @@ export default function RoleSwitcherModal({ isOpen, onClose, users, currentUser,
               YOUSAFZAI AGRI FOODS (PVT) LTD · SINCE 1960
             </span>
             <h2 className="text-xl font-black text-gray-900 mt-1">
-              Select Demo Role (19 Working Roles from PDF Page 4)
+              Select Demo Role ({users?.length || 20} Working Roles)
             </h2>
             <p className="text-xs text-gray-500 mt-0.5">
               Click any role to sign in as that person. Each user has their own permissions and workflow tasks.

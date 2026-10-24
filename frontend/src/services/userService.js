@@ -19,6 +19,10 @@ export const userService = {
 
   resetUserPassword(id, newPassword) {
     return apiClient.post(`/api/users/${id}/reset-password`, { newPassword });
+  },
+
+  deleteUser(id) {
+    return apiClient.delete(`/api/users/${id}`);
   }
 };
 

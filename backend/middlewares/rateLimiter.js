@@ -1,9 +1,21 @@
 const { rateLimit } = require('express-rate-limit');
 
-// 1. General API Rate Limiter (Protects against scraping and DoS)
+// Helper to bypass rate limiting for verified loopback IP or non-production dev environment
+const isLocalhost = (req) => {
+  const ip = req.ip || req.connection?.remoteAddress || '';
+  return (
+    ip === '127.0.0.1' ||
+    ip === '::1' ||
+    ip === '::ffff:127.0.0.1' ||
+    process.env.NODE_ENV !== 'production'
+  );
+};
+
+// 1. General API Rate Limiter (Protects against scraping and DoS; skips loopback/dev)
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 1000, // Max 1000 requests per 15 minutes per IP
+  max: 1000, // Max 1000 requests per 15 minutes per IP in production
+  skip: isLocalhost,
   standardHeaders: 'draft-7',
   legacyHeaders: false,
   message: {
@@ -11,10 +23,11 @@ const apiLimiter = rateLimit({
   }
 });
 
-// 2. Strict Auth Rate Limiter (Protects against Brute-Force & Credential Stuffing)
+// 2. Strict Auth Rate Limiter (Protects against Brute-Force & Credential Stuffing; skips loopback/dev)
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes window
-  max: 10, // Max 10 attempts per 15 min per IP
+  max: 10, // Max 10 attempts per 15 min per IP in production
+  skip: isLocalhost,
   standardHeaders: 'draft-7',
   legacyHeaders: false,
   message: {
@@ -22,10 +35,11 @@ const authLimiter = rateLimit({
   }
 });
 
-// 3. Password Reset Rate Limiter
+// 3. Password Reset Rate Limiter (skips loopback/dev)
 const passwordResetLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 5,
+  skip: isLocalhost,
   standardHeaders: 'draft-7',
   legacyHeaders: false,
   message: {

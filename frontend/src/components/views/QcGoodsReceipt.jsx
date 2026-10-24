@@ -27,10 +27,10 @@ export default function QcGoodsReceipt({ onReceiveStore }) {
             </span>
           </div>
           <h2 className="text-xl font-bold text-gray-900 tracking-tight mt-1">
-            Goods receipt (GRN) · Charsadda Poultry Farm
+            Goods receipt (GRN) · Charsadda Supply Partners
           </h2>
           <p className="text-xs text-gray-500">
-            Egg weight, cracked and dirty %, Haugh unit, temperature, vehicle hygiene and pests — checked against limits.
+            Product quality, weight, defect rate, packaging integrity, temperature, and vehicle hygiene — checked against limits.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -88,7 +88,7 @@ export default function QcGoodsReceipt({ onReceiveStore }) {
         <div>
           <span className="font-bold">QC result: Passed with deductions</span>
           <p className="text-amber-800 mt-0.5">
-            Inspected by <strong>Dr. Asma Noor</strong> · 29 Sept, 22:41 · vehicle CSD-2298 (Sample Pass) — <strong>10 trays of cracked eggs rejected</strong> and returned with the driver.
+            Inspected by <strong>Dr. Asma Noor</strong> · 29 Sept, 22:41 · vehicle CSD-2298 (Sample Pass) — <strong>10 units of damaged goods rejected</strong> and returned with the driver.
           </p>
         </div>
       </div>
@@ -125,23 +125,95 @@ export default function QcGoodsReceipt({ onReceiveStore }) {
               <th className="pb-3">RECEIVED</th>
               <th className="pb-3">ACCEPTED</th>
               <th className="pb-3">REJECTED</th>
-              <th className="pb-3">AMOUNT (PKR)</th>
+              <th className="pb-3 text-right">AMOUNT (PKR)</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100 font-medium">
             <tr>
               <td className="py-4">
-                <div className="font-bold text-gray-900">White eggs – Medium</div>
-                <div className="text-[11px] text-gray-500 font-mono">SE-01-02-01 · Shell eggs · Standard Medium (53-58 g)</div>
+                <div className="font-bold text-gray-900">Standard Product Item – Medium</div>
+                <div className="text-[11px] text-gray-500 font-mono">PRD-01-02-01 · Finished Goods · Standard Medium Pack</div>
               </td>
-              <td className="py-4 text-gray-600">800 trays</td>
-              <td className="py-4 text-gray-600">800 trays</td>
-              <td className="py-4 font-bold text-emerald-700">790 trays</td>
-              <td className="py-4 font-bold text-rose-600">10 trays</td>
-              <td className="py-4 font-black text-gray-900 font-mono">426,600</td>
+              <td className="py-4 text-gray-600">800 units</td>
+              <td className="py-4 text-gray-600">800 units</td>
+              <td className="py-4 font-bold text-emerald-700">790 units</td>
+              <td className="py-4 font-bold text-rose-600">10 units</td>
+              <td className="py-4 font-black text-gray-900 font-mono text-right">426,600</td>
             </tr>
           </tbody>
         </table>
+      </div>
+
+      {/* Complete QC Inspection Logs Table */}
+      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+        <div className="p-4 border-b border-gray-100 flex items-center justify-between">
+          <h3 className="text-xs font-bold text-gray-900 uppercase tracking-wider">
+            QC Inspection & Goods Receipt Logs (GRN History)
+          </h3>
+          <span className="text-xs text-gray-500 font-medium">Verified by Dr. Asma Noor (QC Cell)</span>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs">
+            <thead>
+              <tr className="border-b border-gray-200 text-gray-400 font-semibold bg-gray-50/70">
+                <th className="py-3.5 px-4">GRN NUMBER</th>
+                <th className="py-3.5 px-4">SUPPLIER</th>
+                <th className="py-3.5 px-4">VEHICLE #</th>
+                <th className="py-3.5 px-4">TEMP</th>
+                <th className="py-3.5 px-4">HYGIENE</th>
+                <th className="py-3.5 px-4">ACCEPTED</th>
+                <th className="py-3.5 px-4">REJECTED</th>
+                <th className="py-3.5 px-4">QC STATUS</th>
+                <th className="py-3.5 px-4 text-right">ACTION</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100 font-medium">
+              {[
+                { grn: 'GRN-2026-0611', supplier: 'Charsadda Supply Partners', vehicle: 'CSD-2298', temp: '24 °C', hygiene: 'Clean', accepted: '790 units', rejected: '10 units', status: received ? 'In Store' : 'Awaiting Store', isCurrent: true },
+                { grn: 'GRN-2026-0610', supplier: 'Swabi Manufacturing & Logistics', vehicle: 'MRD-4471', temp: '22 °C', hygiene: 'Clean', accepted: '1,200 units', rejected: '0 units', status: 'In Store', isCurrent: false },
+                { grn: 'GRN-2026-0609', supplier: 'Frontier Raw Materials', vehicle: 'PSW-9912', temp: '25 °C', hygiene: 'Acceptable', accepted: '500 units', rejected: '5 units', status: 'In Store', isCurrent: false },
+                { grn: 'GRN-2026-0608', supplier: 'Khyber Cold Chain Logistics', vehicle: 'KHY-8829', temp: '21 °C', hygiene: 'Optimal', accepted: '1,500 units', rejected: '0 units', status: 'In Store', isCurrent: false },
+                { grn: 'GRN-2026-0607', supplier: 'Premier Packaging Co.', vehicle: 'ISB-3341', temp: '26 °C', hygiene: 'Clean', accepted: '800 cartons', rejected: '0 units', status: 'In Store', isCurrent: false },
+                { grn: 'GRN-2026-0606', supplier: 'Haripur Production Partners', vehicle: 'HRP-1102', temp: '23 °C', hygiene: 'Clean', accepted: '950 units', rejected: '8 units', status: 'In Store', isCurrent: false },
+                { grn: 'GRN-2026-0605', supplier: 'Attock Layer Farms Consortium', vehicle: 'ATK-9018', temp: '24 °C', hygiene: 'Clean', accepted: '1,100 units', rejected: '12 units', status: 'In Store', isCurrent: false },
+                { grn: 'GRN-2026-0604', supplier: 'Rashakai Farm Supplies', vehicle: 'RSK-7711', temp: '22 °C', hygiene: 'Optimal', accepted: '650 units', rejected: '0 units', status: 'In Store', isCurrent: false },
+                { grn: 'GRN-2026-0603', supplier: 'Mardan Layer Cooperative', vehicle: 'MRD-3320', temp: '23 °C', hygiene: 'Clean', accepted: '850 units', rejected: '6 units', status: 'In Store', isCurrent: false },
+                { grn: 'GRN-2026-0602', supplier: 'Swat Valley Poultry Partners', vehicle: 'SWT-5541', temp: '20 °C', hygiene: 'Optimal', accepted: '1,350 units', rejected: '4 units', status: 'In Store', isCurrent: false }
+              ].map((row, idx) => (
+                <tr key={idx} className="hover:bg-gray-50/80 transition">
+                  <td className="py-3.5 px-4 font-mono font-bold text-gray-900">{row.grn}</td>
+                  <td className="py-3.5 px-4 font-semibold text-gray-800">{row.supplier}</td>
+                  <td className="py-3.5 px-4 font-mono text-gray-600">{row.vehicle}</td>
+                  <td className="py-3.5 px-4 font-mono text-gray-700">{row.temp}</td>
+                  <td className="py-3.5 px-4 text-emerald-700 font-semibold">{row.hygiene}</td>
+                  <td className="py-3.5 px-4 font-bold text-emerald-700">{row.accepted}</td>
+                  <td className="py-3.5 px-4 font-bold text-rose-600">{row.rejected}</td>
+                  <td className="py-3.5 px-4">
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${
+                      row.status === 'In Store'
+                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                        : 'bg-amber-50 text-amber-700 border-amber-200'
+                    }`}>
+                      {row.status}
+                    </span>
+                  </td>
+                  <td className="py-3.5 px-4 text-right">
+                    {row.isCurrent && !received ? (
+                      <button
+                        onClick={() => { setReceived(true); if (onReceiveStore) onReceiveStore(); }}
+                        className="px-2.5 py-1 text-[11px] font-bold text-white bg-black hover:bg-zinc-800 rounded-md transition shadow-xs"
+                      >
+                        Receive →
+                      </button>
+                    ) : (
+                      <span className="text-emerald-700 font-semibold text-[11px]">✓ Verified</span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );

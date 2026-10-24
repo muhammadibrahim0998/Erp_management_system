@@ -208,7 +208,7 @@ const requireRoles = (allowedRoles = []) => {
 /**
  * Enforces Admin privileges (ERP Admin or Chairman & CEO) backed by database verification
  */
-const requireAdmin = requireRoles(['ERP Admin', 'Chairman & CEO']);
+const requireAdmin = requireRoles(['Super Admin', 'ERP Admin', 'Chairman & CEO']);
 
 module.exports = {
   JWT_SECRET,

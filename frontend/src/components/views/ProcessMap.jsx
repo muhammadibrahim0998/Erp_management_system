@@ -23,34 +23,34 @@ import DemoBadge from '../DemoBadge';
 const processes = [
   {
     id: 'receiving',
-    title: 'Egg Receiving & QC',
-    description: 'Supplier farm → Gate pass → QC cell inspection → Store receipt.',
+    title: 'Goods Receiving & QC',
+    description: 'Supplier shipment → Gate pass → QC inspection → Store receipt.',
     color: 'emerald',
     icon: Truck,
     steps: [
-      { name: 'Supplier farm', role: 'Poultry Farms (Zahid Afridi)', desc: 'Eggs loaded at Charsadda / Swabi / Haripur farm.', status: 'done' },
+      { name: 'Supplier shipment', role: 'Supply Chain Partner (Zahid Afridi)', desc: 'Goods dispatched from regional supplier warehouse.', status: 'done' },
       { name: 'Gate in', role: 'Gate Officer (Gul Rehman)', desc: 'Issues inward gate pass (GPI-YYYY-NNNN). Vehicle logged.', status: 'done' },
-      { name: 'QC cell', role: 'QC Cell (Dr. Asma Noor)', desc: 'Checks weight, cracks %, Haugh unit, temperature, hygiene, pests. Issues GRN.', status: 'active' },
-      { name: 'Raw material store', role: 'Raw Material Store (Usman Ali)', desc: 'Unloads accepted trays, records in inventory by grade. Returns rejected.', status: 'pending' },
+      { name: 'QC cell', role: 'QC Cell (Dr. Asma Noor)', desc: 'Checks product specs, weight, packaging integrity, and temperature. Issues GRN.', status: 'active' },
+      { name: 'Raw material store', role: 'Raw Material Store (Usman Ali)', desc: 'Unloads accepted products, records in inventory by SKU/grade. Returns rejected.', status: 'pending' },
       { name: 'Gate out', role: 'Gate Officer (Gul Rehman)', desc: 'Empty vehicle cleared out after store confirmation.', status: 'pending' },
     ]
   },
   {
     id: 'production',
-    title: 'Liquid Egg Production',
-    description: 'Sales order → GM approve → Plant plan → Breaking → Pasteurize → Dispatch.',
+    title: 'Product Manufacturing & Assembly',
+    description: 'Sales order → GM approve → Plant plan → Processing → Quality check → Dispatch.',
     color: 'blue',
     icon: Layers,
     steps: [
-      { name: 'Sales order', role: 'Sales Officer (Bilal Yousafzai)', desc: 'Customer orders liquid egg (whole/yolk/white). SO created with credit check.', status: 'done' },
+      { name: 'Sales order', role: 'Sales Officer (Bilal Yousafzai)', desc: 'Customer places product order. SO created with credit check.', status: 'done' },
       { name: 'GM approval', role: 'General Manager (Khalid Mehmood)', desc: 'Confirms batch is commercially viable. Releases work order (WO-YYYY-NNNN).', status: 'done' },
-      { name: 'Plant Manager', role: 'Plant Manager (Usama Tariq)', desc: 'Schedules plant time & labour. Calculates recipe — eggs, salt, pasteurization.', status: 'active' },
-      { name: 'Production Manager', role: 'Production Manager (Farhan Ali)', desc: 'Requests raw materials from store. Assigns breaking shift supervisor.', status: 'active' },
-      { name: 'Raw material issue', role: 'Raw Material Store (Usman Ali)', desc: 'Issues calculated trays to Breaking Supervisor (Sher Zaman).', status: 'pending' },
-      { name: 'Breaking & processing', role: 'Breaking Supervisor (Sher Zaman)', desc: 'Shell eggs broken, liquid separated. Pasteurized & cooled at Rashakai plant.', status: 'bottleneck' },
-      { name: 'Finish store', role: 'Finish Store & Delivery (Waqas Ahmed)', desc: 'Pasteurized liquid stored in insulated tanks. Quality sealed.', status: 'pending' },
-      { name: 'Dispatch', role: 'Finish Store & Delivery (Waqas Ahmed)', desc: 'Loaded into refrigerated tankers with dispatch note & invoice.', status: 'pending' },
-      { name: 'Customer', role: 'Customer (Peek Freans / Dawn Foods)', desc: 'Liquid egg delivered. Invoice posted. Receivable created.', status: 'pending' },
+      { name: 'Plant Manager', role: 'Plant Manager (Usama Tariq)', desc: 'Schedules plant time & labour. Calculates bill of materials & recipe.', status: 'active' },
+      { name: 'Production Manager', role: 'Production Manager (Farhan Ali)', desc: 'Requests raw materials from store. Assigns shift supervisor.', status: 'active' },
+      { name: 'Raw material issue', role: 'Raw Material Store (Usman Ali)', desc: 'Issues calculated components & inventory to Shift Supervisor (Sher Zaman).', status: 'pending' },
+      { name: 'Assembly & processing', role: 'Production Supervisor (Sher Zaman)', desc: 'Materials processed, assembled and quality-checked at main plant.', status: 'bottleneck' },
+      { name: 'Finish store', role: 'Finish Store & Delivery (Waqas Ahmed)', desc: 'Finished goods stored in secure warehouse. Quality sealed.', status: 'pending' },
+      { name: 'Dispatch', role: 'Finish Store & Delivery (Waqas Ahmed)', desc: 'Loaded into dispatch transport with delivery note & invoice.', status: 'pending' },
+      { name: 'Customer', role: 'Customer (Dawn Foods / FMCG Partners)', desc: 'Finished product delivered. Invoice posted. Receivable created.', status: 'pending' },
     ]
   },
   {
@@ -60,7 +60,7 @@ const processes = [
     color: 'amber',
     icon: Package,
     steps: [
-      { name: 'Department need', role: 'Any Department Head', desc: 'Identifies requirement — eggs, feed, vet supplies, packing, equipment.', status: 'done' },
+      { name: 'Department need', role: 'Any Department Head', desc: 'Identifies requirement — raw materials, packaging, inventory and equipment.', status: 'done' },
       { name: 'Purchase requisition', role: 'Department Head', desc: 'Raises PR. System routes to Procurement.', status: 'done' },
       { name: 'Quotation & comparison', role: 'Procurement (Waqar Ahmad)', desc: 'Gets at least 3 quotes. Attaches comparison to PO draft.', status: 'done' },
       { name: 'PO approval (Band 1–3)', role: 'Finance + CEO (based on amount)', desc: 'Band 1: ≤500K → Finance. Band 2: ≤2.5M → Finance. Band 3: >2.5M → CEO.', status: 'active' },
@@ -437,7 +437,7 @@ export default function ProcessMap({ onNavigate }) {
             <tbody className="divide-y divide-gray-100 font-medium">
               {[
                 { name: 'Goods Receiving & QC', start: 'Supplier Shipment', owner: 'QC Cell (Dr. Asma Noor)', final: 'Store Incharge (Usman Ali)', steps: 5, target: 'gate' },
-                { name: 'Manufacturing & Processing', start: 'Sales Order Approval', owner: 'Production Mgr (Farhan Ali)', final: 'Plant Mgr (Usama Tariq)', steps: 9, target: 'production' },
+                { name: 'Manufacturing & Assembly', start: 'Sales Order Approval', owner: 'Production Mgr (Farhan Ali)', final: 'Plant Mgr (Usama Tariq)', steps: 9, target: 'production' },
                 { name: 'Procurement (POs)', start: 'Department Requisition', owner: 'Purchasing (Waqar Ahmad)', final: 'Finance / CEO', steps: 6, target: 'procurement' },
                 { name: 'Sales & Credit Control', start: 'Customer Order', owner: 'Sales Officer (Bilal Yousafzai)', final: 'Chairman & CEO', steps: 6, target: 'sales' },
                 { name: 'Monthly Payroll Run', start: 'HR Attendance', owner: 'HR Manager (Nadia Shah)', final: 'Chairman & CEO', steps: 5, target: 'payroll' },
