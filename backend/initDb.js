@@ -296,6 +296,28 @@ async function initSchema(connection = db) {
       ) ENGINE=InnoDB;
     `);
 
+    // Ensure purchase_order sequence is initialized safely if not already present
+    const [poSeqRows] = await conn.query(
+      "SELECT seq_key FROM document_sequences WHERE seq_key = 'purchase_order'"
+    );
+    if (poSeqRows.length === 0) {
+      const [maxPoRows] = await conn.query(
+        "SELECT po_number FROM purchase_orders WHERE po_number LIKE 'PO-2026-%' ORDER BY po_number DESC LIMIT 1"
+      );
+      let initVal = 935;
+      if (maxPoRows.length > 0 && maxPoRows[0]?.po_number) {
+        const parts = maxPoRows[0].po_number.split('-');
+        const parsed = parseInt(parts[parts.length - 1], 10);
+        if (!isNaN(parsed) && parsed > 0) {
+          initVal = Math.max(initVal, parsed);
+        }
+      }
+      await conn.query(
+        "INSERT IGNORE INTO document_sequences (seq_key, prefix, current_val) VALUES ('purchase_order', 'PO-2026', ?)",
+        [initVal]
+      );
+    }
+
     // 8. Marketing Campaigns
     await conn.query(`
       CREATE TABLE IF NOT EXISTS marketing_campaigns (
@@ -589,7 +611,8 @@ async function seedDemoData(connection = db, env = process.env) {
         ('sales_invoice', 'INV-2026', 100),
         ('sales_payment', 'PAY-2026', 50),
         ('production_order', 'WO-2026', 100),
-        ('payroll_run', 'PAY-2026', 9)
+        ('payroll_run', 'PAY-2026', 9),
+        ('purchase_order', 'PO-2026', 935)
       `);
     }
 

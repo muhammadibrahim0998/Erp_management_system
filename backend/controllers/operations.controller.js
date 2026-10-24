@@ -197,32 +197,99 @@ const getProcurementPOs = async (req, res) => {
   }
 };
 
+const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+function formatDocumentDate(d = new Date()) {
+  const dateObj = d instanceof Date && !isNaN(d) ? d : new Date();
+  return `${dateObj.getDate()} ${MONTH_NAMES[dateObj.getMonth()]} ${dateObj.getFullYear()}`;
+}
+
 const createProcurementPO = async (req, res) => {
   const { supplier, amount, items_count } = req.body;
-  if (!supplier || amount === undefined || isNaN(Number(amount))) {
-    return res.status(400).json({ error: 'Valid supplier name and amount are required' });
+
+  // 1. Validate Supplier
+  if (typeof supplier !== 'string' || !supplier.trim()) {
+    return res.status(400).json({ error: 'Valid supplier name is required' });
   }
-  const creatorName = req.user?.name || req.trustedUser?.name || 'Procurement Officer';
-  const creatorRole = req.user?.role || req.trustedUser?.role || 'Procurement';
-  const po_number = `PO-2026-09${Math.floor(Math.random() * 89 + 10)}`;
+  const cleanSupplier = supplier.trim();
+
+  // 2. Validate Amount
+  const numAmount = Number(amount);
+  if (
+    amount === undefined ||
+    amount === null ||
+    typeof amount === 'boolean' ||
+    isNaN(numAmount) ||
+    !Number.isFinite(numAmount) ||
+    numAmount <= 0
+  ) {
+    return res.status(400).json({ error: 'Valid positive purchase order amount is required' });
+  }
+  const cleanAmount = Math.round(numAmount * 100) / 100;
+  if (cleanAmount <= 0) {
+    return res.status(400).json({ error: 'Purchase order amount must be greater than zero' });
+  }
+
+  // 3. Validate items_count (positive integer >= 1)
+  let cleanItemsCount = 1;
+  if (items_count !== undefined) {
+    if (typeof items_count === 'boolean' || items_count === null) {
+      return res.status(400).json({ error: 'items_count must be a positive integer' });
+    }
+    const parsedCount = Number(items_count);
+    if (!Number.isInteger(parsedCount) || parsedCount <= 0) {
+      return res.status(400).json({ error: 'items_count must be a positive integer' });
+    }
+    cleanItemsCount = parsedCount;
+  }
+
+  // 4. Authenticated identity attribution (fail-closed if profile incomplete)
+  const authenticatedUserId = req.user?.id || req.trustedUser?.id;
+  const creatorName = req.trustedUser?.name || req.user?.name;
+  const creatorRole = req.trustedUser?.role || req.user?.role;
+
+  if (!creatorName || typeof creatorName !== 'string' || !creatorName.trim()) {
+    return res.status(403).json({ error: 'Authenticated user profile is incomplete' });
+  }
+  const cleanCreator = creatorName.trim();
+  const cleanRole = typeof creatorRole === 'string' && creatorRole.trim() ? creatorRole.trim() : 'Procurement';
+
+  const connection = await db.getConnection();
   try {
-    await db.query(
-      'INSERT INTO purchase_orders (po_number, po_date, supplier, status, created_by, amount, items_count) VALUES (?, "29 Sep 2026", ?, "Draft", ?, ?, ?)',
-      [po_number, supplier, creatorName, amount, items_count || 1]
+    await connection.beginTransaction();
+
+    const po_number = await getNextDocNumber('purchase_order', 'PO-2026', connection);
+    const po_date = formatDocumentDate(new Date());
+
+    await connection.query(
+      `INSERT INTO purchase_orders
+       (po_number, po_date, supplier, status, created_by, amount, items_count)
+       VALUES (?, ?, ?, 'Draft', ?, ?, ?)`,
+      [po_number, po_date, cleanSupplier, cleanCreator, cleanAmount, cleanItemsCount]
     );
+
     await logAudit({
       req,
-      userId: req.user?.id,
-      userName: creatorName,
-      role: creatorRole,
+      userId: authenticatedUserId,
+      userName: cleanCreator,
+      role: cleanRole,
       action: 'CREATE_PO',
       entityType: 'PURCHASE_ORDER',
       entityId: po_number,
-      details: `${creatorRole} (${creatorName}) generated purchase order ${po_number} for supplier: ${supplier} (PKR ${Number(amount).toLocaleString()})`
+      details: `${cleanRole} (${cleanCreator}) generated purchase order ${po_number} for supplier: ${cleanSupplier} (PKR ${cleanAmount.toLocaleString()})`,
+      connection
     });
-    res.json({ success: true, po_number });
+
+    await connection.commit();
+    res.status(201).json({ success: true, po_number });
   } catch (err) {
+    try {
+      await connection.rollback();
+    } catch (rbErr) {
+      console.error('❌ Transaction rollback failure:', rbErr.message);
+    }
     res.status(500).json({ error: err.message });
+  } finally {
+    connection.release();
   }
 };
 
@@ -1122,5 +1189,6 @@ module.exports = {
   getSettingsMatrix,
   CORPORATE_CUSTOMER_PROFILES,
   resolveCustomerCreditPolicy,
-  getDefaultUnvettedCreditLimit
+  getDefaultUnvettedCreditLimit,
+  formatDocumentDate,
 };
