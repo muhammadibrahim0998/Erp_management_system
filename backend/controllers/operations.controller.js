@@ -305,20 +305,125 @@ const getProductionBoard = async (req, res) => {
   }
 };
 
+const PRODUCTION_STAGES = [
+  'With GM',
+  'With Plant Manager',
+  'With Production Manager',
+  'Materials requested',
+  'In production',
+  'Completed'
+];
+
 const moveProduction = async (req, res) => {
   const { id, stage } = req.body;
+
+  // 1. Validate ID
+  const orderId = Number(id);
+  if (
+    id === undefined ||
+    id === null ||
+    typeof id === 'boolean' ||
+    isNaN(orderId) ||
+    !Number.isInteger(orderId) ||
+    orderId <= 0
+  ) {
+    return res.status(400).json({ error: 'Valid production order ID is required' });
+  }
+
+  // 2. Validate Target Stage
+  if (typeof stage !== 'string' || !stage.trim()) {
+    return res.status(400).json({ error: 'Valid target production stage is required' });
+  }
+  const cleanTargetStage = stage.trim();
+  const targetIdx = PRODUCTION_STAGES.indexOf(cleanTargetStage);
+  if (targetIdx === -1) {
+    return res.status(400).json({
+      error: `Invalid production stage: "${cleanTargetStage}". Allowed stages: ${PRODUCTION_STAGES.join(', ')}`
+    });
+  }
+
+  // 3. Concurrency-Safe Transaction with Row Lock
+  const connection = await db.getConnection();
   try {
-    await db.query('UPDATE production_orders SET stage = ? WHERE id = ?', [stage, id]);
+    await connection.beginTransaction();
+
+    const [orders] = await connection.query(
+      'SELECT id, wo_number, stage, status FROM production_orders WHERE id = ? FOR UPDATE',
+      [orderId]
+    );
+
+    if (orders.length === 0) {
+      await connection.rollback();
+      return res.status(404).json({ error: `Production order #${orderId} not found` });
+    }
+
+    const order = orders[0];
+    const currentStage = order.stage;
+    const currentIdx = PRODUCTION_STAGES.indexOf(currentStage);
+
+    if (currentIdx === -1) {
+      await connection.rollback();
+      return res.status(400).json({
+        error: `Current order stage "${currentStage}" is not a recognized production stage`
+      });
+    }
+
+    // Redundant transition check
+    if (currentIdx === targetIdx) {
+      await connection.rollback();
+      return res.status(400).json({
+        error: `Order #${orderId} is already in "${currentStage}" stage. Cannot transition to the same stage.`
+      });
+    }
+
+    // Permitted transition: strict sequential forward advancement (+1 only)
+    if (targetIdx !== currentIdx + 1) {
+      await connection.rollback();
+      return res.status(400).json({
+        error: `Invalid stage transition from "${currentStage}" to "${cleanTargetStage}". Only sequential forward advancement to the immediate next stage is permitted.`
+      });
+    }
+
+    // Update authoritative stage
+    await connection.query(
+      'UPDATE production_orders SET stage = ? WHERE id = ?',
+      [cleanTargetStage, orderId]
+    );
+
+    // Resolve authenticated identity for transactional audit log
+    const authenticatedUserId = req.user?.id || req.trustedUser?.id;
+    const actorName = req.trustedUser?.name || req.user?.name || 'Staff';
+    const actorRole = req.trustedUser?.role || req.user?.role || 'Staff';
+
     await logAudit({
       req,
+      userId: authenticatedUserId,
+      userName: actorName,
+      role: actorRole,
       action: 'MOVE_PRODUCTION',
       entityType: 'PRODUCTION',
-      entityId: id,
-      details: `Moved production work order #${id} to stage: "${stage}"`
+      entityId: orderId,
+      details: `${actorRole} (${actorName}) moved production work order #${orderId} (${order.wo_number}) from "${currentStage}" to "${cleanTargetStage}"`,
+      connection
     });
-    res.json({ success: true });
+
+    await connection.commit();
+    res.json({
+      success: true,
+      id: orderId,
+      wo_number: order.wo_number,
+      previousStage: currentStage,
+      stage: cleanTargetStage
+    });
   } catch (err) {
+    try {
+      await connection.rollback();
+    } catch (rbErr) {
+      console.error('❌ Transaction rollback failure:', rbErr.message);
+    }
     res.status(500).json({ error: err.message });
+  } finally {
+    connection.release();
   }
 };
 
@@ -1191,4 +1296,5 @@ module.exports = {
   resolveCustomerCreditPolicy,
   getDefaultUnvettedCreditLimit,
   formatDocumentDate,
+  PRODUCTION_STAGES
 };
