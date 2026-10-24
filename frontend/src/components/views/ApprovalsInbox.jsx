@@ -18,6 +18,7 @@ export default function ApprovalsInbox({ tasks, onApproveTask, isLoading, error,
   const [processingId, setProcessingId] = useState(null);
   const [rowError, setRowError] = useState(null);
   const [rejectModalTask, setRejectModalTask] = useState(null);
+  const [decisionAction, setDecisionAction] = useState('rejected');
   const [rejectReason, setRejectReason] = useState('');
   const [rejectError, setRejectError] = useState('');
 
@@ -43,39 +44,34 @@ export default function ApprovalsInbox({ tasks, onApproveTask, isLoading, error,
     }
   };
 
-  const handleReturn = async (task) => {
-    setProcessingId(task.id);
-    setRowError(null);
-    try {
-      await onApproveTask(task.id, 'returned');
-      if (onRefetch) onRefetch();
-    } catch (err) {
-      setRowError({ id: task.id, message: err.message || 'Action failed' });
-    } finally {
-      setProcessingId(null);
-    }
+  const handleReturn = (task) => {
+    setRejectModalTask(task);
+    setDecisionAction('returned');
+    setRejectReason('');
+    setRejectError('');
   };
 
   const handleOpenReject = (task) => {
     setRejectModalTask(task);
+    setDecisionAction('rejected');
     setRejectReason('');
     setRejectError('');
   };
 
   const handleConfirmReject = async () => {
     if (!rejectReason.trim()) {
-      setRejectError('A non-empty rejection reason is required before sending.');
+      setRejectError(`A non-empty reason is required before ${decisionAction === 'returned' ? 'returning' : 'rejecting'}.`);
       return;
     }
     setProcessingId(rejectModalTask.id);
     setRejectError('');
     try {
-      await onApproveTask(rejectModalTask.id, 'rejected', rejectReason.trim());
+      await onApproveTask(rejectModalTask.id, decisionAction, rejectReason.trim());
       setRejectModalTask(null);
       setRejectReason('');
       if (onRefetch) onRefetch();
     } catch (err) {
-      setRejectError(err.message || 'Rejection failed');
+      setRejectError(err.message || `${decisionAction === 'returned' ? 'Return' : 'Rejection'} failed`);
     } finally {
       setProcessingId(null);
     }
@@ -244,7 +240,7 @@ export default function ApprovalsInbox({ tasks, onApproveTask, isLoading, error,
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl border border-gray-200 shadow-xl max-w-md w-full p-6 space-y-4">
             <div className="flex items-center justify-between">
-              <h3 className="text-base font-bold text-gray-900">Reject Task {rejectModalTask.doc_number}</h3>
+              <h3 className="text-base font-bold text-gray-900">{decisionAction === 'returned' ? 'Return' : 'Reject'} Task {rejectModalTask.doc_number}</h3>
               <button
                 onClick={() => { setRejectModalTask(null); setRejectReason(''); setRejectError(''); }}
                 className="text-gray-400 hover:text-gray-600"
@@ -253,18 +249,18 @@ export default function ApprovalsInbox({ tasks, onApproveTask, isLoading, error,
               </button>
             </div>
             <p className="text-xs text-gray-500">
-              Please provide a mandatory reason for rejecting this document.
+              Please provide a mandatory reason for {decisionAction === 'returned' ? 'returning' : 'rejecting'} this document.
             </p>
             <div>
               <textarea
                 value={rejectReason}
                 onChange={(e) => { setRejectReason(e.target.value); setRejectError(''); }}
-                placeholder="Enter rejection reason..."
-                className="w-full text-xs p-3 border border-gray-300 rounded-lg focus:outline-none focus:border-rose-500 h-24"
+                placeholder={`Enter ${decisionAction === 'returned' ? 'return' : 'rejection'} reason...`}
+                className="w-full text-xs p-3 border border-gray-300 rounded-lg focus:outline-none focus:border-black h-24"
                 rows={3}
               />
               <p className="text-[11px] text-gray-500 mt-1">
-                The reason is sent with the request. Saving it on the record needs a backend update.
+                The reason is recorded in the transaction audit trail.
               </p>
               {rejectError && (
                 <p className="text-xs text-rose-600 font-semibold mt-1">{rejectError}</p>
@@ -283,10 +279,12 @@ export default function ApprovalsInbox({ tasks, onApproveTask, isLoading, error,
                 type="button"
                 onClick={handleConfirmReject}
                 disabled={processingId === rejectModalTask.id}
-                className="px-4 py-1.5 rounded-lg bg-rose-600 text-white text-xs font-bold hover:bg-rose-700 transition flex items-center gap-1.5 disabled:opacity-50"
+                className={`px-4 py-1.5 rounded-lg text-white text-xs font-bold transition flex items-center gap-1.5 disabled:opacity-50 ${
+                  decisionAction === 'returned' ? 'bg-amber-600 hover:bg-amber-700' : 'bg-rose-600 hover:bg-rose-700'
+                }`}
               >
                 {processingId === rejectModalTask.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
-                <span>Confirm Rejection</span>
+                <span>{decisionAction === 'returned' ? 'Confirm Return' : 'Confirm Rejection'}</span>
               </button>
             </div>
           </div>

@@ -21,7 +21,7 @@ router.get('/dashboard/chairman', authenticateToken, requireRoles(EXECUTIVE_ROLE
 
 // Workflow Approvals Inbox
 router.get('/approvals', authenticateToken, operationsController.getApprovals);
-router.post('/approvals/:id/action', authenticateToken, requireRoles(WORKFLOW_ROLES), operationsController.actionApproval);
+router.post('/approvals/:id/action', authenticateToken, operationsController.actionApproval);
 
 // Live Operations Control Room
 router.get('/live-operations', authenticateToken, operationsController.getLiveOperations);

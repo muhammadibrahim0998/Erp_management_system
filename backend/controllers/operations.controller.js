@@ -3,13 +3,80 @@ const { db } = require('../config/db');
 const auditLogger = require('../utils/auditLogger');
 const { logAudit } = auditLogger;
 const { getNextDocNumber } = require('../utils/sequence');
+const { getTrustedUser } = require('../middlewares/auth');
+
+const VALID_ERP_ROLES = [
+  'Chairman & CEO',
+  'General Manager',
+  'Director Operations',
+  'Director Finance',
+  'Plant Manager',
+  'Production Manager',
+  'Breaking Supervisor',
+  'Gate Officer',
+  'QC Cell',
+  'Raw Material Store',
+  'Finish Store & Delivery',
+  'Procurement',
+  'Sales Manager',
+  'Sales Officer',
+  'Head of Marketing',
+  'Social Media & Content',
+  'Accounts Officer',
+  'HR Manager',
+  'Poultry Farms',
+  'ERP Admin',
+  'Staff'
+];
 
 /**
  * 1. Chairman's Executive Dashboard
  */
 const getChairmanDashboard = async (req, res) => {
   try {
-    const [tasks] = await db.query('SELECT * FROM workflow_tasks WHERE status = "pending" LIMIT 6');
+    const userId = req.user?.id;
+    const trustedUser = req.trustedUser || (userId ? await getTrustedUser(userId) : null);
+    const userRole = (typeof trustedUser?.role === 'string') ? trustedUser.role.trim() : (req.user?.role || '');
+    const userName = (typeof trustedUser?.name === 'string') ? trustedUser.name.trim() : (req.user?.name || '');
+    const callerId = Number(trustedUser?.id || req.user?.id);
+    const validCallerId = Number.isInteger(callerId) && callerId > 0 ? callerId : -1;
+
+    // DEC-02: A & DEC-06: A: Least-privilege visibility for pending workflow approvals
+    let tasks = [];
+    if (userRole === 'ERP Admin') {
+      // ERP Admin is barred from operational & financial approvals; receive empty waitingApprovals (F3 remediation)
+      tasks = [];
+    } else if (userRole === 'Chairman & CEO' || userRole === 'General Manager') {
+      const [allPending] = await db.query(
+        'SELECT * FROM workflow_tasks WHERE status = "pending" ORDER BY id ASC LIMIT 6'
+      );
+      tasks = allPending;
+    } else if (userRole === 'Director Operations') {
+      const [opsPending] = await db.query(
+        `SELECT * FROM workflow_tasks
+         WHERE status = "pending"
+           AND (doc_type IN ('Production order', 'Gate pass — inward', 'Goods receipt (GRN)', 'Raw material requirement')
+                OR assigned_user_id = ?
+                OR LOWER(assigned_role) = LOWER(?))
+         ORDER BY id ASC LIMIT 6`,
+        [validCallerId, userRole]
+      );
+      tasks = opsPending;
+    } else if (userRole === 'Director Finance') {
+      const [finPending] = await db.query(
+        `SELECT * FROM workflow_tasks
+         WHERE status = "pending"
+           AND (doc_type = 'Purchase order'
+                OR assigned_user_id = ?
+                OR LOWER(assigned_role) = LOWER(?))
+         ORDER BY id ASC LIMIT 6`,
+        [validCallerId, userRole]
+      );
+      tasks = finPending;
+    } else {
+      tasks = [];
+    }
+
     const [inventoryCount] = await db.query('SELECT COUNT(*) as count FROM inventory_items WHERE status = "Reorder"');
     const [totalOrders] = await db.query('SELECT COUNT(*) as count FROM purchase_orders');
 
@@ -66,49 +133,566 @@ const getChairmanDashboard = async (req, res) => {
 
 /**
  * 2. Approvals & Tasks Inbox
+ * Enforces least-privilege inbox visibility and atomic, transaction-safe workflow task decisions (SEC-03).
  */
 const getApprovals = async (req, res) => {
+  const userId = req.user?.id;
+  if (!userId) {
+    return res.status(401).json({ error: 'Access denied: Authentication required.' });
+  }
+
   try {
-    const [tasks] = await db.query('SELECT * FROM workflow_tasks ORDER BY id ASC');
-    res.json(tasks);
+    const trustedUser = req.trustedUser || (await getTrustedUser(userId));
+    if (!trustedUser || trustedUser.status !== 'active') {
+      return res.status(403).json({ error: 'Access denied: User account is inactive or not found.' });
+    }
+
+    const userRole = (typeof trustedUser.role === 'string') ? trustedUser.role.trim() : '';
+    const userName = (typeof trustedUser.name === 'string') ? trustedUser.name.trim() : '';
+    const callerId = Number(trustedUser.id);
+    const validCallerId = Number.isInteger(callerId) && callerId > 0 ? callerId : -1;
+
+    // DEC-02: A: ERP Admin is barred from operational & financial approvals; receive empty inbox
+    if (userRole === 'ERP Admin') {
+      return res.json([]);
+    }
+
+    // DEC-06: A: Least-privilege approval-inbox visibility
+    // 1. Enterprise-wide Executive Oversight: Chairman & CEO and General Manager see all tasks
+    if (userRole === 'Chairman & CEO' || userRole === 'General Manager') {
+      const [tasks] = await db.query('SELECT * FROM workflow_tasks ORDER BY id ASC');
+      return res.json(tasks);
+    }
+
+    // 2. Departmental Executive Oversight
+    if (userRole === 'Director Operations') {
+      const [tasks] = await db.query(
+        `SELECT * FROM workflow_tasks
+         WHERE doc_type IN ('Production order', 'Gate pass — inward', 'Goods receipt (GRN)', 'Raw material requirement')
+            OR assigned_user_id = ?
+            OR LOWER(assigned_role) = LOWER(?)
+         ORDER BY id ASC`,
+        [validCallerId, userRole]
+      );
+      return res.json(tasks);
+    }
+
+    if (userRole === 'Director Finance') {
+      const [tasks] = await db.query(
+        `SELECT * FROM workflow_tasks
+         WHERE doc_type = 'Purchase order'
+            OR assigned_user_id = ?
+            OR LOWER(assigned_role) = LOWER(?)
+         ORDER BY id ASC`,
+        [validCallerId, userRole]
+      );
+      return res.json(tasks);
+    }
+
+    if (userRole === 'HR Manager') {
+      const [tasks] = await db.query(
+        `SELECT * FROM workflow_tasks
+         WHERE doc_type = 'Payroll run'
+            OR assigned_user_id = ?
+            OR LOWER(assigned_role) = LOWER(?)
+         ORDER BY id ASC`,
+        [validCallerId, userRole]
+      );
+      return res.json(tasks);
+    }
+
+    // 3. Operational Assignees (Plant Manager, Production Manager, QC Cell, Raw Material Store, Procurement, Sales Manager, etc.)
+    // Only see tasks explicitly assigned to their exact stable user ID or exact canonical role
+    const [tasks] = await db.query(
+      `SELECT * FROM workflow_tasks
+       WHERE assigned_user_id = ?
+          OR LOWER(assigned_role) = LOWER(?)
+       ORDER BY id ASC`,
+      [validCallerId, userRole]
+    );
+
+    return res.json(tasks);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return res.status(500).json({ error: 'Failed to retrieve workflow tasks' });
   }
 };
 
-const actionApproval = async (req, res) => {
-  const { id } = req.params;
-  const { action } = req.body; // 'approved' | 'rejected' | 'completed'
+const CANONICAL_DOC_TYPES = {
+  PURCHASE_ORDER: 'purchase_order',
+  GATE_PASS: 'gate_pass',
+  PRODUCTION_ORDER: 'production_order',
+  GOODS_RECEIPT: 'goods_receipt',
+  RAW_MATERIAL_REQUIREMENT: 'raw_material_requirement',
+  PAYROLL_RUN: 'payroll_run',
+  UNKNOWN: 'unknown'
+};
 
-  const validActions = ['approved', 'rejected', 'completed'];
-  const normalizedAction = (typeof action === 'string') ? action.trim().toLowerCase() : 'completed';
-  if (!validActions.includes(normalizedAction)) {
-    return res.status(400).json({ error: `Invalid action "${action}". Allowed: ${validActions.join(', ')}` });
+/**
+ * Normalizes document type strings from workflow_tasks into canonical identifiers.
+ * Trims leading/trailing whitespace, normalizes case, normalizes Unicode dash variants
+ * (em dash \u2014, en dash \u2013, horizontal bar \u2015, figure dash \u2012) to standard ASCII hyphen (-),
+ * and maps known aliases strictly to canonical types without broad substring matching.
+ */
+function normalizeWorkflowDocType(rawDocType) {
+  if (typeof rawDocType !== 'string') return CANONICAL_DOC_TYPES.UNKNOWN;
+  let s = rawDocType.trim().toLowerCase();
+  if (!s) return CANONICAL_DOC_TYPES.UNKNOWN;
+
+  // Normalize Unicode dashes to standard ASCII hyphen
+  s = s.replace(/[\u2012\u2013\u2014\u2015]/g, '-');
+  // Condense internal whitespace runs
+  s = s.replace(/\s+/g, ' ');
+
+  // Exact alias matching against supported document types (no loose substring matching)
+  if (s === 'purchase order' || s === 'po') {
+    return CANONICAL_DOC_TYPES.PURCHASE_ORDER;
+  }
+  if (
+    s === 'gate pass - inward' ||
+    s === 'gate pass inward' ||
+    s === 'gate pass - outward' ||
+    s === 'gate pass outward' ||
+    s === 'gate pass' ||
+    s === 'gpi'
+  ) {
+    return CANONICAL_DOC_TYPES.GATE_PASS;
+  }
+  if (s === 'production order' || s === 'work order' || s === 'wo') {
+    return CANONICAL_DOC_TYPES.PRODUCTION_ORDER;
+  }
+  if (s === 'goods receipt (grn)' || s === 'goods receipt grn' || s === 'goods receipt' || s === 'grn') {
+    return CANONICAL_DOC_TYPES.GOODS_RECEIPT;
+  }
+  if (s === 'raw material requirement' || s === 'raw material' || s === 'rmr') {
+    return CANONICAL_DOC_TYPES.RAW_MATERIAL_REQUIREMENT;
+  }
+  if (s === 'payroll run' || s === 'payroll') {
+    return CANONICAL_DOC_TYPES.PAYROLL_RUN;
   }
 
-  const actorName = req.user?.name || req.trustedUser?.name || 'Executive Officer';
-  const actorRole = req.user?.role || req.trustedUser?.role || 'Executive';
+  return CANONICAL_DOC_TYPES.UNKNOWN;
+}
 
+const actionApproval = async (req, res) => {
+  const { id } = req.params;
+  const taskId = Number(id);
+  if (!id || isNaN(taskId) || !Number.isInteger(taskId) || taskId <= 0) {
+    return res.status(400).json({ error: 'Valid positive integer task ID is required' });
+  }
+
+  const { action, reason } = req.body;
+  if (typeof action !== 'string' || !action.trim()) {
+    return res.status(400).json({ error: 'Valid action is required' });
+  }
+
+  const validActions = ['approved', 'rejected', 'returned', 'completed'];
+  const normalizedAction = action.trim().toLowerCase();
+  if (!validActions.includes(normalizedAction)) {
+    return res.status(400).json({
+      error: `Invalid action "${action}". Allowed actions: ${validActions.join(', ')}`
+    });
+  }
+
+  // Enforce mandatory non-empty reason for rejected and returned actions (DEC-07, Finding SEC-03.07)
+  let cleanReason = null;
+  if (normalizedAction === 'rejected' || normalizedAction === 'returned') {
+    if (typeof reason !== 'string' || !reason.trim()) {
+      return res.status(400).json({
+        error: `A non-empty reason is mandatory for "${normalizedAction}" action.`
+      });
+    }
+    cleanReason = reason.trim();
+  } else if (typeof reason === 'string' && reason.trim()) {
+    cleanReason = reason.trim();
+  }
+
+  // Authenticated identity verification (fail-closed against DB record)
+  const userId = req.user?.id;
+  if (!userId) {
+    return res.status(401).json({ error: 'Access denied: Authentication required.' });
+  }
+
+  let connection = null;
   try {
-    const [existing] = await db.query('SELECT id, status, title FROM workflow_tasks WHERE id = ?', [id]);
-    if (existing.length === 0) {
-      return res.status(404).json({ error: `Workflow task #${id} not found` });
+    const trustedUser = req.trustedUser || (await getTrustedUser(userId));
+    if (!trustedUser || trustedUser.status !== 'active') {
+      return res.status(403).json({
+        error: 'Unable to establish trusted approver identity: Account is inactive or does not exist.'
+      });
     }
 
-    await db.query('UPDATE workflow_tasks SET status = ? WHERE id = ?', [normalizedAction, id]);
-    await logAudit({
+    const callerId = Number(trustedUser.id);
+    if (!Number.isInteger(callerId) || callerId <= 0) {
+      return res.status(403).json({
+        error: 'Unable to establish trusted approver identity: Invalid user ID.'
+      });
+    }
+
+    const userName = (typeof trustedUser.name === 'string') ? trustedUser.name.trim() : '';
+    const userRole = (typeof trustedUser.role === 'string') ? trustedUser.role.trim() : '';
+    if (!userName || !userRole) {
+      return res.status(403).json({
+        error: 'Unable to establish trusted approver identity: Incomplete user profile.'
+      });
+    }
+
+    // DEC-02: A: ERP Admin is barred from operational and financial workflow approvals
+    if (userRole === 'ERP Admin') {
+      return res.status(403).json({
+        error: 'Access Denied: ERP Admin is barred from operational and financial workflow approvals.'
+      });
+    }
+
+    // Acquire dedicated connection and begin atomic transaction
+    connection = await db.getConnection();
+    await connection.beginTransaction();
+
+    // Lock the task row with FOR UPDATE
+    const [taskRows] = await connection.query(
+      `SELECT * FROM workflow_tasks WHERE id = ? FOR UPDATE`,
+      [taskId]
+    );
+
+    if (taskRows.length === 0) {
+      await connection.rollback();
+      return res.status(404).json({ error: `Workflow task #${taskId} not found.` });
+    }
+
+    const task = taskRows[0];
+
+    // State transition guard: Only pending tasks can receive a decision
+    if (typeof task.status !== 'string' || task.status.trim().toLowerCase() !== 'pending') {
+      await connection.rollback();
+      return res.status(400).json({
+        error: `Cannot ${normalizedAction} task #${taskId}: task is already in "${task.status}" status. Only pending tasks can receive a decision.`
+      });
+    }
+
+    const assignedTarget = (typeof task.assigned_role === 'string') ? task.assigned_role.trim() : '';
+    const rawAssignedUserId = task.assigned_user_id != null ? Number(task.assigned_user_id) : null;
+    const hasValidAssignedUserId = rawAssignedUserId != null && Number.isInteger(rawAssignedUserId) && rawAssignedUserId > 0;
+
+    // Check whether assigned_role represents a canonical ERP functional role
+    const isCanonicalRole = VALID_ERP_ROLES.some(r => r.toLowerCase() === assignedTarget.toLowerCase());
+
+    // Strict individual assignment requirement (Phase D2.30):
+    // If a task is not assigned to a canonical functional role, it represents an individual task.
+    // Individual tasks MUST have a verified, non-null assigned_user_id; display-name fallback is strictly prohibited.
+    if (!isCanonicalRole && !hasValidAssignedUserId) {
+      await connection.rollback();
+      return res.status(403).json({
+        error: `Access Denied: Task #${taskId} has an unverified individual assignee identity. Approval is blocked pending assignment migration.`
+      });
+    }
+
+    const isUserMatch = hasValidAssignedUserId && rawAssignedUserId === callerId;
+    const isRoleMatch = isCanonicalRole && assignedTarget.toLowerCase() === userRole.toLowerCase();
+    const isCEO = userRole.toLowerCase() === 'chairman & ceo';
+    const isGM = userRole.toLowerCase() === 'general manager';
+
+    // Domain / Departmental Head check
+    const canonicalDocType = normalizeWorkflowDocType(task.doc_type);
+    const isOperationsDomain = [
+      CANONICAL_DOC_TYPES.GATE_PASS,
+      CANONICAL_DOC_TYPES.PRODUCTION_ORDER,
+      CANONICAL_DOC_TYPES.GOODS_RECEIPT,
+      CANONICAL_DOC_TYPES.RAW_MATERIAL_REQUIREMENT
+    ].includes(canonicalDocType);
+    const isFinanceDomain = canonicalDocType === CANONICAL_DOC_TYPES.PURCHASE_ORDER;
+    const isHRDomain = canonicalDocType === CANONICAL_DOC_TYPES.PAYROLL_RUN;
+
+    const isAuthorizedDeptHead =
+      (userRole === 'Director Operations' && isOperationsDomain) ||
+      (userRole === 'Director Finance' && isFinanceDomain) ||
+      (userRole === 'HR Manager' && isHRDomain);
+
+    // Initial authorization check: caller must match stable user ID, assigned functional role, departmental head, or executive override (CEO/GM)
+    const isAssigneeAuthorized = isUserMatch || isRoleMatch || isAuthorizedDeptHead || isCEO || isGM;
+    if (!isAssigneeAuthorized) {
+      await connection.rollback();
+      return res.status(403).json({
+        error: `Access Denied: Task #${taskId} is assigned to ${hasValidAssignedUserId ? `user #${rawAssignedUserId}` : `"${assignedTarget || 'Unassigned'}"`}. Current user #${callerId} (${userRole}) is not authorized to act on this task.`
+      });
+    }
+
+    let authoritativeAmount = Number(task.amount) || 0;
+    let sodStatus = 'NOT_APPLICABLE';
+
+    // Specific rules for Purchase Orders (Monetary delegation DEC-04: A, CEO-exclusive Band 3 DEC-01: B, SOD DEC-05: A & D2.21 & D2.30)
+    if (isFinanceDomain) {
+      const [poRows] = await connection.query(
+        `SELECT * FROM purchase_orders WHERE po_number = ? FOR UPDATE`,
+        [task.doc_number]
+      );
+
+      if (poRows.length === 0) {
+        // Document reference missing: fail-closed for financial approvals
+        await connection.rollback();
+        return res.status(403).json({
+          error: `Access Denied: Underlying purchase order record "${task.doc_number}" not found in trusted store.`
+        });
+      }
+
+      const poRecord = poRows[0];
+      const parsedPoAmount = Number(poRecord.amount);
+      if (isNaN(parsedPoAmount) || parsedPoAmount < 0) {
+        await connection.rollback();
+        return res.status(403).json({
+          error: `Access Denied: Underlying purchase order "${task.doc_number}" contains invalid amount.`
+        });
+      }
+      authoritativeAmount = parsedPoAmount;
+
+      // DEC-05: A & Phase D2.30: Purchase-order SOD must fail closed
+      const rawPoCreatorId = poRecord.created_by_user_id != null ? Number(poRecord.created_by_user_id) : null;
+      const isVerifiedPoCreator = rawPoCreatorId != null && Number.isInteger(rawPoCreatorId) && rawPoCreatorId > 0;
+
+      if (!isVerifiedPoCreator) {
+        await connection.rollback();
+        return res.status(403).json({
+          error: `Access Denied: Creator identity is unverified on purchase order "${task.doc_number}". Approval is blocked pending an approved resolution process.`
+        });
+      }
+
+      if (rawPoCreatorId === callerId || Number(poRecord.created_by_user_id) === Number(trustedUser.id)) {
+        await connection.rollback();
+        return res.status(403).json({
+          error: 'Separation of duties violation: Document creator cannot approve their own purchase order.'
+        });
+      }
+
+      sodStatus = 'VERIFIED_INDEPENDENT';
+
+      // Monetary Delegation of Authority (DEC-04: A & DEC-01: B)
+      // Only applies to positive transitions (approved / completed)
+      if (normalizedAction === 'approved' || normalizedAction === 'completed') {
+        if (authoritativeAmount > 2500000) {
+          // Band 3 (> PKR 2,500,000): Strictly Chairman & CEO exclusively (GM override barred by DEC-01: B)
+          if (!isCEO) {
+            await connection.rollback();
+            return res.status(403).json({
+              error: `Access Denied: Purchase order ${task.doc_number} (PKR ${authoritativeAmount.toLocaleString()}) exceeds PKR 2,500,000 and requires Chairman & CEO authorization exclusively.`
+            });
+          }
+        } else if (authoritativeAmount > 500000) {
+          // Band 2 (PKR 500,001 to 2,500,000): Authorized: GM, Director Finance, CEO, or assigned Department Head
+          const isBand2Authorized = isCEO || isGM || userRole === 'Director Finance' || (isUserMatch && isAuthorizedDeptHead);
+          if (!isBand2Authorized) {
+            await connection.rollback();
+            return res.status(403).json({
+              error: `Access Denied: Purchase order ${task.doc_number} (PKR ${authoritativeAmount.toLocaleString()}) requires Director Finance, General Manager, or CEO authorization.`
+            });
+          }
+        } else {
+          // Band 1 (Up to PKR 500,000): Authorized: assigned recipient, Director Finance, GM, CEO
+          const isBand1Authorized = isCEO || isGM || userRole === 'Director Finance' || isUserMatch || isRoleMatch;
+          if (!isBand1Authorized) {
+            await connection.rollback();
+            return res.status(403).json({
+              error: `Access Denied: Current user role "${userRole}" is not authorized for Band 1 purchase order approvals.`
+            });
+          }
+        }
+      }
+
+      // Keep underlying purchase_orders.status synchronized
+      if (normalizedAction === 'approved') {
+        await connection.query('UPDATE purchase_orders SET status = "Approved" WHERE po_number = ?', [task.doc_number]);
+      } else if (normalizedAction === 'rejected') {
+        await connection.query('UPDATE purchase_orders SET status = "Rejected" WHERE po_number = ?', [task.doc_number]);
+      } else if (normalizedAction === 'returned') {
+        await connection.query('UPDATE purchase_orders SET status = "Returned" WHERE po_number = ?', [task.doc_number]);
+      }
+    } else {
+      // Non-financial operational workflows (Gate pass, Production order, GRN, RMR)
+      // Enforce DEC-01: B: GM operational override permitted.
+      // Fix F-03: Strict creator/approver separation with fail-closed enforcement for unverified or missing records.
+      if (canonicalDocType === CANONICAL_DOC_TYPES.GATE_PASS) {
+        const [gpRows] = await connection.query(
+          `SELECT * FROM gate_passes WHERE pass_number = ? FOR UPDATE`,
+          [task.doc_number]
+        );
+        if (gpRows.length === 0) {
+          await connection.rollback();
+          return res.status(403).json({
+            error: `Access Denied: Underlying gate pass record "${task.doc_number}" not found in trusted store.`
+          });
+        }
+        const gpRecord = gpRows[0];
+        if (gpRecord.created_by_user_id == null) {
+          await connection.rollback();
+          return res.status(403).json({
+            error: `Access Denied: Creator identity is unverified on gate pass "${task.doc_number}". Approval is blocked pending an approved resolution process.`
+          });
+        }
+        if (Number(gpRecord.created_by_user_id) === Number(trustedUser.id)) {
+          await connection.rollback();
+          return res.status(403).json({
+            error: `Separation of duties violation: Gate pass creator cannot approve their own gate pass.`
+          });
+        }
+        sodStatus = 'VERIFIED_INDEPENDENT';
+      } else if (canonicalDocType === CANONICAL_DOC_TYPES.PRODUCTION_ORDER) {
+        const [prodRows] = await connection.query(
+          `SELECT * FROM production_orders WHERE wo_number = ? FOR UPDATE`,
+          [task.doc_number]
+        );
+        if (prodRows.length === 0) {
+          await connection.rollback();
+          return res.status(403).json({
+            error: `Access Denied: Underlying production order record "${task.doc_number}" not found in trusted store.`
+          });
+        }
+        const prodRecord = prodRows[0];
+        if (prodRecord.created_by_user_id == null) {
+          await connection.rollback();
+          return res.status(403).json({
+            error: `Access Denied: Creator identity is unverified on production order "${task.doc_number}". Approval is blocked pending an approved resolution process.`
+          });
+        }
+        if (Number(prodRecord.created_by_user_id) === Number(trustedUser.id)) {
+          await connection.rollback();
+          return res.status(403).json({
+            error: `Separation of duties violation: Production order creator cannot approve their own work order.`
+          });
+        }
+        sodStatus = 'VERIFIED_INDEPENDENT';
+      } else if (canonicalDocType === CANONICAL_DOC_TYPES.GOODS_RECEIPT) {
+        try {
+          const [grnRows] = await connection.query(
+            `SELECT * FROM goods_receipts WHERE grn_number = ? FOR UPDATE`,
+            [task.doc_number]
+          );
+          if (grnRows.length === 0) {
+            await connection.rollback();
+            return res.status(403).json({
+              error: `Access Denied: Underlying goods receipt record "${task.doc_number}" not found in trusted store.`
+            });
+          }
+          const grnRecord = grnRows[0];
+          if (grnRecord.created_by_user_id != null && trustedUser.id != null) {
+            if (Number(grnRecord.created_by_user_id) === Number(trustedUser.id)) {
+              await connection.rollback();
+              return res.status(403).json({
+                error: `Separation of duties violation: Goods receipt creator cannot approve their own goods receipt.`
+              });
+            }
+            sodStatus = 'VERIFIED_INDEPENDENT';
+          } else {
+            sodStatus = 'CREATOR_UNRECORDED';
+          }
+        } catch (tableErr) {
+          // If table does not exist in unmigrated database, fail closed for GRN approval
+          if (tableErr.code === 'ER_NO_SUCH_TABLE' || tableErr.message?.includes("doesn't exist")) {
+            await connection.rollback();
+            return res.status(403).json({
+              error: `Access Denied: Goods receipt schema not migrated in trusted store. Approvals are blocked pending database migration.`
+            });
+          }
+          throw tableErr;
+        }
+      } else if (canonicalDocType === CANONICAL_DOC_TYPES.RAW_MATERIAL_REQUIREMENT) {
+        try {
+          const [rmrRows] = await connection.query(
+            `SELECT * FROM raw_material_requirements WHERE rmr_number = ? FOR UPDATE`,
+            [task.doc_number]
+          );
+          if (rmrRows.length === 0) {
+            await connection.rollback();
+            return res.status(403).json({
+              error: `Access Denied: Underlying raw material requirement record "${task.doc_number}" not found in trusted store.`
+            });
+          }
+          const rmrRecord = rmrRows[0];
+          if (rmrRecord.created_by_user_id != null && trustedUser.id != null) {
+            if (Number(rmrRecord.created_by_user_id) === Number(trustedUser.id)) {
+              await connection.rollback();
+              return res.status(403).json({
+                error: `Separation of duties violation: Raw material requirement creator cannot approve their own requisition.`
+              });
+            }
+            sodStatus = 'VERIFIED_INDEPENDENT';
+          } else {
+            sodStatus = 'CREATOR_UNRECORDED';
+          }
+        } catch (tableErr) {
+          // If table does not exist in unmigrated database, fail closed for RMR approval
+          if (tableErr.code === 'ER_NO_SUCH_TABLE' || tableErr.message?.includes("doesn't exist")) {
+            await connection.rollback();
+            return res.status(403).json({
+              error: `Access Denied: Raw material requirement schema not migrated in trusted store. Approvals are blocked pending database migration.`
+            });
+          }
+          throw tableErr;
+        }
+      } else {
+        // Any recognized operational task type without a fully implemented, explicitly supported document handler,
+        // or unsupported/unknown document type fails closed. It must not reach a generic approval fallback.
+        await connection.rollback();
+        return res.status(403).json({
+          error: `Access Denied: Document type "${task.doc_type || 'Unknown'}" is not supported for workflow approval decisions. Approval is blocked pending an approved resolution process.`
+        });
+      }
+    }
+
+    // Execute state mutation in workflow_tasks
+    await connection.query(
+      'UPDATE workflow_tasks SET status = ? WHERE id = ?',
+      [normalizedAction, taskId]
+    );
+
+    // Prepare structured audit details
+    const auditDetails = {
+      task_id: taskId,
+      doc_number: task.doc_number,
+      doc_type: task.doc_type,
+      previous_status: task.status,
+      new_status: normalizedAction,
+      amount: authoritativeAmount,
+      assigned_role: assignedTarget,
+      reason: cleanReason,
+      actor: { id: trustedUser.id, name: userName, role: userRole },
+      sod_status: sodStatus
+    };
+
+    // Atomic audit log insertion (re-throws on failure, triggering rollback)
+    await auditLogger.logAudit({
       req,
-      userId: req.user?.id,
-      userName: actorName,
-      role: actorRole,
+      userId: trustedUser.id,
+      userName,
+      role: userRole,
       action: `WORKFLOW_${normalizedAction.toUpperCase()}`,
       entityType: 'WORKFLOW',
-      entityId: id,
-      details: `${actorRole} (${actorName}) updated workflow task #${id} ("${existing[0].title}") to: ${normalizedAction}`
+      entityId: String(taskId),
+      details: JSON.stringify(auditDetails),
+      connection
     });
-    res.json({ success: true, message: `Task ${normalizedAction} successfully by ${actorName}` });
+
+    await connection.commit();
+
+    return res.json({
+      success: true,
+      message: `Workflow task #${taskId} (${task.doc_number}) marked as ${normalizedAction} by ${userName} (${userRole})`,
+      task: {
+        id: taskId,
+        doc_number: task.doc_number,
+        status: normalizedAction
+      }
+    });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    if (connection) {
+      try {
+        await connection.rollback();
+      } catch (rbErr) {
+        console.error('❌ Transaction rollback failure:', rbErr.message);
+      }
+    }
+    console.error(`❌ actionApproval error for task #${taskId}:`, err.message);
+    return res.status(500).json({ error: 'Internal server error processing approval decision' });
+  } finally {
+    if (connection) {
+      connection.release();
+    }
   }
 };
 
@@ -164,14 +748,27 @@ const createGatePass = async (req, res) => {
   const passNo = pass_number || `GPI-2026-000${Math.floor(Math.random() * 90 + 10)}`;
   const officerName = req.user?.name || req.trustedUser?.name || 'Gate Officer';
   const officerRole = req.user?.role || req.trustedUser?.role || 'Security';
+  const creatorUserId = req.trustedUser?.id || req.user?.id || null;
   try {
-    const [result] = await db.query(
-      'INSERT INTO gate_passes (pass_number, vehicle_number, supplier_customer, pass_type, since_time, status) VALUES (?, ?, ?, ?, "Just now", "At gate — waiting for QC")',
-      [passNo, vehicle_number, supplier_customer, pass_type || 'inward']
-    );
+    let result;
+    try {
+      [result] = await db.query(
+        'INSERT INTO gate_passes (pass_number, vehicle_number, supplier_customer, pass_type, since_time, status, created_by_user_id) VALUES (?, ?, ?, ?, "Just now", "At gate — waiting for QC", ?)',
+        [passNo, vehicle_number, supplier_customer, pass_type || 'inward', creatorUserId]
+      );
+    } catch (insertErr) {
+      if (insertErr.code === 'ER_BAD_FIELD_ERROR' || insertErr.message?.includes('Unknown column')) {
+        [result] = await db.query(
+          'INSERT INTO gate_passes (pass_number, vehicle_number, supplier_customer, pass_type, since_time, status) VALUES (?, ?, ?, ?, "Just now", "At gate — waiting for QC")',
+          [passNo, vehicle_number, supplier_customer, pass_type || 'inward']
+        );
+      } else {
+        throw insertErr;
+      }
+    }
     await logAudit({
       req,
-      userId: req.user?.id,
+      userId: creatorUserId,
       userName: officerName,
       role: officerRole,
       action: 'CREATE_GATE_PASS',
@@ -260,12 +857,25 @@ const createProcurementPO = async (req, res) => {
     const po_number = await getNextDocNumber('purchase_order', 'PO-2026', connection);
     const po_date = formatDocumentDate(new Date());
 
-    await connection.query(
-      `INSERT INTO purchase_orders
-       (po_number, po_date, supplier, status, created_by, amount, items_count)
-       VALUES (?, ?, ?, 'Draft', ?, ?, ?)`,
-      [po_number, po_date, cleanSupplier, cleanCreator, cleanAmount, cleanItemsCount]
-    );
+    try {
+      await connection.query(
+        `INSERT INTO purchase_orders
+         (po_number, po_date, supplier, status, created_by, amount, items_count, created_by_user_id)
+         VALUES (?, ?, ?, 'Draft', ?, ?, ?, ?)`,
+        [po_number, po_date, cleanSupplier, cleanCreator, cleanAmount, cleanItemsCount, authenticatedUserId]
+      );
+    } catch (poInsertErr) {
+      if (poInsertErr.code === 'ER_BAD_FIELD_ERROR' || poInsertErr.message?.includes('Unknown column')) {
+        await connection.query(
+          `INSERT INTO purchase_orders
+           (po_number, po_date, supplier, status, created_by, amount, items_count)
+           VALUES (?, ?, ?, 'Draft', ?, ?, ?)`,
+          [po_number, po_date, cleanSupplier, cleanCreator, cleanAmount, cleanItemsCount]
+        );
+      } else {
+        throw poInsertErr;
+      }
+    }
 
     await logAudit({
       req,
@@ -1262,9 +1872,9 @@ const getSettingsMatrix = (req, res) => {
   res.json({
     rules: [
       { doc: 'Purchase requisition', range: '0 to No limit', approvers: ['Department head'] },
-      { doc: 'Purchase order Band 1', range: '0 to 500,000', approvers: ['Department head', 'Accounts & Finance'] },
-      { doc: 'Purchase order Band 2', range: '500,000 to 2,500,000', approvers: ['Department head', 'Accounts & Finance'] },
-      { doc: 'Purchase order Band 3', range: '2,500,000 to No limit', approvers: ['Department head', 'Accounts & Finance', 'CEO'] }
+      { doc: 'Purchase order Band 1', range: '0 to 500,000', approvers: ['Department head', 'Accounts & Finance', 'Director Finance'] },
+      { doc: 'Purchase order Band 2', range: '500,000 to 2,500,000', approvers: ['Department head', 'Director Finance', 'General Manager'] },
+      { doc: 'Purchase order Band 3', range: '2,500,000 to No limit', approvers: ['Chairman & CEO'] }
     ]
   });
 };
@@ -1296,5 +1906,7 @@ module.exports = {
   resolveCustomerCreditPolicy,
   getDefaultUnvettedCreditLimit,
   formatDocumentDate,
-  PRODUCTION_STAGES
+  PRODUCTION_STAGES,
+  CANONICAL_DOC_TYPES,
+  normalizeWorkflowDocType
 };

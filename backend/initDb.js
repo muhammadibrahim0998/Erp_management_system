@@ -85,7 +85,9 @@ async function initSchema(connection = db) {
         waiting_since VARCHAR(50),
         status VARCHAR(50) DEFAULT 'pending',
         assigned_role VARCHAR(100),
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        assigned_user_id INT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_wt_assigned_user (assigned_user_id)
       )
     `);
 
@@ -487,20 +489,31 @@ async function seedDemoData(connection = db, env = process.env) {
     if (taskRows[0].count === 0) {
       console.log('🌱 Seeding Workflow Tasks from PDF Page 6...');
       const tasks = [
-        ['WO-2026-0002', 'Production order', 'Peek Freans · 2,000 kg Liquid Whole Egg', 'Peek Freans', 836000, 'high', 'Record production output', 'waiting 1 d ago', 'pending', 'Farhan Ali'],
-        ['WO-2026-0005', 'Production order', 'Dawn Foods · 400 kg Salted Liquid Whole Egg', 'Dawn Foods', 145000, 'normal', 'Assign to Production Manager', 'waiting 5 h ago', 'pending', 'Usama Tariq'],
-        ['WO-2026-0004', 'Production order', 'Master Baker · 500 kg Liquid Whole Egg', 'Master Baker', 182000, 'normal', 'Prepare raw material requirement', 'waiting 4 h ago', 'pending', 'Farhan Ali'],
-        ['GRN-2026-0611', 'Goods receipt (GRN)', 'Charsadda Poultry Farm · 800 Trays Medium Eggs', 'Charsadda Poultry Farm', 426600, 'normal', 'Receive into store', 'waiting 1 h ago', 'pending', 'Usman Ali'],
-        ['RMR-2026-0003', 'Raw material requirement', 'Liquid Egg Plant – Rashakai', 'Rashakai Plant', 340000, 'normal', 'Issue to breaking supervisor', 'waiting 1 h ago', 'pending', 'Usman Ali'],
-        ['WO-2026-0006', 'Production order', 'Salman Sweets & Bakers · 250 kg Whole Egg', 'Salman Sweets', 92000, 'normal', 'Assign to Plant Manager', 'waiting 55 min ago', 'pending', 'Khalid Mehmood'],
-        ['GPI-2026-0002', 'Gate pass — inward', 'Swabi Layer Farms · Vehicle MRD-4471', 'Swabi Layer Farms', 1250000, 'normal', 'Start QC inspection', 'waiting 35 min ago', 'pending', 'Dr. Asma Noor'],
-        ['PO-2026-0929', 'Purchase order', 'Peshawar Pulp Trays · 3-ply egg trays', 'Peshawar Pulp Trays', 2943392, 'high', 'Approve purchase order', 'waiting 3 d ago', 'pending', 'Sana Ullah']
+        ['WO-2026-0002', 'Production order', 'Peek Freans · 2,000 kg Liquid Whole Egg', 'Peek Freans', 836000, 'high', 'Record production output', 'waiting 1 d ago', 'pending', 'Production Manager', 6],
+        ['WO-2026-0005', 'Production order', 'Dawn Foods · 400 kg Salted Liquid Whole Egg', 'Dawn Foods', 145000, 'normal', 'Assign to Production Manager', 'waiting 5 h ago', 'pending', 'Plant Manager', 5],
+        ['WO-2026-0004', 'Production order', 'Master Baker · 500 kg Liquid Whole Egg', 'Master Baker', 182000, 'normal', 'Prepare raw material requirement', 'waiting 4 h ago', 'pending', 'Production Manager', 6],
+        ['GRN-2026-0611', 'Goods receipt (GRN)', 'Charsadda Poultry Farm · 800 Trays Medium Eggs', 'Charsadda Poultry Farm', 426600, 'normal', 'Receive into store', 'waiting 1 h ago', 'pending', 'Raw Material Store', 10],
+        ['RMR-2026-0003', 'Raw material requirement', 'Liquid Egg Plant – Rashakai', 'Rashakai Plant', 340000, 'normal', 'Issue to breaking supervisor', 'waiting 1 h ago', 'pending', 'Raw Material Store', 10],
+        ['WO-2026-0006', 'Production order', 'Salman Sweets & Bakers · 250 kg Whole Egg', 'Salman Sweets', 92000, 'normal', 'Assign to Plant Manager', 'waiting 55 min ago', 'pending', 'General Manager', 2],
+        ['GPI-2026-0002', 'Gate pass — inward', 'Swabi Layer Farms · Vehicle MRD-4471', 'Swabi Layer Farms', 1250000, 'normal', 'Start QC inspection', 'waiting 35 min ago', 'pending', 'QC Cell', 9],
+        ['PO-2026-0929', 'Purchase order', 'Peshawar Pulp Trays · 3-ply egg trays', 'Peshawar Pulp Trays', 2943392, 'high', 'Approve purchase order', 'waiting 3 d ago', 'pending', 'Chairman & CEO', 1]
       ];
       for (const t of tasks) {
-        await conn.query(
-          'INSERT INTO workflow_tasks (doc_number, doc_type, title, party, amount, priority, action_label, waiting_since, status, assigned_role) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-          t
-        );
+        try {
+          await conn.query(
+            'INSERT INTO workflow_tasks (doc_number, doc_type, title, party, amount, priority, action_label, waiting_since, status, assigned_role, assigned_user_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            t
+          );
+        } catch (insertErr) {
+          if (insertErr.code === 'ER_BAD_FIELD_ERROR' || insertErr.message?.includes('Unknown column')) {
+            await conn.query(
+              'INSERT INTO workflow_tasks (doc_number, doc_type, title, party, amount, priority, action_label, waiting_since, status, assigned_role) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+              t.slice(0, 10)
+            );
+          } else {
+            throw insertErr;
+          }
+        }
       }
     }
 
@@ -737,9 +750,224 @@ async function initDatabase(options = {}) {
   }
 }
 
+/**
+ * Standalone SEC-03 Database Migration Routine.
+ * Strictly decoupled from normal application boot (initDatabase / server.js).
+ * Must be executed explicitly via a dedicated migration runner (e.g. migrateSec03.js)
+ * after owner authorization is granted.
+ */
+async function runSec03Migrations(connection = db) {
+  const conn = connection || db;
+  console.log('🔄 Executing SEC-03 Schema Migrations...');
+
+  // 1. gate_passes: created_by_user_id column and index idx_gp_created_by
+  const [gpCols] = await conn.query(`
+    SELECT COLUMN_NAME 
+    FROM information_schema.COLUMNS 
+    WHERE TABLE_SCHEMA = DATABASE() 
+      AND TABLE_NAME = 'gate_passes' 
+      AND COLUMN_NAME = 'created_by_user_id'
+  `);
+  if (!Array.isArray(gpCols) || gpCols.length === 0) {
+    try {
+      await conn.query('ALTER TABLE gate_passes ADD COLUMN created_by_user_id INT NULL');
+    } catch (alterErr) {
+      if (!alterErr.message.includes('Duplicate column name') && alterErr.code !== 'ER_DUP_FIELDNAME') {
+        throw alterErr;
+      }
+    }
+  }
+
+  const [gpIdx] = await conn.query(`
+    SELECT INDEX_NAME 
+    FROM information_schema.STATISTICS 
+    WHERE TABLE_SCHEMA = DATABASE() 
+      AND TABLE_NAME = 'gate_passes' 
+      AND COLUMN_NAME = 'created_by_user_id'
+  `);
+  if (!Array.isArray(gpIdx) || gpIdx.length === 0) {
+    try {
+      await conn.query('ALTER TABLE gate_passes ADD INDEX idx_gp_created_by (created_by_user_id)');
+    } catch (idxErr) {
+      if (!idxErr.message.includes('Duplicate key name') && idxErr.code !== 'ER_DUP_KEYNAME') {
+        throw idxErr;
+      }
+    }
+  }
+
+  // 2. purchase_orders: created_by_user_id column and index idx_po_created_by
+  const [poCols] = await conn.query(`
+    SELECT COLUMN_NAME 
+    FROM information_schema.COLUMNS 
+    WHERE TABLE_SCHEMA = DATABASE() 
+      AND TABLE_NAME = 'purchase_orders' 
+      AND COLUMN_NAME = 'created_by_user_id'
+  `);
+  if (!Array.isArray(poCols) || poCols.length === 0) {
+    try {
+      await conn.query('ALTER TABLE purchase_orders ADD COLUMN created_by_user_id INT NULL');
+    } catch (alterErr) {
+      if (!alterErr.message.includes('Duplicate column name') && alterErr.code !== 'ER_DUP_FIELDNAME') {
+        throw alterErr;
+      }
+    }
+  }
+
+  const [poIdx] = await conn.query(`
+    SELECT INDEX_NAME 
+    FROM information_schema.STATISTICS 
+    WHERE TABLE_SCHEMA = DATABASE() 
+      AND TABLE_NAME = 'purchase_orders' 
+      AND COLUMN_NAME = 'created_by_user_id'
+  `);
+  if (!Array.isArray(poIdx) || poIdx.length === 0) {
+    try {
+      await conn.query('ALTER TABLE purchase_orders ADD INDEX idx_po_created_by (created_by_user_id)');
+    } catch (idxErr) {
+      if (!idxErr.message.includes('Duplicate key name') && idxErr.code !== 'ER_DUP_KEYNAME') {
+        throw idxErr;
+      }
+    }
+  }
+
+  // 3. production_orders: created_by_user_id column and index idx_prod_created_by
+  const [prodCols] = await conn.query(`
+    SELECT COLUMN_NAME 
+    FROM information_schema.COLUMNS 
+    WHERE TABLE_SCHEMA = DATABASE() 
+      AND TABLE_NAME = 'production_orders' 
+      AND COLUMN_NAME = 'created_by_user_id'
+  `);
+  if (!Array.isArray(prodCols) || prodCols.length === 0) {
+    try {
+      await conn.query('ALTER TABLE production_orders ADD COLUMN created_by_user_id INT NULL');
+    } catch (alterErr) {
+      if (!alterErr.message.includes('Duplicate column name') && alterErr.code !== 'ER_DUP_FIELDNAME') {
+        throw alterErr;
+      }
+    }
+  }
+
+  const [prodIdx] = await conn.query(`
+    SELECT INDEX_NAME 
+    FROM information_schema.STATISTICS 
+    WHERE TABLE_SCHEMA = DATABASE() 
+      AND TABLE_NAME = 'production_orders' 
+      AND COLUMN_NAME = 'created_by_user_id'
+  `);
+  if (!Array.isArray(prodIdx) || prodIdx.length === 0) {
+    try {
+      await conn.query('ALTER TABLE production_orders ADD INDEX idx_prod_created_by (created_by_user_id)');
+    } catch (idxErr) {
+      if (!idxErr.message.includes('Duplicate key name') && idxErr.code !== 'ER_DUP_KEYNAME') {
+        throw idxErr;
+      }
+    }
+  }
+
+  // 4. workflow_tasks: assigned_user_id column and index idx_wt_assigned_user
+  const [wtCols] = await conn.query(`
+    SELECT COLUMN_NAME
+    FROM information_schema.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE()
+      AND TABLE_NAME = 'workflow_tasks'
+      AND COLUMN_NAME = 'assigned_user_id'
+  `);
+  if (!Array.isArray(wtCols) || wtCols.length === 0) {
+    try {
+      await conn.query('ALTER TABLE workflow_tasks ADD COLUMN assigned_user_id INT NULL AFTER assigned_role');
+    } catch (alterErr) {
+      if (!alterErr.message.includes('Duplicate column name') && alterErr.code !== 'ER_DUP_FIELDNAME') {
+        throw alterErr;
+      }
+    }
+  }
+
+  const [wtIdx] = await conn.query(`
+    SELECT INDEX_NAME
+    FROM information_schema.STATISTICS
+    WHERE TABLE_SCHEMA = DATABASE()
+      AND TABLE_NAME = 'workflow_tasks'
+      AND COLUMN_NAME = 'assigned_user_id'
+  `);
+  if (!Array.isArray(wtIdx) || wtIdx.length === 0) {
+    try {
+      await conn.query('ALTER TABLE workflow_tasks ADD INDEX idx_wt_assigned_user (assigned_user_id)');
+    } catch (idxErr) {
+      if (!idxErr.message.includes('Duplicate key name') && idxErr.code !== 'ER_DUP_KEYNAME') {
+        throw idxErr;
+      }
+    }
+  }
+
+  // 5. Goods Receipts (GRN) — Reviewable Idempotent DDL
+  await conn.query(`
+    CREATE TABLE IF NOT EXISTS goods_receipts (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      grn_number VARCHAR(50) NOT NULL UNIQUE,
+      po_number VARCHAR(50) NULL,
+      supplier VARCHAR(255) NOT NULL,
+      vehicle_number VARCHAR(50) NULL,
+      gate_pass_no VARCHAR(50) NULL,
+      receipt_date VARCHAR(50) NOT NULL,
+      status VARCHAR(50) DEFAULT 'Pending QC',
+      qc_status VARCHAR(50) DEFAULT 'Pending',
+      qc_notes TEXT NULL,
+      created_by_user_id INT NULL,
+      received_by VARCHAR(100) NOT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      INDEX idx_grn_po (po_number),
+      INDEX idx_grn_created_by (created_by_user_id),
+      INDEX idx_grn_status (status)
+    ) ENGINE=InnoDB;
+  `);
+
+  // 6. Goods Receipt Items — Reviewable Idempotent DDL
+  await conn.query(`
+    CREATE TABLE IF NOT EXISTS goods_receipt_items (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      grn_id INT NOT NULL,
+      item_code VARCHAR(50) NOT NULL,
+      item_name VARCHAR(255) NOT NULL,
+      ordered_qty DECIMAL(10, 2) NOT NULL DEFAULT 0,
+      received_qty DECIMAL(10, 2) NOT NULL,
+      accepted_qty DECIMAL(10, 2) NOT NULL DEFAULT 0,
+      rejected_qty DECIMAL(10, 2) NOT NULL DEFAULT 0,
+      unit_price DECIMAL(10, 2) NOT NULL DEFAULT 0,
+      warehouse VARCHAR(100) DEFAULT 'Raw Material Store',
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      INDEX idx_gri_grn (grn_id),
+      FOREIGN KEY (grn_id) REFERENCES goods_receipts(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB;
+  `);
+
+  // 7. Raw Material Requirements (RMR) — Reviewable Idempotent DDL
+  await conn.query(`
+    CREATE TABLE IF NOT EXISTS raw_material_requirements (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      rmr_number VARCHAR(50) NOT NULL UNIQUE,
+      wo_number VARCHAR(50) NULL,
+      requisition_date VARCHAR(50) NOT NULL,
+      department VARCHAR(100) DEFAULT 'Liquid Egg Plant',
+      status VARCHAR(50) DEFAULT 'Pending',
+      created_by_user_id INT NULL,
+      requested_by VARCHAR(100) NOT NULL,
+      total_items INT DEFAULT 1,
+      notes TEXT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      INDEX idx_rmr_wo (wo_number),
+      INDEX idx_rmr_created_by (created_by_user_id),
+      INDEX idx_rmr_status (status)
+    ) ENGINE=InnoDB;
+  `);
+
+  console.log('✅ SEC-03 migrations applied successfully.');
+}
+
 module.exports = {
   initDatabase,
   initSchema,
+  runSec03Migrations,
   seedDemoData,
   shouldSeedDemoData
 };

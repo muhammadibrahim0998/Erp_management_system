@@ -2,7 +2,11 @@ import React from 'react';
 import { UserCheck, X, Shield } from 'lucide-react';
 
 export default function RoleSwitcherModal({ isOpen, onClose, users, currentUser, onSelectUser }) {
-  if (!isOpen) return null;
+  const isDevRoleSwitcherEnabled = Boolean(
+    import.meta.env.DEV && import.meta.env.VITE_ENABLE_DEV_ROLE_SWITCHER === 'true'
+  );
+
+  if (!isOpen || !isDevRoleSwitcherEnabled) return null;
 
   return (
     <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
@@ -25,6 +29,17 @@ export default function RoleSwitcherModal({ isOpen, onClose, users, currentUser,
           >
             ✕
           </button>
+        </div>
+
+        {/* Development Only Disclaimer */}
+        <div className="p-3.5 bg-amber-50 border border-amber-300 rounded-2xl text-xs text-amber-900 flex items-start gap-2.5">
+          <Shield className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+          <div>
+            <span className="font-bold">DEVELOPMENT UI PREVIEW ONLY:</span>
+            <p className="mt-0.5 text-amber-800">
+              Switching roles here previews client-side page layouts and navigation rules. It <strong>does not authenticate</strong> the selected user with the backend or exchange JWT bearer tokens. Any API operations requiring elevated privileges will be rejected with HTTP 403 Forbidden. To test real role permissions, sign out and log in with real account credentials.
+            </p>
+          </div>
         </div>
 
         {/* 19 Role Cards Grid */}

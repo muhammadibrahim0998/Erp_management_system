@@ -173,6 +173,9 @@ export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(() => authService.isAuthenticated());
   const [activeTab, setActiveTab] = useState(() => getDefaultTabForUser(authService.getCurrentUser()));
   const [isRoleModalOpen, setIsRoleModalOpen] = useState(false);
+  const isDevRoleSwitcherEnabled = Boolean(
+    import.meta.env.DEV && import.meta.env.VITE_ENABLE_DEV_ROLE_SWITCHER === 'true'
+  );
   const [users, setUsers] = useState([]);
 
   // Live Server Data
@@ -721,19 +724,21 @@ export default function App() {
         </main>
       </div>
 
-      {/* 19 Roles Switcher Modal (PDF Page 4) */}
-      <RoleSwitcherModal
-        isOpen={isRoleModalOpen}
-        onClose={() => setIsRoleModalOpen(false)}
-        users={users}
-        currentUser={currentUser}
-        onSelectUser={(u) => {
-          setCurrentUser(u);
-          localStorage.setItem('yaf_user', JSON.stringify(u));
-          setActiveTab(getDefaultTabForUser(u));
-          showNotification(`Switched role to: ${u.name} (${u.role})`);
-        }}
-      />
+      {/* 19 Roles Switcher Modal (Development UI Preview Only) */}
+      {isDevRoleSwitcherEnabled && (
+        <RoleSwitcherModal
+          isOpen={isRoleModalOpen}
+          onClose={() => setIsRoleModalOpen(false)}
+          users={users}
+          currentUser={currentUser}
+          onSelectUser={(u) => {
+            setCurrentUser(u);
+            localStorage.setItem('yaf_user', JSON.stringify(u));
+            setActiveTab(getDefaultTabForUser(u));
+            showNotification(`Dev UI Preview switched to: ${u.name} (${u.role}) — Note: Backend JWT is unchanged`);
+          }}
+        />
+      )}
     </div>
   );
 }
