@@ -162,10 +162,46 @@ const resetPassword = async (req, res) => {
   }
 };
 
+/**
+ * Delete user account (Admin only)
+ */
+const deleteUser = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Prevent deleting self
+    if (req.user && String(req.user.id) === String(id)) {
+      return res.status(400).json({ error: 'Cannot delete your own logged-in account' });
+    }
+
+    const [existing] = await db.query('SELECT id, name, email, role FROM users WHERE id = ?', [id]);
+    if (existing.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const targetUser = existing[0];
+    await db.query('DELETE FROM users WHERE id = ?', [id]);
+
+    await logAudit({
+      req,
+      action: 'DELETE_USER',
+      entityType: 'USER',
+      entityId: id,
+      details: `Admin deleted user account: ${targetUser.name} (${targetUser.email}, Role: ${targetUser.role})`,
+      status: 'WARNING'
+    });
+
+    res.json({ success: true, message: `User ${targetUser.name} deleted successfully` });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
 module.exports = {
   getUsers,
   createUser,
   updateUser,
   updateStatus,
-  resetPassword
+  resetPassword,
+  deleteUser
 };

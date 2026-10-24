@@ -12,5 +12,6 @@ router.post('/', authenticateToken, requireAdmin, userController.createUser);
 router.put('/:id', authenticateToken, requireAdmin, userController.updateUser);
 router.patch('/:id/status', authenticateToken, requireAdmin, userController.updateStatus);
 router.post('/:id/reset-password', authenticateToken, requireAdmin, passwordResetLimiter, userController.resetPassword);
+router.delete('/:id', authenticateToken, requireAdmin, userController.deleteUser);
 
 module.exports = router;

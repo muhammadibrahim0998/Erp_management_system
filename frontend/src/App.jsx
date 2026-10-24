@@ -26,11 +26,13 @@ import {
   LogOut,
   Menu,
   Shield,
+  ShieldCheck,
   History,
   Store,
   ShieldAlert
 } from 'lucide-react';
 
+import SuperAdminDashboard from './components/views/SuperAdminDashboard';
 import ChairmanDashboard from './components/views/ChairmanDashboard';
 import ApprovalsInbox from './components/views/ApprovalsInbox';
 import { authService, operationsService, userService } from './services';
@@ -59,7 +61,13 @@ import Auth from './components/Auth';
  * Each user ONLY sees the modules directly related to their operational duties.
  */
 export const ROLE_ALLOWED_PAGES = {
-  // 1. Executive Leadership & Super Admins (Comprehensive access)
+  // 1. Executive Leadership & Super Admins (Strictly isolated roles)
+  'Super Admin': [
+    'super-admin', 'users', 'audit-logs', 'settings'
+  ],
+  'ERP Admin': [
+    'super-admin', 'users', 'audit-logs', 'settings'
+  ],
   'Chairman & CEO': [
     'dashboard', 'approvals', 'live-operations', 'procurement', 'gate', 'qc', 
     'inventory', 'production', 'pos', 'sales', 'marketing', 'hr', 'payroll', 
@@ -69,11 +77,6 @@ export const ROLE_ALLOWED_PAGES = {
     'dashboard', 'approvals', 'live-operations', 'procurement', 'gate', 'qc', 
     'inventory', 'production', 'pos', 'sales', 'marketing', 'hr', 'payroll', 
     'finance', 'reports', 'users', 'audit-logs', 'settings', 'process-map'
-  ],
-  'ERP Admin': [
-    'users', 'audit-logs', 'settings', 'dashboard', 'approvals', 'live-operations',
-    'procurement', 'gate', 'qc', 'inventory', 'production', 'pos', 'sales', 
-    'marketing', 'hr', 'payroll', 'finance', 'reports', 'process-map'
   ],
 
   // 2. Finance & Accounts
@@ -174,7 +177,7 @@ export function getEffectiveAllowedPages(user) {
   if (deptLower === 'hr') return ['hr', 'payroll'];
   if (deptLower === 'finance') return ['finance', 'reports', 'payroll'];
   if (deptLower === 'plant' || deptLower === 'production') return ['production', 'live-operations'];
-  if (deptLower === 'it') return ['users', 'audit-logs', 'settings'];
+  if (deptLower === 'it') return ['super-admin', 'users', 'audit-logs', 'settings'];
   if (deptLower === 'executive') return ROLE_ALLOWED_PAGES['Chairman & CEO'];
 
   return ['dashboard'];
@@ -329,11 +332,35 @@ export default function App() {
     setCurrentUser(null);
   };
 
+  // Check if active user is Super Admin
+  const isSuperAdmin = currentUser?.role === 'Super Admin' || currentUser?.role === 'ERP Admin';
+
   // Get strict allowed pages for current user based on their exact role
   const allowedTabIds = useMemo(() => getEffectiveAllowedPages(currentUser), [currentUser]);
 
   // Nav Groups strictly filtered to each user's specific job role
   const navSections = useMemo(() => {
+    // 1. DEDICATED SUPER ADMIN SIDEBAR (Strictly Super Admin functions only!)
+    if (isSuperAdmin) {
+      return [
+        {
+          title: 'ACCESS CONTROL & ACCOUNTS',
+          items: [
+            { id: 'super-admin', label: 'Super Admin Console', icon: ShieldCheck },
+            { id: 'users', label: 'User Directory', icon: Users }
+          ]
+        },
+        {
+          title: 'SECURITY & POLICIES',
+          items: [
+            { id: 'audit-logs', label: 'System Audit Logs', icon: History },
+            { id: 'settings', label: 'Approval Matrix', icon: Sliders }
+          ]
+        }
+      ];
+    }
+
+    // 2. REGULAR OPERATIONAL SIDEBAR (Super Admin Console is excluded!)
     const rawSections = [
       {
         title: 'OVERVIEW',
@@ -379,7 +406,7 @@ export default function App() {
       {
         title: 'ADMIN & SETTINGS',
         items: [
-          { id: 'users', label: 'User Management', icon: Shield },
+          { id: 'users', label: 'User Directory', icon: Shield },
           { id: 'audit-logs', label: 'System Audit Logs', icon: History },
           { id: 'settings', label: 'Approval Matrix', icon: Sliders }
         ]
@@ -392,7 +419,7 @@ export default function App() {
         items: section.items.filter(item => allowedTabIds.includes(item.id))
       }))
       .filter(section => section.items.length > 0);
-  }, [allowedTabIds, tasks]);
+  }, [isSuperAdmin, allowedTabIds, tasks]);
 
   // Automatically ensure active tab is strictly allowed for current user role
   useEffect(() => {
@@ -442,11 +469,13 @@ export default function App() {
             {/* Brand Title & Subtitle */}
             <div className="hidden sm:block min-w-0">
               <h1 className="font-black text-[11px] tracking-tight text-white uppercase truncate drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)] group-hover:text-amber-300 transition-colors duration-200">
-                Yousafzai Foods
+                {isSuperAdmin ? 'Super Admin Portal' : 'Yousafzai Foods'}
               </h1>
               <div className="flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-300 group-hover:bg-amber-400 transition-colors animate-pulse"></span>
-                <p className="text-[9px] text-emerald-100 group-hover:text-amber-200/90 font-bold truncate transition-colors duration-200">Head office - Mardan</p>
+                <span className={`w-1.5 h-1.5 rounded-full ${isSuperAdmin ? 'bg-amber-400' : 'bg-emerald-300'} group-hover:bg-amber-400 transition-colors animate-pulse`}></span>
+                <p className="text-[9px] text-emerald-100 group-hover:text-amber-200/90 font-bold truncate transition-colors duration-200">
+                  {isSuperAdmin ? 'Identity & Access Command' : 'Head office - Mardan'}
+                </p>
               </div>
             </div>
           </div>
@@ -544,6 +573,23 @@ export default function App() {
             style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
             className="overflow-y-auto no-scrollbar [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden [&::-webkit-scrollbar]:w-0 flex-1 w-56 px-2.5 py-3 space-y-4"
           >
+            {isSuperAdmin && (
+              <div className="mx-0.5 mb-2.5 p-2.5 rounded-xl bg-gradient-to-b from-[#18181b] via-[#111113] to-[#09090b] border-t border-amber-400/70 border-x border-zinc-800 border-b-[2.5px] border-b-black shadow-[0_4px_10px_rgba(0,0,0,0.5)]">
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-lg bg-amber-400/20 border border-amber-400/70 flex items-center justify-center shrink-0 shadow-[0_0_8px_rgba(245,158,11,0.4)]">
+                    <ShieldCheck className="w-4 h-4 text-amber-400" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-[10px] font-black uppercase tracking-wider text-amber-400">
+                      Super Admin Portal
+                    </div>
+                    <div className="text-[9px] text-zinc-300 font-bold truncate">
+                      Root Access Console
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
             {navSections.map((section, sIdx) => (
               <div key={sIdx} className="space-y-2">
                 <div className="px-2 text-[10.5px] font-black uppercase tracking-wider text-emerald-100 drop-shadow-sm mb-1">
@@ -711,6 +757,13 @@ export default function App() {
 
             {activeTab === 'reports' && (
               <ReportsView />
+            )}
+
+            {activeTab === 'super-admin' && (
+              <SuperAdminDashboard
+                currentUser={currentUser}
+                onUserUpdated={fetchAllData}
+              />
             )}
 
             {activeTab === 'users' && (

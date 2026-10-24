@@ -43,7 +43,7 @@ const authenticateToken = (req, res, next) => {
  * Enforces Admin privileges (ERP Admin or Chairman & CEO)
  */
 const requireAdmin = (req, res, next) => {
-  if (req.user && (req.user.role === 'ERP Admin' || req.user.role === 'Chairman & CEO')) {
+  if (req.user && (req.user.role === 'Super Admin' || req.user.role === 'ERP Admin' || req.user.role === 'Chairman & CEO')) {
     next();
   } else {
     res.status(403).json({ error: 'Admin access required.' });

@@ -147,7 +147,11 @@ export default function Auth({ onLogin }) {
                     type="button"
                     disabled={!hasLogin}
                     onClick={() => {
-                        const fillPass = u.email === 'ceo@gmail.com' ? 'ceo12345' : '123456';
+                        let fillPass = '123456';
+                        if (u.email === 'ceo@gmail.com') fillPass = 'ceo12345';
+                        else if (u.email === 'kamranali@gmail.com') fillPass = 'superadmin12345';
+                        else if (u.email === 'superadmin@gmail.com') fillPass = 'admin12345';
+                        else if (u.email === 'tariqgate@gmail.com') fillPass = 'tariq123';
                         handleQuickFill(u.email, fillPass);
                         setSelectedEmail(u.email);
                     }}
@@ -170,7 +174,7 @@ export default function Auth({ onLogin }) {
               })}
             </div>
             <div className="text-[10px] text-[#6A947F] mt-2 text-center">
-              Click any role to autofill Email & Password (pass: <code className="text-amber-300/80 font-mono">123456</code> · CEO: <code className="text-amber-300/80 font-mono">ceo12345</code>)
+              Click any role to autofill Email & Password (pass: <code className="text-amber-300/80 font-mono">123456</code> · Super Admin: <code className="text-amber-300/80 font-mono">superadmin12345</code> · CEO: <code className="text-amber-300/80 font-mono">ceo12345</code>)
             </div>
           </div>
         )}
