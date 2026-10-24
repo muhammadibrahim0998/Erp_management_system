@@ -173,25 +173,157 @@ export default function FinanceView({ financeData, onNavigate }) {
             </div>
           </div>
 
-          <div>
-            <h4 className="text-xs font-bold text-gray-800 mb-2">Top Creditors</h4>
-            <div className="space-y-2 text-xs font-medium">
-              {(financeData?.payables?.topCreditors || [
-                { supplier: 'Frontier Poultry Feeds', amount: '11,119,140' },
-                { supplier: 'Swabi Layer Farms', amount: '2,646,840' },
-                { supplier: 'Haripur Egg Farm', amount: '2,646,330' },
-                { supplier: 'Khyber Cold Chain Logistics', amount: '2,062,160' },
-                { supplier: 'Charsadda Poultry Farm', amount: '1,940,905' }
-              ]).map((c, i) => (
-                <div key={i} className="flex justify-between items-center py-1 border-b border-gray-50">
-                  <span className="text-gray-700">{c.supplier}</span>
-                  <span className="font-mono font-bold text-gray-900">PKR {c.amount}</span>
-                </div>
-              ))}
+            <div>
+              <h4 className="text-xs font-bold text-gray-800 mb-2">Top Creditors</h4>
+              <div className="space-y-2 text-xs font-medium">
+                {(financeData?.payables?.topCreditors || [
+                  { supplier: 'Frontier Poultry Feeds', amount: '11,119,140' },
+                  { supplier: 'Swabi Layer Farms', amount: '2,646,840' },
+                  { supplier: 'Haripur Egg Farm', amount: '2,646,330' },
+                  { supplier: 'Khyber Cold Chain Logistics', amount: '2,062,160' },
+                  { supplier: 'Charsadda Poultry Farm', amount: '1,940,905' }
+                ]).map((c, i) => (
+                  <div key={i} className="flex justify-between items-center py-1 border-b border-gray-50">
+                    <span className="text-gray-700">{c.supplier}</span>
+                    <span className="font-mono font-bold text-gray-900">PKR {c.amount}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Bank Accounts & Cash Holdings Table */}
+        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+          <div className="p-4 border-b border-gray-100 flex items-center justify-between">
+            <div>
+              <h3 className="text-xs font-bold text-gray-900 uppercase tracking-wider">
+                Bank Accounts & Cash Holdings Table
+              </h3>
+              <p className="text-[11px] text-gray-400">Institutional accounts verified by Accounts & Finance</p>
+            </div>
+            <span className="text-xs text-gray-500 font-mono font-bold">
+              {cashAccounts.length} Accounts
+            </span>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead>
+                <tr className="border-b border-gray-200 text-gray-400 font-semibold bg-gray-50/70">
+                  <th className="py-3 px-4">ACCOUNT NAME</th>
+                  <th className="py-3 px-4">BANK / INSTITUTION</th>
+                  <th className="py-3 px-4">ACCOUNT REF</th>
+                  <th className="py-3 px-4">TYPE</th>
+                  <th className="py-3 px-4 text-right">BALANCE (PKR)</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100 font-medium">
+                {cashAccounts.map((acc, idx) => (
+                  <tr key={idx} className="hover:bg-gray-50/80 transition">
+                    <td className="py-3 px-4 font-bold text-gray-900">{acc.name}</td>
+                    <td className="py-3 px-4 text-gray-700">{acc.account}</td>
+                    <td className="py-3 px-4 font-mono text-gray-500">
+                      {acc.name.includes('••') ? acc.name.split('••')[1] : 'Vault-01'}
+                    </td>
+                    <td className="py-3 px-4">
+                      <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-gray-100 text-gray-700">
+                        {acc.account === 'Cash' ? 'Cash Safe' : 'Commercial Bank'}
+                      </span>
+                    </td>
+                    <td className="py-3 px-4 text-right font-mono font-bold text-gray-900">
+                      PKR {acc.balance}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Debtors vs Creditors Split Tables */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Debtors Table */}
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+            <div className="p-4 border-b border-gray-100 flex items-center justify-between">
+              <div>
+                <h3 className="text-xs font-bold text-gray-900 uppercase tracking-wider">
+                  Debtors & Customer Receivables Schedule
+                </h3>
+                <p className="text-[11px] text-gray-400">Aging receivables by primary wholesale customer</p>
+              </div>
+              <span className="text-xs text-rose-600 font-bold font-mono">
+                {financeData?.receivables?.total || 'PKR 45.6M'}
+              </span>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="border-b border-gray-200 text-gray-400 font-semibold bg-gray-50/70">
+                    <th className="py-3 px-4">CUSTOMER NAME</th>
+                    <th className="py-3 px-4 text-right">OUTSTANDING (PKR)</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100 font-medium">
+                  {(financeData?.receivables?.topDebtors || [
+                    { customer: 'Karachi Egg Wholesalers', amount: '12,386,999' },
+                    { customer: 'Peek Freans', amount: '7,093,583' },
+                    { customer: 'Barkat Frisian (value-added)', amount: '5,486,933' },
+                    { customer: 'Dawn Foods', amount: '3,942,893' },
+                    { customer: 'Swat Valley Egg Dealers', amount: '3,877,654' }
+                  ]).map((d, i) => (
+                    <tr key={i} className="hover:bg-gray-50/80 transition">
+                      <td className="py-3 px-4 font-bold text-gray-800">{d.customer}</td>
+                      <td className="py-3 px-4 text-right font-mono font-bold text-gray-900">
+                        PKR {d.amount}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Creditors Table */}
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+            <div className="p-4 border-b border-gray-100 flex items-center justify-between">
+              <div>
+                <h3 className="text-xs font-bold text-gray-900 uppercase tracking-wider">
+                  Creditors & Supplier Payables Schedule
+                </h3>
+                <p className="text-[11px] text-gray-400">Aging payables by primary raw material vendor</p>
+              </div>
+              <span className="text-xs text-gray-600 font-bold font-mono">
+                {financeData?.payables?.total || 'PKR 27.1M'}
+              </span>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="border-b border-gray-200 text-gray-400 font-semibold bg-gray-50/70">
+                    <th className="py-3 px-4">SUPPLIER NAME</th>
+                    <th className="py-3 px-4 text-right">PAYABLE (PKR)</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100 font-medium">
+                  {(financeData?.payables?.topCreditors || [
+                    { supplier: 'Frontier Poultry Feeds', amount: '11,119,140' },
+                    { supplier: 'Swabi Layer Farms', amount: '2,646,840' },
+                    { supplier: 'Haripur Egg Farm', amount: '2,646,330' },
+                    { supplier: 'Khyber Cold Chain Logistics', amount: '2,062,160' },
+                    { supplier: 'Charsadda Poultry Farm', amount: '1,940,905' }
+                  ]).map((c, i) => (
+                    <tr key={i} className="hover:bg-gray-50/80 transition">
+                      <td className="py-3 px-4 font-bold text-gray-800">{c.supplier}</td>
+                      <td className="py-3 px-4 text-right font-mono font-bold text-gray-900">
+                        PKR {c.amount}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
         </div>
       </div>
-    </div>
   );
 }

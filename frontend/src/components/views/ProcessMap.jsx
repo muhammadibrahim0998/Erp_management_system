@@ -408,6 +408,61 @@ export default function ProcessMap({ onNavigate }) {
           </div>
         </div>
       )}
+
+      {/* Process Matrix & Department Routing Reference Table */}
+      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+        <div className="p-4 border-b border-gray-100 flex items-center justify-between">
+          <div>
+            <h3 className="text-xs font-bold text-gray-900 uppercase tracking-wider">
+              Standard Operating Procedures (SOP) & Department Routing Schedule
+            </h3>
+            <p className="text-[11px] text-gray-400">Reference mapping of core business flows and operational owners</p>
+          </div>
+          <span className="text-xs text-gray-500 font-medium px-2 py-0.5 rounded bg-gray-100 border border-gray-200">
+            Workflow Architecture Reference
+          </span>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs">
+            <thead>
+              <tr className="border-b border-gray-200 text-gray-400 font-semibold bg-gray-50/70">
+                <th className="py-3.5 px-4">PROCESS NAME</th>
+                <th className="py-3.5 px-4">STARTING POINT</th>
+                <th className="py-3.5 px-4">KEY ROLE / OWNER</th>
+                <th className="py-3.5 px-4">FINAL APPROVAL</th>
+                <th className="py-3.5 px-4">TOTAL STEPS</th>
+                <th className="py-3.5 px-4 text-right">ACTION</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100 font-medium">
+              {[
+                { name: 'Goods Receiving & QC', start: 'Supplier Shipment', owner: 'QC Cell (Dr. Asma Noor)', final: 'Store Incharge (Usman Ali)', steps: 5, target: 'gate' },
+                { name: 'Manufacturing & Processing', start: 'Sales Order Approval', owner: 'Production Mgr (Farhan Ali)', final: 'Plant Mgr (Usama Tariq)', steps: 9, target: 'production' },
+                { name: 'Procurement (POs)', start: 'Department Requisition', owner: 'Purchasing (Waqar Ahmad)', final: 'Finance / CEO', steps: 6, target: 'procurement' },
+                { name: 'Sales & Credit Control', start: 'Customer Order', owner: 'Sales Officer (Bilal Yousafzai)', final: 'Chairman & CEO', steps: 6, target: 'sales' },
+                { name: 'Monthly Payroll Run', start: 'HR Attendance', owner: 'HR Manager (Nadia Shah)', final: 'Chairman & CEO', steps: 5, target: 'payroll' },
+                { name: 'Marketing Campaigns', start: 'Brand Planning', owner: 'Head of Mktg (Mahnoor Khan)', final: 'Director Finance / CEO', steps: 5, target: 'marketing' }
+              ].map((proc, idx) => (
+                <tr key={idx} className="hover:bg-gray-50/80 transition">
+                  <td className="py-3.5 px-4 font-bold text-gray-900">{proc.name}</td>
+                  <td className="py-3.5 px-4 text-gray-600">{proc.start}</td>
+                  <td className="py-3.5 px-4 font-semibold text-gray-800">{proc.owner}</td>
+                  <td className="py-3.5 px-4 font-bold text-gray-900">{proc.final}</td>
+                  <td className="py-3.5 px-4 text-gray-500 font-mono">{proc.steps} stages</td>
+                  <td className="py-3.5 px-4 text-right">
+                    <button
+                      onClick={() => onNavigate && onNavigate(proc.target)}
+                      className="px-2.5 py-1 text-[11px] font-bold text-white bg-black hover:bg-zinc-800 rounded-md transition shadow-xs cursor-pointer"
+                    >
+                      Open Module →
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
   );
 }

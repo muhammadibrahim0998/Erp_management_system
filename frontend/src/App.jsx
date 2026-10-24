@@ -25,13 +25,14 @@ import {
   GitBranch,
   LogOut,
   Shield,
+  ShieldAlert,
   History,
   Store
 } from 'lucide-react';
 
 import ChairmanDashboard from './components/views/ChairmanDashboard';
 import ApprovalsInbox from './components/views/ApprovalsInbox';
-import { authService, operationsService } from './services';
+import { authService, operationsService, userService } from './services';
 import LiveOperations from './components/views/LiveOperations';
 import GateSecurity from './components/views/GateSecurity';
 import QcGoodsReceipt from './components/views/QcGoodsReceipt';
@@ -41,6 +42,7 @@ import InventoryView from './components/views/InventoryView';
 import PosView from './components/views/PosView';
 import SalesCreditView from './components/views/SalesCreditView';
 import MarketingView from './components/views/MarketingView';
+import HrAdminView from './components/views/HrAdminView';
 import PayrollView from './components/views/PayrollView';
 import FinanceView from './components/views/FinanceView';
 import ReportsView from './components/views/ReportsView';
@@ -51,12 +53,127 @@ import RoleSwitcherModal from './components/RoleSwitcherModal';
 import ProcessMap from './components/views/ProcessMap';
 import Auth from './components/Auth';
 
+/**
+ * Strict role-to-pages access control mapping.
+ * Each user primarily sees the modules directly related to their operational duties.
+ */
+export const ROLE_ALLOWED_PAGES = {
+  'Chairman & CEO': [
+    'dashboard', 'approvals', 'live-operations', 'procurement', 'gate', 'qc',
+    'inventory', 'production', 'pos', 'sales', 'marketing', 'hr', 'payroll',
+    'finance', 'reports', 'users', 'audit-logs', 'settings', 'process-map'
+  ],
+  'General Manager': [
+    'dashboard', 'approvals', 'live-operations', 'procurement', 'gate', 'qc',
+    'inventory', 'production', 'pos', 'sales', 'marketing', 'hr', 'payroll',
+    'finance', 'reports', 'users', 'audit-logs', 'settings', 'process-map'
+  ],
+  'ERP Admin': [
+    'users', 'audit-logs', 'settings', 'dashboard', 'approvals', 'live-operations',
+    'procurement', 'gate', 'qc', 'inventory', 'production', 'pos', 'sales',
+    'marketing', 'hr', 'payroll', 'finance', 'reports', 'process-map'
+  ],
+  'Director Finance': [
+    'finance', 'reports', 'payroll', 'procurement', 'sales', 'approvals', 'dashboard'
+  ],
+  'Accounts Officer': [
+    'finance', 'reports', 'payroll', 'pos'
+  ],
+  'Director Operations': [
+    'live-operations', 'production', 'inventory', 'qc', 'gate', 'procurement', 'approvals', 'dashboard'
+  ],
+  'Plant Manager': [
+    'production', 'live-operations', 'inventory', 'qc', 'gate', 'approvals'
+  ],
+  'Production Manager': [
+    'production', 'live-operations'
+  ],
+  'Breaking Supervisor': [
+    'production', 'live-operations'
+  ],
+  'Poultry Farms': [
+    'live-operations', 'production', 'inventory'
+  ],
+  'Gate Officer': [
+    'gate'
+  ],
+  'QC Cell': [
+    'qc', 'gate'
+  ],
+  'Raw Material Store': [
+    'inventory'
+  ],
+  'Finish Store & Delivery': [
+    'inventory', 'gate'
+  ],
+  'Procurement': [
+    'procurement', 'inventory', 'approvals'
+  ],
+  'Sales Manager': [
+    'sales', 'pos', 'marketing', 'approvals'
+  ],
+  'Sales Officer': [
+    'pos', 'sales', 'inventory'
+  ],
+  'Store Sales Officer': [
+    'pos', 'sales', 'inventory'
+  ],
+  'Head of Marketing': [
+    'marketing', 'approvals'
+  ],
+  'Social Media & Content': [
+    'marketing'
+  ],
+  'HR Manager': [
+    'hr', 'payroll', 'approvals'
+  ],
+  'Staff': [
+    'process-map', 'live-operations'
+  ]
+};
+
+export function getEffectiveAllowedPages(user) {
+  if (!user) return ['process-map', 'live-operations'];
+
+  if (ROLE_ALLOWED_PAGES[user.role]) {
+    return ROLE_ALLOWED_PAGES[user.role];
+  }
+
+  const roleLower = (user.role || '').toLowerCase();
+  for (const [rName, pages] of Object.entries(ROLE_ALLOWED_PAGES)) {
+    if (roleLower === rName.toLowerCase() || roleLower.includes(rName.toLowerCase())) {
+      return pages;
+    }
+  }
+
+  const deptLower = (user.department || '').toLowerCase();
+  if (deptLower === 'security') return ['gate'];
+  if (deptLower === 'quality') return ['qc'];
+  if (deptLower === 'inventory') return ['inventory'];
+  if (deptLower === 'logistics') return ['inventory', 'gate'];
+  if (deptLower === 'purchasing') return ['procurement', 'inventory'];
+  if (deptLower === 'sales') return ['pos', 'sales'];
+  if (deptLower === 'marketing') return ['marketing'];
+  if (deptLower === 'hr') return ['hr', 'payroll'];
+  if (deptLower === 'finance') return ['finance', 'reports', 'payroll'];
+  if (deptLower === 'plant' || deptLower === 'production') return ['production', 'live-operations'];
+  if (deptLower === 'it') return ['users', 'audit-logs', 'settings'];
+  if (deptLower === 'executive') return ROLE_ALLOWED_PAGES['Chairman & CEO'];
+
+  return ['process-map', 'live-operations'];
+}
+
+export function getDefaultTabForUser(user) {
+  const allowed = getEffectiveAllowedPages(user);
+  return allowed[0] || 'process-map';
+}
+
 export default function App() {
-  const [activeTab, setActiveTab] = useState('dashboard');
-  const [isRoleModalOpen, setIsRoleModalOpen] = useState(false);
-  const [users, setUsers] = useState([]);
   const [currentUser, setCurrentUser] = useState(() => authService.getCurrentUser());
   const [isAuthenticated, setIsAuthenticated] = useState(() => authService.isAuthenticated());
+  const [activeTab, setActiveTab] = useState(() => getDefaultTabForUser(authService.getCurrentUser()));
+  const [isRoleModalOpen, setIsRoleModalOpen] = useState(false);
+  const [users, setUsers] = useState([]);
 
   // Live Server Data
   const [chairmanData, setChairmanData] = useState(null);
@@ -218,6 +335,18 @@ export default function App() {
     }
   };
 
+  const handleAddUser = async (userData) => {
+    try {
+      const res = await userService.createUser(userData);
+      showNotification('New staff member registered successfully');
+      fetchAllData();
+      return res;
+    } catch (e) {
+      showNotification(e.message || 'Failed to add user', 'error');
+      throw e;
+    }
+  };
+
   const handleLogout = () => {
     authService.logout();
     setIsAuthenticated(false);
@@ -230,6 +359,7 @@ export default function App() {
         onLogin={(user, _token) => {
           setCurrentUser(user);
           setIsAuthenticated(true);
+          setActiveTab(getDefaultTabForUser(user));
           fetchAllData();
         }}
       />
@@ -237,67 +367,57 @@ export default function App() {
   }
 
   // Role & Department permission checking
-  const userRole = currentUser.role || '';
-  const userDept = currentUser.department || '';
-  const isSuperAdmin = userRole === 'ERP Admin' || userRole === 'Chairman & CEO';
-  const isGM = userRole === 'General Manager' || isSuperAdmin;
-  const isFinance = userDept === 'Finance' || isGM;
-  const isOperations = ['Operations', 'Plant', 'Production'].includes(userDept) || isGM;
-  const isSecurity = userDept === 'Security' || userDept === 'Logistics' || isGM;
-  const isQC = userDept === 'Quality' || isGM;
-  const isInventory = userDept === 'Inventory' || isOperations || isGM;
-  const isSales = ['Sales', 'Marketing'].includes(userDept) || isGM;
-  const isHR = userDept === 'HR' || isGM;
+  const allowedTabIds = getEffectiveAllowedPages(currentUser);
 
   // Nav Groups with Role-Based Access Control
   const navSections = [
     {
       title: 'OVERVIEW',
       items: [
-        { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, visible: true },
-        { id: 'approvals', label: 'Approvals', icon: CheckSquare, badge: tasks.filter(t => t.status === 'pending').length, visible: true },
-        { id: 'live-operations', label: 'Live operations', icon: Activity, visible: isOperations || isSecurity || isQC || isGM },
-        { id: 'process-map', label: 'Process map', icon: GitBranch, visible: true }
+        { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, visible: allowedTabIds.includes('dashboard') },
+        { id: 'approvals', label: 'Approvals', icon: CheckSquare, badge: tasks.filter(t => t.status === 'pending').length, visible: allowedTabIds.includes('approvals') },
+        { id: 'live-operations', label: 'Live operations', icon: Activity, visible: allowedTabIds.includes('live-operations') },
+        { id: 'process-map', label: 'Process map', icon: GitBranch, visible: allowedTabIds.includes('process-map') }
       ].filter(item => item.visible)
     },
     {
       title: 'OPERATIONS',
       items: [
-        { id: 'procurement', label: 'Procurement', icon: ShoppingBag, visible: userDept === 'Purchasing' || isFinance || isOperations || isGM },
-        { id: 'gate', label: 'Gate & security', icon: Truck, visible: isSecurity || isOperations || isGM },
-        { id: 'qc', label: 'QC cell', icon: CheckCircle2, visible: isQC || isOperations || isGM },
-        { id: 'inventory', label: 'Inventory', icon: Package, visible: isInventory || isGM },
-        { id: 'production', label: 'Production', icon: Layers, visible: isOperations || isGM }
+        { id: 'procurement', label: 'Procurement', icon: ShoppingBag, visible: allowedTabIds.includes('procurement') },
+        { id: 'gate', label: 'Gate & security', icon: Truck, visible: allowedTabIds.includes('gate') },
+        { id: 'qc', label: 'QC cell', icon: CheckCircle2, visible: allowedTabIds.includes('qc') },
+        { id: 'inventory', label: 'Inventory', icon: Package, visible: allowedTabIds.includes('inventory') },
+        { id: 'production', label: 'Production', icon: Layers, visible: allowedTabIds.includes('production') }
       ].filter(item => item.visible)
     },
     {
       title: 'SALES & MARKETING',
       items: [
-        { id: 'pos', label: 'Point of Sale (POS)', icon: Store, visible: isSales || isFinance || isGM },
-        { id: 'sales', label: 'Sales orders', icon: ShoppingCart, visible: isSales || isFinance || isGM },
-        { id: 'marketing', label: 'Marketing', icon: Share2, visible: isSales || isGM }
+        { id: 'pos', label: 'Point of Sale (POS)', icon: Store, visible: allowedTabIds.includes('pos') },
+        { id: 'sales', label: 'Sales orders', icon: ShoppingCart, visible: allowedTabIds.includes('sales') },
+        { id: 'marketing', label: 'Marketing', icon: Share2, visible: allowedTabIds.includes('marketing') }
       ].filter(item => item.visible)
     },
     {
       title: 'PEOPLE',
       items: [
-        { id: 'hr', label: 'HR & Admin', icon: Users, visible: isHR || isGM },
-        { id: 'payroll', label: 'Payroll', icon: DollarSign, visible: isHR || isFinance || isGM }
+        { id: 'hr', label: 'HR & Admin', icon: Users, visible: allowedTabIds.includes('hr') },
+        { id: 'payroll', label: 'Payroll', icon: DollarSign, visible: allowedTabIds.includes('payroll') }
       ].filter(item => item.visible)
     },
     {
       title: 'MONEY',
       items: [
-        { id: 'finance', label: 'Accounts & Finance', icon: Building2, visible: isFinance || isGM },
-        { id: 'reports', label: 'Reports', icon: FileText, visible: isGM || isFinance }
+        { id: 'finance', label: 'Accounts & Finance', icon: Building2, visible: allowedTabIds.includes('finance') },
+        { id: 'reports', label: 'Reports', icon: FileText, visible: allowedTabIds.includes('reports') }
       ].filter(item => item.visible)
     },
     {
       title: 'ADMIN & SETTINGS',
       items: [
-        { id: 'users', label: 'User Management', icon: Shield, visible: isSuperAdmin || isGM },
-        { id: 'audit-logs', label: 'Audit Trail & Logs', icon: History, visible: isSuperAdmin || isGM },
-        { id: 'settings', label: 'Approval matrix', icon: Sliders, visible: isSuperAdmin || isGM }
+        { id: 'users', label: 'User Management', icon: Shield, visible: allowedTabIds.includes('users') },
+        { id: 'audit-logs', label: 'Audit Trail & Logs', icon: History, visible: allowedTabIds.includes('audit-logs') },
+        { id: 'settings', label: 'Approval matrix', icon: Sliders, visible: allowedTabIds.includes('settings') }
       ].filter(item => item.visible)
     }
   ].filter(section => section.items.length > 0);
@@ -433,9 +553,27 @@ export default function App() {
         </header>
 
         {/* Gray Dashboard Background with Full White Content Views */}
-        <main className="flex-1 bg-gray-100 overflow-y-auto p-8">
-          <div className="max-w-7xl mx-auto">
-            {activeTab === 'dashboard' && (
+        <main className="flex-1 bg-gray-100 overflow-y-auto p-8 relative">
+          <div key={activeTab} className="max-w-7xl mx-auto animate-page-slide-left">
+            {!allowedTabIds.includes(activeTab) ? (
+              <div className="bg-white rounded-2xl p-8 border border-gray-200 text-center max-w-md mx-auto my-12 shadow-sm">
+                <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center mx-auto mb-3">
+                  <ShieldAlert className="w-6 h-6" />
+                </div>
+                <h3 className="text-base font-black text-gray-900">Access Restricted</h3>
+                <p className="text-xs text-gray-500 mt-1">
+                  Your role <strong>{currentUser?.role || 'Staff'}</strong> ({currentUser?.department || 'General'}) does not have permission to view this section.
+                </p>
+                <button
+                  onClick={() => setActiveTab(getDefaultTabForUser(currentUser))}
+                  className="mt-4 px-4 py-2 bg-[#0c8547] hover:bg-[#0a733d] text-white rounded-xl text-xs font-bold transition shadow-sm cursor-pointer"
+                >
+                  Open My Role Module
+                </button>
+              </div>
+            ) : (
+              <>
+                {activeTab === 'dashboard' && (
               <ChairmanDashboard
                 data={chairmanData}
                 currentUser={currentUser}
@@ -532,11 +670,10 @@ export default function App() {
             )}
 
             {activeTab === 'hr' && (
-              <ApprovalsInbox
-                tasks={tasks.filter(t => t.assigned_role === currentUser?.name)}
-                onApproveTask={handleApproveTask}
-                isLoading={isLoading}
-                onRefetch={fetchAllData}
+              <HrAdminView
+                users={users}
+                currentUser={currentUser}
+                onAddUser={handleAddUser}
               />
             )}
 
@@ -578,6 +715,8 @@ export default function App() {
             {activeTab === 'process-map' && (
               <ProcessMap onNavigate={(t) => setActiveTab(t)} />
             )}
+              </>
+            )}
           </div>
         </main>
       </div>
@@ -591,6 +730,7 @@ export default function App() {
         onSelectUser={(u) => {
           setCurrentUser(u);
           localStorage.setItem('yaf_user', JSON.stringify(u));
+          setActiveTab(getDefaultTabForUser(u));
           showNotification(`Switched role to: ${u.name} (${u.role})`);
         }}
       />
