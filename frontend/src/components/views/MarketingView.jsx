@@ -151,7 +151,7 @@ export default function MarketingView({ campaigns }) {
           <h3 className="text-xs font-bold text-gray-900 uppercase tracking-wider">
             All Marketing Campaigns & Performance Table
           </h3>
-          <span className="text-xs text-gray-500 font-medium">{campaigns?.length || 3} campaigns</span>
+          <span className="text-xs text-gray-500 font-medium">{campaigns?.length || 0} campaigns</span>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
@@ -168,11 +168,7 @@ export default function MarketingView({ campaigns }) {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 font-medium">
-              {(campaigns || [
-                { code: 'MKB-2026-0002', title: 'Always-on social — premium quality since 1960', dates: '16 Jul 2026 – 14 Oct 2026', budget: '1,781,000', spent: '1,319,000', reach: '873k', leads: 498, status: 'Live' },
-                { code: 'MKB-2026-0004', title: 'Winter demand push — dealers & retail', dates: '29 Oct 2026 – 17 Jan 2027', budget: '2,100,000', spent: '0', reach: '500k', leads: 0, status: 'In Approval' },
-                { code: 'MKB-2026-0003', title: 'New product line launch — retail & wholesale', dates: '11 Oct 2026 – 9 Jan 2027', budget: '4,300,000', spent: '0', reach: '1.2M', leads: 0, status: 'In Approval' }
-              ]).map((c, idx) => (
+              {(campaigns || []).map((c, idx) => (
                 <tr key={idx} className="hover:bg-gray-50/80 transition">
                   <td className="py-3.5 px-4 font-mono font-bold text-gray-900">{c.code}</td>
                   <td className="py-3.5 px-4 font-bold text-gray-800">{c.title}</td>

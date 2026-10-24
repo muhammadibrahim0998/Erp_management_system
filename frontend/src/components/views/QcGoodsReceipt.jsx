@@ -169,7 +169,14 @@ export default function QcGoodsReceipt({ onReceiveStore }) {
               {[
                 { grn: 'GRN-2026-0611', supplier: 'Charsadda Supply Partners', vehicle: 'CSD-2298', temp: '24 °C', hygiene: 'Clean', accepted: '790 units', rejected: '10 units', status: received ? 'In Store' : 'Awaiting Store', isCurrent: true },
                 { grn: 'GRN-2026-0610', supplier: 'Swabi Manufacturing & Logistics', vehicle: 'MRD-4471', temp: '22 °C', hygiene: 'Clean', accepted: '1,200 units', rejected: '0 units', status: 'In Store', isCurrent: false },
-                { grn: 'GRN-2026-0609', supplier: 'Frontier Raw Materials', vehicle: 'PSW-9912', temp: '25 °C', hygiene: 'Acceptable', accepted: '500 units', rejected: '5 units', status: 'In Store', isCurrent: false }
+                { grn: 'GRN-2026-0609', supplier: 'Frontier Raw Materials', vehicle: 'PSW-9912', temp: '25 °C', hygiene: 'Acceptable', accepted: '500 units', rejected: '5 units', status: 'In Store', isCurrent: false },
+                { grn: 'GRN-2026-0608', supplier: 'Khyber Cold Chain Logistics', vehicle: 'KHY-8829', temp: '21 °C', hygiene: 'Optimal', accepted: '1,500 units', rejected: '0 units', status: 'In Store', isCurrent: false },
+                { grn: 'GRN-2026-0607', supplier: 'Premier Packaging Co.', vehicle: 'ISB-3341', temp: '26 °C', hygiene: 'Clean', accepted: '800 cartons', rejected: '0 units', status: 'In Store', isCurrent: false },
+                { grn: 'GRN-2026-0606', supplier: 'Haripur Production Partners', vehicle: 'HRP-1102', temp: '23 °C', hygiene: 'Clean', accepted: '950 units', rejected: '8 units', status: 'In Store', isCurrent: false },
+                { grn: 'GRN-2026-0605', supplier: 'Attock Layer Farms Consortium', vehicle: 'ATK-9018', temp: '24 °C', hygiene: 'Clean', accepted: '1,100 units', rejected: '12 units', status: 'In Store', isCurrent: false },
+                { grn: 'GRN-2026-0604', supplier: 'Rashakai Farm Supplies', vehicle: 'RSK-7711', temp: '22 °C', hygiene: 'Optimal', accepted: '650 units', rejected: '0 units', status: 'In Store', isCurrent: false },
+                { grn: 'GRN-2026-0603', supplier: 'Mardan Layer Cooperative', vehicle: 'MRD-3320', temp: '23 °C', hygiene: 'Clean', accepted: '850 units', rejected: '6 units', status: 'In Store', isCurrent: false },
+                { grn: 'GRN-2026-0602', supplier: 'Swat Valley Poultry Partners', vehicle: 'SWT-5541', temp: '20 °C', hygiene: 'Optimal', accepted: '1,350 units', rejected: '4 units', status: 'In Store', isCurrent: false }
               ].map((row, idx) => (
                 <tr key={idx} className="hover:bg-gray-50/80 transition">
                   <td className="py-3.5 px-4 font-mono font-bold text-gray-900">{row.grn}</td>

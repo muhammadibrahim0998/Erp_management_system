@@ -45,32 +45,41 @@ export default function ReportsView() {
     ]
   };
 
-  // 2. Receivables Aging Data
+  // 2. Receivables Aging Data (10 Customer Records)
   const receivablesData = {
     title: 'Trade Receivables Aging Analysis',
     totalReceivables: 'PKR 45.66M',
     overdue30: 'PKR 3.20M',
     items: [
-      { customer: 'Peek Freans (English Biscuit Mfrs)', invoice: 'INV-2026-0812', amount: '18,450,000', current: '18,450,000', d1_30: '0', d31_60: '0', status: 'Current' },
-      { customer: 'Dawn Foods (Bread & Confectionery)', invoice: 'INV-2026-0818', amount: '8,200,000', current: '8,200,000', d1_30: '0', d31_60: '0', status: 'Current' },
-      { customer: 'Swat Valley Egg Dealers', invoice: 'INV-2026-0741', amount: '6,410,034', current: '0', d1_30: '3,210,034', d31_60: '3,200,000', status: 'Overdue (On Hold)' },
-      { customer: 'Master Baker (Lahore Branch)', invoice: 'INV-2026-0825', amount: '5,100,000', current: '4,350,000', d1_30: '750,000', d31_60: '0', status: 'Normal' },
-      { customer: 'Salman Sweets & Bakers (Mardan)', invoice: 'INV-2026-0830', amount: '4,500,000', current: '0', d1_30: '4,500,000', d31_60: '0', status: 'Due This Week' },
-      { customer: 'Tehzeeb Bakers (Rawalpindi)', invoice: 'INV-2026-0834', amount: '3,000,000', current: '0', d1_30: '2,940,000', d31_60: '60,000', status: 'Normal' }
+      { customer: 'Karachi General Wholesalers', invoice: 'INV-2026-0810', amount: '12,386,999', current: '12,386,999', d1_30: '0', d31_60: '0', status: 'Current' },
+      { customer: 'Peek Freans Food Industries', invoice: 'INV-2026-0812', amount: '7,093,583', current: '7,093,583', d1_30: '0', d31_60: '0', status: 'Current' },
+      { customer: 'Barkat Frisian (Value Added)', invoice: 'INV-2026-0815', amount: '5,486,933', current: '5,486,933', d1_30: '0', d31_60: '0', status: 'Current' },
+      { customer: 'Dawn Foods Karachi', invoice: 'INV-2026-0818', amount: '3,942,893', current: '3,942,893', d1_30: '0', d31_60: '0', status: 'Current' },
+      { customer: 'Swat Valley Egg Dealers', invoice: 'INV-2026-0741', amount: '3,877,654', current: '0', d1_30: '677,654', d31_60: '3,200,000', status: 'Overdue (On Hold)' },
+      { customer: 'Master Baker Lahore', invoice: 'INV-2026-0825', amount: '4,200,000', current: '3,450,000', d1_30: '750,000', d31_60: '0', status: 'Normal' },
+      { customer: 'Gourmet Foods Islamabad', invoice: 'INV-2026-0828', amount: '3,650,000', current: '3,650,000', d1_30: '0', d31_60: '0', status: 'Current' },
+      { customer: 'Tehzeeb Bakers Rawalpindi', invoice: 'INV-2026-0834', amount: '2,850,000', current: '2,850,000', d1_30: '0', d31_60: '0', status: 'Current' },
+      { customer: 'Shezan Bakers Peshawar', invoice: 'INV-2026-0838', amount: '2,150,000', current: '2,150,000', d1_30: '0', d31_60: '0', status: 'Current' },
+      { customer: 'Salman Sweets Mardan', invoice: 'INV-2026-0842', amount: '1,120,000', current: '1,120,000', d1_30: '0', d31_60: '0', status: 'Current' }
     ]
   };
 
-  // 3. Inventory Valuation Data
+  // 3. Inventory Valuation Data (10 Item Records)
   const inventoryData = {
     title: 'Warehouse Inventory Stock Valuation',
     totalStockValue: 'PKR 14.88M',
     totalUnits: '73,640 Trays',
     items: [
-      { code: 'RM-EGG-M', name: 'Fresh Shell Eggs — Medium Grade', warehouse: 'Mardan Central', qty: '22,400', avgCost: '180.00', totalValue: '4,032,000', status: 'Optimal' },
-      { code: 'RM-EGG-L', name: 'Fresh Shell Eggs — Large Grade', warehouse: 'Rashakai Plant', qty: '18,500', avgCost: '195.00', totalValue: '3,607,500', status: 'Optimal' },
-      { code: 'FG-LIQ-WHOLE', name: 'Pasteurized Liquid Whole Egg (Kg)', warehouse: 'Rashakai Plant Tankers', qty: '12,000', avgCost: '363.00', totalValue: '4,356,000', status: 'Optimal' },
-      { code: 'PKG-TRAY-3P', name: 'Pulp Trays (3-Ply Packaging)', warehouse: 'Charsadda Store', qty: '15,000', avgCost: '18.50', totalValue: '277,500', status: 'Reorder' },
-      { code: 'VET-SUP-01', name: 'Poultry Feed & Vitamin Supplements', warehouse: 'Swabi Layer Farm', qty: '5,740', avgCost: '455.00', totalValue: '2,611,700', status: 'Watch' }
+      { code: 'PRD-01-01-01', name: 'Premium Product Grade A – Pack Extra Large', warehouse: 'Mardan Central', qty: '900', avgCost: '610.00', totalValue: '549,000', status: 'Watch' },
+      { code: 'PRD-01-01-02', name: 'Standard Product Grade A – Pack Large', warehouse: 'Mardan Central', qty: '4,387', avgCost: '575.00', totalValue: '2,522,525', status: 'Optimal' },
+      { code: 'PRD-01-02-01', name: 'Standard Product Item – Medium', warehouse: 'Rashakai Plant', qty: '1,400', avgCost: '540.00', totalValue: '756,000', status: 'Watch' },
+      { code: 'PRD-01-02-02', name: 'Standard Product Item – Small', warehouse: 'Mardan Central', qty: '500', avgCost: '495.00', totalValue: '247,500', status: 'Watch' },
+      { code: 'PRD-02-01-01', name: 'Specialty Product – Large', warehouse: 'Attock Depot', qty: '420', avgCost: '670.00', totalValue: '281,400', status: 'Watch' },
+      { code: 'PRD-02-01-02', name: 'Specialty Product – Medium', warehouse: 'Charsadda Store', qty: '300', avgCost: '635.00', totalValue: '190,500', status: 'Watch' },
+      { code: 'PRD-03-01-01', name: 'Organic Product Batch – Large', warehouse: 'Peshawar Cold', qty: '60', avgCost: '950.00', totalValue: '57,000', status: 'Reorder' },
+      { code: 'PRD-03-02-01', name: 'Custom Formulation Product – Large', warehouse: 'Rashakai Tankers', qty: '90', avgCost: '900.00', totalValue: '81,000', status: 'Optimal' },
+      { code: 'RM-PKG-01', name: 'Corrugated Export Cartons (30-Pack Box)', warehouse: 'Mardan Central', qty: '2,200', avgCost: '85.00', totalValue: '187,000', status: 'Optimal' },
+      { code: 'RM-TRF-02', name: 'Industrial Molded Pulp Egg Trays', warehouse: 'Rashakai Store', qty: '1,740', avgCost: '120.00', totalValue: '208,800', status: 'Optimal' }
     ]
   };
 

@@ -6,7 +6,7 @@ const { logAudit } = require('../utils/auditLogger');
  */
 const getChairmanDashboard = async (req, res) => {
   try {
-    const [tasks] = await db.query('SELECT * FROM workflow_tasks WHERE status = "pending" LIMIT 6');
+    const [tasks] = await db.query('SELECT * FROM workflow_tasks WHERE status = "pending" LIMIT 10');
     const [inventoryCount] = await db.query('SELECT COUNT(*) as count FROM inventory_items WHERE status = "Reorder"');
     const [totalOrders] = await db.query('SELECT COUNT(*) as count FROM purchase_orders');
 
@@ -227,7 +227,7 @@ const moveProduction = async (req, res) => {
 const getSalesOrders = async (req, res) => {
   try {
     const [orders] = await db.query('SELECT * FROM sales_orders ORDER BY id DESC');
-    res.json(orders[0] || null);
+    res.json(orders);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -301,10 +301,16 @@ const generatePayroll = async (req, res) => {
 const getFinanceOverview = (req, res) => {
   res.json({
     cashAndBank: [
-      { name: 'Cash in hand', balance: '800,000', account: 'Cash' },
-      { name: 'Bank — Current A/C ••4410', balance: '14,905,300', account: 'Meezan Bank' },
-      { name: 'Bank — Current A/C ••2231', balance: '10,713,825', account: 'HBL Mardan' },
-      { name: 'Bank — Payroll A/C ••7702', balance: '3,000,000', account: 'MCB' }
+      { name: 'Cash in hand · Main Vault', balance: '800,000', account: 'Cash' },
+      { name: 'Meezan Bank Current A/C ••4410', balance: '14,905,300', account: 'Meezan Bank' },
+      { name: 'HBL Mardan Branch ••2231', balance: '10,713,825', account: 'HBL Mardan' },
+      { name: 'MCB Payroll Disbursement A/C ••7702', balance: '3,000,000', account: 'MCB Bank' },
+      { name: 'Bank of Khyber Operational A/C ••9182', balance: '6,450,000', account: 'Bank of Khyber' },
+      { name: 'Faysal Islamic Trade Facility ••5501', balance: '4,200,000', account: 'Faysal Bank' },
+      { name: 'Allied Bank Commercial A/C ••3321', balance: '2,850,000', account: 'Allied Bank' },
+      { name: 'National Bank of Pakistan Tax A/C ••1190', balance: '1,750,000', account: 'NBP' },
+      { name: 'Bank Alfalah Collection A/C ••6643', balance: '3,920,000', account: 'Bank Alfalah' },
+      { name: 'UBL Retail Outlets Remittance A/C ••8812', balance: '2,150,000', account: 'United Bank Ltd' }
     ],
     receivables: {
       total: 'PKR 45,660,034',
@@ -312,11 +318,16 @@ const getFinanceOverview = (req, res) => {
       d1_30: '11.4M',
       d31_60: '3.2M',
       topDebtors: [
-        { customer: 'Karachi Egg Wholesalers', amount: '12,386,999' },
-        { customer: 'Peek Freans', amount: '7,093,583' },
-        { customer: 'Barkat Frisian (value-added)', amount: '5,486,933' },
-        { customer: 'Dawn Foods', amount: '3,942,893' },
-        { customer: 'Swat Valley Egg Dealers', amount: '3,877,654' }
+        { customer: 'Karachi General Wholesalers', amount: '12,386,999', category: 'Distributor' },
+        { customer: 'Peek Freans Food Industries', amount: '7,093,583', category: 'B2B Client' },
+        { customer: 'Barkat Frisian (Value Added)', amount: '5,486,933', category: 'Industrial' },
+        { customer: 'Dawn Foods Karachi', amount: '3,942,893', category: 'Bakery Chain' },
+        { customer: 'Swat Valley Trading Co.', amount: '3,877,654', category: 'Dealer' },
+        { customer: 'Master Baker Lahore', amount: '4,200,000', category: 'Bakery Chain' },
+        { customer: 'Gourmet Foods Islamabad', amount: '3,650,000', category: 'Food Manufacturer' },
+        { customer: 'Tehzeeb Bakers Rawalpindi', amount: '2,850,000', category: 'B2B Client' },
+        { customer: 'Shezan Bakers Peshawar', amount: '2,150,000', category: 'Bakery Chain' },
+        { customer: 'Salman Sweets Mardan', amount: '1,120,000', category: 'Confectioner' }
       ]
     },
     payables: {
@@ -324,11 +335,16 @@ const getFinanceOverview = (req, res) => {
       current: '23.2M',
       d1_30: '4.0M',
       topCreditors: [
-        { supplier: 'Frontier Poultry Feeds', amount: '11,119,140' },
-        { supplier: 'Swabi Layer Farms', amount: '2,646,840' },
-        { supplier: 'Haripur Egg Farm', amount: '2,646,330' },
-        { supplier: 'Khyber Cold Chain Logistics', amount: '2,062,160' },
-        { supplier: 'Charsadda Poultry Farm', amount: '1,940,905' }
+        { supplier: 'Frontier Raw Materials & Supplies', amount: '11,119,140', category: 'Feed & Raw' },
+        { supplier: 'Premier Packaging Co.', amount: '2,943,392', category: 'Packaging Material' },
+        { supplier: 'Swabi Manufacturing & Logistics', amount: '2,646,840', category: 'Layer Farm' },
+        { supplier: 'Haripur Production Partners', amount: '2,646,330', category: 'Egg Farm' },
+        { supplier: 'Khyber Cold Chain Logistics', amount: '2,062,160', category: 'Cold Transport' },
+        { supplier: 'Charsadda Supply Partners', amount: '1,940,905', category: 'Egg Farm' },
+        { supplier: 'Attock Layer Farms Consortium', amount: '1,450,000', category: 'Shell Eggs Raw' },
+        { supplier: 'Peshawar Fuel & Logistics Fleet', amount: '1,230,000', category: 'Transport Services' },
+        { supplier: 'Rashakai Engineering Works', amount: '808,300', category: 'Equipment & Spares' },
+        { supplier: 'Mardan Office Supplies', amount: '76,110', category: 'Administration' }
       ]
     }
   });

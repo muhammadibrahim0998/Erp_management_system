@@ -5,12 +5,9 @@ import { exportToPDF, exportToExcel } from '../../utils/exportUtils';
 export default function FinanceView({ financeData, onNavigate }) {
   const [notice, setNotice] = useState(null);
 
-  const cashAccounts = financeData?.cashAndBank || [
-    { name: 'Cash in hand', balance: '800,000', account: 'Cash' },
-    { name: 'Bank — Current A/C ••4410', balance: '14,905,300', account: 'Meezan Bank' },
-    { name: 'Bank — Current A/C ••2231', balance: '10,713,825', account: 'HBL Mardan' },
-    { name: 'Bank — Payroll A/C ••7702', balance: '3,000,000', account: 'MCB' }
-  ];
+  const cashAccounts = financeData?.cashAndBank || [];
+  const debtors = financeData?.receivables?.topDebtors || [];
+  const creditors = financeData?.payables?.topCreditors || [];
 
   const handleExportPDF = () => {
     exportToPDF({
@@ -128,13 +125,7 @@ export default function FinanceView({ financeData, onNavigate }) {
           <div>
             <h4 className="text-xs font-bold text-gray-800 mb-2">Top Debtors</h4>
             <div className="space-y-2 text-xs font-medium">
-              {[
-                { customer: 'Karachi General Wholesalers', amount: '12,386,999' },
-                { customer: 'Peek Freans', amount: '7,093,583' },
-                { customer: 'Barkat Frisian (value-added)', amount: '5,486,933' },
-                { customer: 'Dawn Foods', amount: '3,942,893' },
-                { customer: 'Swat Valley Trading Co.', amount: '3,877,654' }
-              ].map((d, i) => (
+              {debtors.slice(0, 5).map((d, i) => (
                 <div key={i} className="flex justify-between items-center py-1 border-b border-gray-50">
                   <span className="text-gray-700">{d.customer}</span>
                   <span className="font-mono font-bold text-gray-900">PKR {d.amount}</span>
@@ -233,16 +224,10 @@ export default function FinanceView({ financeData, onNavigate }) {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 font-medium">
-                  {[
-                    { customer: 'Karachi General Wholesalers', category: 'Distributor', amount: '12,386,999' },
-                    { customer: 'Peek Freans Food Industries', category: 'B2B Client', amount: '7,093,583' },
-                    { customer: 'Barkat Frisian (Value Added)', category: 'Industrial', amount: '5,486,933' },
-                    { customer: 'Dawn Foods Karachi', category: 'Bakery Chain', amount: '3,942,893' },
-                    { customer: 'Swat Valley Trading Co.', category: 'Dealer', amount: '3,877,654' }
-                  ].map((d, i) => (
+                  {debtors.map((d, i) => (
                     <tr key={i} className="hover:bg-gray-50/80 transition">
                       <td className="py-3 px-4 font-bold text-gray-800">{d.customer}</td>
-                      <td className="py-3 px-4 text-gray-500">{d.category}</td>
+                      <td className="py-3 px-4 text-gray-500">{d.category || 'Wholesale Client'}</td>
                       <td className="py-3 px-4 text-right font-mono font-bold text-gray-900">{d.amount}</td>
                     </tr>
                   ))}
@@ -269,16 +254,10 @@ export default function FinanceView({ financeData, onNavigate }) {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 font-medium">
-                  {[
-                    { supplier: 'Frontier Raw Materials & Supplies', category: 'Feed & Raw', amount: '11,119,140' },
-                    { supplier: 'Swabi Manufacturing & Logistics', category: 'Layer Farm', amount: '2,646,840' },
-                    { supplier: 'Haripur Production Partners', category: 'Egg Farm', amount: '2,646,330' },
-                    { supplier: 'Khyber Cold Chain Logistics', category: 'Cold Transport', amount: '2,062,160' },
-                    { supplier: 'Charsadda Supply Partners', category: 'Egg Farm', amount: '1,940,905' }
-                  ].map((c, i) => (
+                  {creditors.map((c, i) => (
                     <tr key={i} className="hover:bg-gray-50/80 transition">
                       <td className="py-3 px-4 font-bold text-gray-800">{c.supplier}</td>
-                      <td className="py-3 px-4 text-gray-500">{c.category}</td>
+                      <td className="py-3 px-4 text-gray-500">{c.category || 'Supplies'}</td>
                       <td className="py-3 px-4 text-right font-mono font-bold text-gray-900">{c.amount}</td>
                     </tr>
                   ))}

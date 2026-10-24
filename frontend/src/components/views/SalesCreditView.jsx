@@ -10,11 +10,28 @@ import {
 } from 'lucide-react';
 
 export default function SalesCreditView({ salesOrder, onApproveOrder }) {
-  const [isApproved, setIsApproved] = useState(salesOrder?.status === 'Approved');
+  const ordersList = Array.isArray(salesOrder)
+    ? salesOrder
+    : (salesOrder ? [salesOrder] : []);
+
+  const [selectedIndex, setSelectedIndex] = useState(0);
+  const activeOrder = ordersList[selectedIndex] || ordersList[0] || {
+    so_number: 'SO-2026-0418',
+    customer: 'Swat Valley Trading Co.',
+    total_amount: 1583850,
+    credit_limit: 4500000,
+    current_exposure: 5461504,
+    credit_breach: 961504,
+    status: 'Pending approval',
+    order_date: '28 Sep 2026',
+    delivery_date: '1 Oct 2026',
+    warehouse: 'Mardan sales point & store'
+  };
+
+  const isApproved = activeOrder.status === 'Approved';
 
   const handleApprove = async () => {
-    await onApproveOrder(salesOrder?.so_number || 'SO-2026-0418');
-    setIsApproved(true);
+    await onApproveOrder(activeOrder.so_number);
   };
 
   return (
@@ -24,16 +41,16 @@ export default function SalesCreditView({ salesOrder, onApproveOrder }) {
         <div>
           <div className="flex items-center gap-2">
             <span className="font-mono font-bold text-xs text-gray-500">
-              {salesOrder?.so_number || 'SO-2026-0418'}
+              {activeOrder.so_number}
             </span>
             <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
               isApproved ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-amber-50 text-amber-700 border border-amber-200'
             }`}>
-              {isApproved ? 'Approved by CEO' : 'Pending approval'}
+              {isApproved ? 'Approved by CEO' : activeOrder.status}
             </span>
           </div>
           <h2 className="text-xl font-bold text-gray-900 tracking-tight mt-1">
-            Sales order with credit control · Swat Valley Trading Co.
+            Sales order · {activeOrder.customer}
           </h2>
           <p className="text-xs text-gray-500">
             Dealer credit limits, partner-tier discounts and sales tax rules are checked as the order is typed. Breaches route to approval.
@@ -76,19 +93,19 @@ export default function SalesCreditView({ salesOrder, onApproveOrder }) {
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs pb-4 border-b border-gray-100">
               <div>
                 <span className="text-gray-400">Date</span>
-                <div className="font-bold text-gray-900 mt-0.5">28 Sep 2026</div>
+                <div className="font-bold text-gray-900 mt-0.5">{activeOrder.order_date || '28 Sep 2026'}</div>
               </div>
               <div>
                 <span className="text-gray-400">Customer</span>
-                <div className="font-bold text-gray-900 mt-0.5">Swat Valley Trading Co.</div>
+                <div className="font-bold text-gray-900 mt-0.5">{activeOrder.customer}</div>
               </div>
               <div>
                 <span className="text-gray-400">Warehouse</span>
-                <div className="font-bold text-gray-900 mt-0.5">Mardan sales point & store</div>
+                <div className="font-bold text-gray-900 mt-0.5">{activeOrder.warehouse || 'Mardan sales point & store'}</div>
               </div>
               <div>
                 <span className="text-gray-400">Delivery Date</span>
-                <div className="font-bold text-gray-900 mt-0.5">1 Oct 2026</div>
+                <div className="font-bold text-gray-900 mt-0.5">{activeOrder.delivery_date || '1 Oct 2026'}</div>
               </div>
             </div>
 
@@ -130,7 +147,7 @@ export default function SalesCreditView({ salesOrder, onApproveOrder }) {
               <div className="text-right">
                 <span className="text-xs text-gray-500">Sales tax: Exempt items</span>
                 <div className="text-xl font-black text-gray-900 mt-1">
-                  Total: PKR 1,583,850
+                  Total: PKR {Number(activeOrder.total_amount).toLocaleString()}
                 </div>
               </div>
             </div>
@@ -198,19 +215,19 @@ export default function SalesCreditView({ salesOrder, onApproveOrder }) {
             <div className="space-y-2 pt-1 font-mono text-[11px]">
               <div className="flex justify-between">
                 <span className="text-gray-500">Credit limit:</span>
-                <span className="font-bold text-gray-900">4,500,000</span>
+                <span className="font-bold text-gray-900">{Number(activeOrder.credit_limit).toLocaleString()}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-500">Outstanding invoices:</span>
-                <span className="font-bold text-gray-900">3,877,654</span>
+                <span className="text-gray-500">Current exposure:</span>
+                <span className="font-bold text-gray-900">{Number(activeOrder.current_exposure).toLocaleString()}</span>
               </div>
               <div className="flex justify-between border-t border-gray-100 pt-1">
-                <span className="text-gray-500">Total exposure:</span>
-                <span className="font-bold text-rose-600">5,461,504</span>
+                <span className="text-gray-500">Credit breach:</span>
+                <span className="font-bold text-rose-600">{Number(activeOrder.credit_breach || 0).toLocaleString()}</span>
               </div>
               <div className="flex justify-between text-rose-700">
-                <span>Overdue:</span>
-                <span className="font-bold">3,088,838</span>
+                <span>Status:</span>
+                <span className="font-bold">{activeOrder.status}</span>
               </div>
             </div>
           </div>
@@ -240,77 +257,53 @@ export default function SalesCreditView({ salesOrder, onApproveOrder }) {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 font-medium">
-              {[
-                {
-                  so_number: salesOrder?.so_number || 'SO-2026-0418',
-                  order_date: '28 Sep 2026',
-                  customer: 'Swat Valley Trading Co.',
-                  amount: '1,583,850',
-                  credit_limit: '4,500,000',
-                  exposure: '5,461,504',
-                  breach: '961,504',
-                  status: isApproved ? 'Approved by CEO' : 'Pending Approval',
-                  canApprove: !isApproved
-                },
-                {
-                  so_number: 'SO-2026-0417',
-                  order_date: '25 Sep 2026',
-                  customer: 'Peek Freans Food Industries',
-                  amount: '4,250,000',
-                  credit_limit: '15,000,000',
-                  exposure: '7,093,583',
-                  breach: '0',
-                  status: 'Approved',
-                  canApprove: false
-                },
-                {
-                  so_number: 'SO-2026-0416',
-                  order_date: '22 Sep 2026',
-                  customer: 'Dawn Foods Karachi',
-                  amount: '2,100,000',
-                  credit_limit: '8,000,000',
-                  exposure: '3,942,893',
-                  breach: '0',
-                  status: 'Approved',
-                  canApprove: false
-                }
-              ].map((order, idx) => (
-                <tr key={idx} className="hover:bg-gray-50/80 transition">
-                  <td className="py-3.5 px-4 font-mono font-bold text-gray-900">{order.so_number}</td>
-                  <td className="py-3.5 px-4 text-gray-500">{order.order_date}</td>
-                  <td className="py-3.5 px-4 font-bold text-gray-800">{order.customer}</td>
-                  <td className="py-3.5 px-4 text-right font-bold text-gray-900 font-mono">
-                    PKR {order.amount}
-                  </td>
-                  <td className="py-3.5 px-4 text-right text-gray-500 font-mono">
-                    PKR {order.credit_limit}
-                  </td>
-                  <td className="py-3.5 px-4 text-right font-mono font-bold text-rose-600">
-                    PKR {order.exposure}
-                  </td>
-                  <td className="py-3.5 px-4">
-                    <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold border ${
-                      order.status.includes('Approved')
-                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                        : 'bg-amber-50 text-amber-700 border-amber-200'
-                    }`}>
-                      {order.status}
-                    </span>
-                  </td>
-                  <td className="py-3.5 px-4 text-right">
-                    {order.canApprove ? (
-                      <button
-                        onClick={handleApprove}
-                        className="px-2.5 py-1 text-[11px] font-bold text-white bg-black hover:bg-zinc-800 rounded-md transition shadow-xs"
-                      >
-                        Approve →
-                      </button>
-                    ) : (
-                      <span className="text-emerald-700 font-semibold text-[11px]">✓ Cleared</span>
-                    )}
-                  </td>
-                </tr>
-              ))}
+              {ordersList.map((order, idx) => {
+                const isSelected = activeOrder.so_number === order.so_number;
+                return (
+                  <tr 
+                    key={idx} 
+                    onClick={() => setSelectedIndex(idx)}
+                    className={`hover:bg-gray-50/80 transition cursor-pointer ${isSelected ? 'bg-amber-50/40' : ''}`}
+                  >
+                    <td className="py-3.5 px-4 font-mono font-bold text-gray-900">{order.so_number}</td>
+                    <td className="py-3.5 px-4 text-gray-500">{order.order_date}</td>
+                    <td className="py-3.5 px-4 font-bold text-gray-800">{order.customer}</td>
+                    <td className="py-3.5 px-4 text-right font-bold text-gray-900 font-mono">
+                      PKR {Number(order.total_amount).toLocaleString()}
+                    </td>
+                    <td className="py-3.5 px-4 text-right text-gray-500 font-mono">
+                      PKR {Number(order.credit_limit).toLocaleString()}
+                    </td>
+                    <td className="py-3.5 px-4 text-right font-mono font-bold text-rose-600">
+                      PKR {Number(order.current_exposure).toLocaleString()}
+                    </td>
+                    <td className="py-3.5 px-4">
+                      <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold border ${
+                        order.status.includes('Approved')
+                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                          : 'bg-amber-50 text-amber-700 border-amber-200'
+                      }`}>
+                        {order.status}
+                      </span>
+                    </td>
+                    <td className="py-3.5 px-4 text-right">
+                      {order.status !== 'Approved' ? (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onApproveOrder(order.so_number);
+                          }}
+                          className="px-2.5 py-1 text-[11px] font-bold text-white bg-black hover:bg-zinc-800 rounded-md transition shadow-xs"
+                        >
+                          Approve →
+                        </button>
+                      ) : (
+                        <span className="text-emerald-700 font-semibold text-[11px]">✓ Cleared</span>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

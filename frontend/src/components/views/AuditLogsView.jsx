@@ -33,7 +33,7 @@ export default function AuditLogsView({ currentUser }) {
     todayEvents: 0,
     uniqueActors: 0
   });
-  const [pagination, setPagination] = useState({ page: 1, limit: 25, total: 0, pages: 1 });
+  const [pagination, setPagination] = useState({ page: 1, limit: 10, total: 0, pages: 1 });
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('ALL');

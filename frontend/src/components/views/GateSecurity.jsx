@@ -20,10 +20,15 @@ export default function GateSecurity({ gatePasses, onAddGatePass }) {
     setIsModalOpen(false);
   };
 
-  const inboundVehicles = gatePasses || [
-    { pass_number: 'GPI-2026-0003', vehicle_number: 'CSD-2298', supplier_customer: 'Charsadda Supply Partners', since_time: '2 h ago', status: 'QC done — unloading' },
-    { pass_number: 'GPI-2026-0002', vehicle_number: 'MRD-4471', supplier_customer: 'Swabi Manufacturing & Logistics', since_time: '35 min ago', status: 'At gate — waiting for QC' }
-  ];
+  const allPasses = gatePasses || [];
+  const inboundVehicles = allPasses.filter(g => g.pass_type === 'inward' || !g.pass_type);
+  const outboundVehicles = allPasses.filter(g => g.pass_type === 'outward');
+
+  const displayedInbound = activeTab === 'Inward gate passes' 
+    ? inboundVehicles 
+    : activeTab === 'Outward gate passes' 
+    ? outboundVehicles 
+    : allPasses;
 
   return (
     <div className="space-y-6">
@@ -62,20 +67,25 @@ export default function GateSecurity({ gatePasses, onAddGatePass }) {
       {/* Grid: Inbound vs Outbound */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
-          <h3 className="text-sm font-bold text-gray-900 mb-4">Inbound vehicles on site</h3>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-sm font-bold text-gray-900">
+              {activeTab === 'Outward gate passes' ? 'Outward gate passes' : 'Vehicles on site & Gate Passes'}
+            </h3>
+            <span className="text-xs font-semibold text-gray-500">{displayedInbound.length} records</span>
+          </div>
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
               <thead>
                 <tr className="border-b border-gray-200 text-gray-400 font-medium">
                   <th className="pb-3">GATE PASS</th>
                   <th className="pb-3">VEHICLE</th>
-                  <th className="pb-3">SUPPLIER</th>
+                  <th className="pb-3">PARTY</th>
                   <th className="pb-3">SINCE</th>
                   <th className="pb-3">STATUS</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 font-medium">
-                {inboundVehicles.map((v, i) => (
+                {displayedInbound.map((v, i) => (
                   <tr key={i} className="hover:bg-gray-50/80 transition">
                     <td className="py-3.5 font-mono font-bold text-gray-900">{v.pass_number}</td>
                     <td className="py-3.5 font-semibold text-gray-800">{v.vehicle_number}</td>
@@ -83,7 +93,9 @@ export default function GateSecurity({ gatePasses, onAddGatePass }) {
                     <td className="py-3.5 text-gray-400">{v.since_time}</td>
                     <td className="py-3.5">
                       <span className={`px-2 py-0.5 rounded-full text-[11px] font-semibold ${
-                        v.status.includes('QC done') ? 'bg-blue-50 text-blue-700 border border-blue-200' : 'bg-amber-50 text-amber-700 border border-amber-200'
+                        v.status.includes('QC done') || v.status.includes('Cleared')
+                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' 
+                          : 'bg-amber-50 text-amber-700 border border-amber-200'
                       }`}>
                         {v.status}
                       </span>
@@ -97,10 +109,30 @@ export default function GateSecurity({ gatePasses, onAddGatePass }) {
 
         <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 flex flex-col justify-between">
           <div>
-            <h3 className="text-sm font-bold text-gray-900 mb-4">Outbound vehicles at the gate</h3>
-            <div className="p-8 border border-dashed border-gray-200 rounded-xl text-center text-xs text-gray-400">
-              No vehicles waiting to go out
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-bold text-gray-900">Outbound dispatch vehicles</h3>
+              <span className="text-xs text-gray-400">{outboundVehicles.length} total</span>
             </div>
+            {outboundVehicles.length > 0 ? (
+              <div className="space-y-2.5">
+                {outboundVehicles.map((v, i) => (
+                  <div key={i} className="p-3 bg-gray-50 rounded-xl border border-gray-200 text-xs flex justify-between items-center">
+                    <div>
+                      <div className="font-mono font-bold text-gray-900">{v.pass_number}</div>
+                      <div className="text-gray-700 font-semibold">{v.vehicle_number}</div>
+                      <div className="text-[10px] text-gray-400">{v.supplier_customer}</div>
+                    </div>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                      {v.status}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="p-8 border border-dashed border-gray-200 rounded-xl text-center text-xs text-gray-400">
+                No vehicles waiting to go out
+              </div>
+            )}
           </div>
           <div className="mt-6 text-[11px] text-gray-400 border-t border-gray-100 pt-3">
             Vehicles let out only after store has verified unloaded items or invoice cleared.
