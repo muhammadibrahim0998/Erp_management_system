@@ -82,6 +82,40 @@ const authenticateToken = (req, res, next) => {
         });
       }
 
+      // Scope B: Strict token version validation for revocation / password change invalidation
+      const rawTokenVersion = decodedUser.token_version;
+      const currentTokenVersion = trustedUser.token_version;
+
+      // Fail-closed guard: If database token_version is missing, null, malformed, or invalid (<= 0),
+      // reject all tokens immediately. Do NOT silently default to 1, which would preserve old tokens.
+      if (typeof currentTokenVersion !== 'number' || !Number.isInteger(currentTokenVersion) || currentTokenVersion <= 0) {
+        return res.status(401).json({
+          error: 'Token has been revoked or invalidated. Please log in again.'
+        });
+      }
+
+      if (rawTokenVersion !== undefined) {
+        // Enforce strict integer type and value: reject strings (including numeric strings),
+        // floats, negative numbers, zero, objects, and version mismatches.
+        if (
+          typeof rawTokenVersion !== 'number' ||
+          !Number.isInteger(rawTokenVersion) ||
+          rawTokenVersion <= 0 ||
+          rawTokenVersion !== currentTokenVersion
+        ) {
+          return res.status(401).json({
+            error: 'Token has been revoked or invalidated. Please log in again.'
+          });
+        }
+      } else {
+        // Unversioned legacy token: valid only if account is still at initial version 1
+        if (currentTokenVersion !== 1) {
+          return res.status(401).json({
+            error: 'Token has been revoked or invalidated. Please log in again.'
+          });
+        }
+      }
+
       // Establish trusted context from database record; mutable token claims are strictly overridden
       req.trustedUser = trustedUser;
       req.user = {
@@ -91,7 +125,8 @@ const authenticateToken = (req, res, next) => {
         role: trustedUser.role,
         department: trustedUser.department,
         avatar: trustedUser.avatar,
-        status: trustedUser.status
+        status: trustedUser.status,
+        token_version: currentTokenVersion
       };
       next();
     } catch (dbErr) {
@@ -108,11 +143,13 @@ const { db } = require('../config/db');
 const getTrustedUser = async (userId) => {
   if (!userId) return null;
   const [rows] = await db.query(
-    'SELECT id, name, email, role, department, avatar, status FROM users WHERE id = ?',
+    'SELECT id, name, email, role, department, avatar, status, token_version FROM users WHERE id = ?',
     [userId]
   );
   if (rows.length === 0) return null;
   const dbUser = rows[0];
+  const rawDbVersion = Number(dbUser.token_version);
+  const validDbVersion = (Number.isInteger(rawDbVersion) && rawDbVersion > 0) ? rawDbVersion : null;
   return {
     id: dbUser.id,
     name: typeof dbUser.name === 'string' ? dbUser.name.trim() : '',
@@ -120,7 +157,8 @@ const getTrustedUser = async (userId) => {
     role: typeof dbUser.role === 'string' ? dbUser.role.trim() : 'Staff',
     department: typeof dbUser.department === 'string' ? dbUser.department.trim() : 'General',
     avatar: dbUser.avatar || 'US',
-    status: typeof dbUser.status === 'string' ? dbUser.status.trim().toLowerCase() : 'inactive'
+    status: typeof dbUser.status === 'string' ? dbUser.status.trim().toLowerCase() : 'inactive',
+    token_version: validDbVersion
   };
 };
 

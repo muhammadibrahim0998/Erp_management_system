@@ -172,11 +172,24 @@ const resetPassword = async (req, res) => {
       return res.status(400).json({ error: 'New password must be at least 6 characters' });
     }
 
-    const [existing] = await db.query('SELECT name, email FROM users WHERE id = ?', [id]);
-    const userName = existing[0] ? existing[0].name : `User #${id}`;
+    const [existing] = await db.query('SELECT name, email, token_version FROM users WHERE id = ?', [id]);
+    if (existing.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const currentVersion = Number(existing[0].token_version);
+    if (!Number.isInteger(currentVersion) || currentVersion <= 0) {
+      return res.status(500).json({
+        error: 'Authentication error: Account session configuration is invalid. Contact ERP Administrator.'
+      });
+    }
+    const userName = existing[0].name || `User #${id}`;
 
     const hashed = await bcrypt.hash(newPassword, 10);
-    await db.query('UPDATE users SET password = ? WHERE id = ?', [hashed, id]);
+    await db.query(
+      'UPDATE users SET password = ?, token_version = token_version + 1 WHERE id = ?',
+      [hashed, id]
+    );
 
     await logAudit({
       req,

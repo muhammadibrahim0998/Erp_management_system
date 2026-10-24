@@ -4,6 +4,11 @@ const { db } = require('../config/db');
 const { JWT_SECRET } = require('../middlewares/auth');
 const { logAudit } = require('../utils/auditLogger');
 
+// Precomputed bcrypt hash for timing attack mitigation when email does not exist
+// or when password hash is invalid/malformed.
+const DUMMY_PASSWORD_HASH = bcrypt.hashSync('yaf_erp_dummy_salt_timing_mitigation_2026', 10);
+
+
 /**
  * Fetch currently authenticated user profile
  */
@@ -84,7 +89,13 @@ const signup = async (req, res) => {
     });
 
     const token = jwt.sign(
-      { id: userPayload.id, role: userPayload.role, email: userPayload.email, name: userPayload.name },
+      {
+        id: userPayload.id,
+        role: userPayload.role,
+        email: userPayload.email,
+        name: userPayload.name,
+        token_version: 1
+      },
       JWT_SECRET,
       { expiresIn: '7d' }
     );
@@ -101,45 +112,34 @@ const signup = async (req, res) => {
 const login = async (req, res) => {
   try {
     const { email, password } = req.body;
-    if (!email || !password) {
+    if (!email || !password || typeof email !== 'string' || typeof password !== 'string') {
       return res.status(400).json({ error: 'Email and password are required' });
     }
 
     const cleanEmail = email.trim().toLowerCase();
     const [users] = await db.query(
-      'SELECT id, name, email, password, role, department, avatar, status FROM users WHERE email = ?',
+      'SELECT id, name, email, password, role, department, avatar, status, token_version FROM users WHERE email = ?',
       [cleanEmail]
     );
 
     if (users.length === 0) {
+      // Execute dummy bcrypt to equalize response timing against account enumeration
+      try {
+        await bcrypt.compare(password, DUMMY_PASSWORD_HASH);
+      } catch (_) {}
       await logAudit({
         req,
         userName: cleanEmail,
         role: 'Unauthenticated',
         action: 'LOGIN_FAILED',
         entityType: 'AUTH',
-        details: `Login failed: Email "${cleanEmail}" does not exist`,
+        details: `Login failed: Invalid credentials for "${cleanEmail}"`,
         status: 'FAILED'
       });
       return res.status(401).json({ error: 'Invalid email or password' });
     }
 
     const user = users[0];
-    if (user.status && user.status !== 'active') {
-      await logAudit({
-        req,
-        userId: user.id,
-        userName: user.name,
-        role: user.role,
-        action: 'LOGIN_BLOCKED',
-        entityType: 'AUTH',
-        entityId: user.id,
-        details: `Deactivated user account tried to log in (${cleanEmail})`,
-        status: 'WARNING'
-      });
-      return res.status(403).json({ error: 'Account is deactivated. Please contact ERP Administrator.' });
-    }
-
     let isMatch = false;
     const dbPassword = user.password;
     if (typeof dbPassword === 'string' && /^\$2[aby]\$\d{2}\$[./A-Za-z0-9]{53}$/.test(dbPassword)) {
@@ -150,6 +150,10 @@ const login = async (req, res) => {
       }
     } else {
       // Legacy plaintext passwords and malformed hashes are strictly rejected
+      // Run dummy compare to equalize timing with valid hash comparisons
+      try {
+        await bcrypt.compare(password, DUMMY_PASSWORD_HASH);
+      } catch (_) {}
       isMatch = false;
     }
 
@@ -168,6 +172,22 @@ const login = async (req, res) => {
       return res.status(401).json({ error: 'Invalid email or password' });
     }
 
+    // Return 403 only after password verification matches, preventing account status disclosure
+    if (user.status && user.status !== 'active') {
+      await logAudit({
+        req,
+        userId: user.id,
+        userName: user.name,
+        role: user.role,
+        action: 'LOGIN_BLOCKED',
+        entityType: 'AUTH',
+        entityId: user.id,
+        details: `Deactivated user account tried to log in (${cleanEmail})`,
+        status: 'WARNING'
+      });
+      return res.status(403).json({ error: 'Account is deactivated. Please contact ERP Administrator.' });
+    }
+
     const userPayload = {
       id: user.id,
       name: user.name,
@@ -177,6 +197,24 @@ const login = async (req, res) => {
       avatar: user.avatar,
       status: user.status
     };
+
+    const tokenVersion = Number(user.token_version);
+    if (!Number.isInteger(tokenVersion) || tokenVersion <= 0) {
+      await logAudit({
+        req,
+        userId: user.id,
+        userName: user.name,
+        role: user.role,
+        action: 'LOGIN_FAILED',
+        entityType: 'AUTH',
+        entityId: user.id,
+        details: `Login failed: Invalid database token_version for account ${cleanEmail}`,
+        status: 'FAILED'
+      });
+      return res.status(500).json({
+        error: 'Authentication error: Account session configuration is invalid. Contact ERP Administrator.'
+      });
+    }
 
     await logAudit({
       req,
@@ -190,7 +228,13 @@ const login = async (req, res) => {
     });
 
     const token = jwt.sign(
-      { id: user.id, role: user.role, email: user.email, name: user.name },
+      {
+        id: user.id,
+        role: user.role,
+        email: user.email,
+        name: user.name,
+        token_version: tokenVersion
+      },
       JWT_SECRET,
       { expiresIn: '7d' }
     );
@@ -214,14 +258,24 @@ const changePassword = async (req, res) => {
       return res.status(400).json({ error: 'New password must be at least 6 characters' });
     }
 
-    const [rows] = await db.query('SELECT password, name, email FROM users WHERE id = ?', [req.user.id]);
+    const [rows] = await db.query('SELECT password, name, email, token_version FROM users WHERE id = ?', [req.user.id]);
     if (rows.length === 0) return res.status(404).json({ error: 'User not found' });
+
+    const currentVersion = Number(rows[0].token_version);
+    if (!Number.isInteger(currentVersion) || currentVersion <= 0) {
+      return res.status(500).json({
+        error: 'Authentication error: Account session configuration is invalid. Contact ERP Administrator.'
+      });
+    }
 
     const isMatch = await bcrypt.compare(currentPassword, rows[0].password);
     if (!isMatch) return res.status(400).json({ error: 'Incorrect current password' });
 
     const newHashed = await bcrypt.hash(newPassword, 10);
-    await db.query('UPDATE users SET password = ? WHERE id = ?', [newHashed, req.user.id]);
+    await db.query(
+      'UPDATE users SET password = ?, token_version = token_version + 1 WHERE id = ?',
+      [newHashed, req.user.id]
+    );
 
     await logAudit({
       req,

@@ -32,9 +32,44 @@ async function initSchema(connection = db) {
         avatar VARCHAR(10) DEFAULT 'US',
         email VARCHAR(100),
         password VARCHAR(255) DEFAULT 'password',
-        status VARCHAR(20) DEFAULT 'active'
+        status VARCHAR(20) DEFAULT 'active',
+        token_version INT DEFAULT 1
       )
     `);
+
+    // Ensure token_version column exists on users table idempotently
+    const [tokenVersionCols] = await conn.query(`
+      SELECT COLUMN_NAME 
+      FROM information_schema.COLUMNS 
+      WHERE TABLE_SCHEMA = DATABASE() 
+        AND TABLE_NAME = 'users' 
+        AND COLUMN_NAME = 'token_version'
+    `);
+    if (!Array.isArray(tokenVersionCols) || tokenVersionCols.length === 0) {
+      try {
+        await conn.query('ALTER TABLE users ADD COLUMN token_version INT DEFAULT 1');
+        await conn.query('UPDATE users SET token_version = 1 WHERE token_version IS NULL');
+      } catch (alterErr) {
+        if (!alterErr.message.includes('Duplicate column name') && alterErr.code !== 'ER_DUP_FIELDNAME') {
+          throw alterErr;
+        }
+      }
+
+      // Explicit post-verification of token_version column existence
+      const [postTokenCols] = await conn.query(`
+        SELECT COLUMN_NAME 
+        FROM information_schema.COLUMNS 
+        WHERE TABLE_SCHEMA = DATABASE() 
+          AND TABLE_NAME = 'users' 
+          AND COLUMN_NAME = 'token_version'
+      `);
+      if (!Array.isArray(postTokenCols) || postTokenCols.length === 0) {
+        throw new Error(
+          'FATAL MIGRATION FAILURE: Column "token_version" on users table could not be verified after ALTER TABLE.'
+        );
+      }
+    }
+
 
     // 2. Approvals & Workflow Tasks
     await conn.query(`
