@@ -28,6 +28,7 @@ import {
 } from 'lucide-react';
 import { posService } from '../../services';
 import { exportToPDF } from '../../utils/exportUtils';
+import DemoBadge from '../DemoBadge';
 
 export default function PosView({ currentUser, onSaleCompleted }) {
   // Navigation inside POS view: 'terminal' or 'history'
@@ -68,6 +69,7 @@ export default function PosView({ currentUser, onSaleCompleted }) {
     todayTraysSold: 0
   });
 
+  // demo customers
   // Pre-registered B2B Egg Dealers for quick selection
   const REGISTERED_DEALERS = [
     { name: 'Swat Valley Egg Dealers', phone: '0300-9876543', limit: 'PKR 15.0M', rating: 'Tier 1' },
@@ -571,6 +573,7 @@ export default function PosView({ currentUser, onSaleCompleted }) {
 
                   {customerType === 'dealer' ? (
                     <div className="space-y-1.5">
+                      <DemoBadge />
                       <select
                         value={customerName}
                         onChange={(e) => handleSelectDealer(e.target.value)}
@@ -1044,7 +1047,7 @@ export default function PosView({ currentUser, onSaleCompleted }) {
               <div className="text-center space-y-1 text-[10px] text-gray-500 pt-1">
                 <p className="font-bold text-gray-800">Thank you for your business!</p>
                 <p>Farm fresh eggs guaranteed since 1960.</p>
-                <p className="text-[9px] text-gray-400 mt-1">Software powered by AgenTech Enterprise ERP</p>
+                <p className="text-[9px] text-gray-400 mt-1">Delivered by ALGOHUB</p>
               </div>
             </div>
 

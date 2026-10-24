@@ -22,7 +22,13 @@ import {
 import { inventoryService } from '../../services';
 import { exportToExcel, exportToPDF } from '../../utils/exportUtils';
 
-export default function InventoryView({ inventoryItems, onAdjustStock }) {
+export default function InventoryView({
+  inventoryItems = [],
+  onAdjustStock,
+  isLoading,
+  error,
+  onRefetch
+}) {
   const [activeTab, setActiveTab] = useState('stock'); // 'stock' or 'ledger'
   const [search, setSearch] = useState('');
   const [onlyBelowReorder, setOnlyBelowReorder] = useState(false);
@@ -40,6 +46,7 @@ export default function InventoryView({ inventoryItems, onAdjustStock }) {
   const [adjQty, setAdjQty] = useState('');
   const [adjReason, setAdjReason] = useState('Physical Stock Count Audit');
   const [adjNotes, setAdjNotes] = useState('');
+  const [adjError, setAdjError] = useState(null);
   const [isSubmittingAdj, setIsSubmittingAdj] = useState(false);
 
   // Form states - Transfer
@@ -47,14 +54,16 @@ export default function InventoryView({ inventoryItems, onAdjustStock }) {
   const [trfFromWh, setTrfFromWh] = useState('CCF');
   const [trfToWh, setTrfToWh] = useState('MRD');
   const [trfQty, setTrfQty] = useState('');
-  const [trfVehicle, setTrfVehicle] = useState('MRD-4471');
+  const [trfVehicle, setTrfVehicle] = useState('');
   const [trfDriver, setTrfDriver] = useState('');
   const [trfAutoGatePass, setTrfAutoGatePass] = useState(true);
+  const [trfError, setTrfError] = useState(null);
   const [isSubmittingTrf, setIsSubmittingTrf] = useState(false);
 
   // Ledger state
   const [ledgerTxs, setLedgerTxs] = useState([]);
   const [isLoadingLedger, setIsLoadingLedger] = useState(false);
+  const [ledgerError, setLedgerError] = useState(null);
   const [notification, setNotification] = useState(null);
 
   const showNotification = (msg) => {
@@ -74,11 +83,13 @@ export default function InventoryView({ inventoryItems, onAdjustStock }) {
   // Fetch Ledger
   const fetchLedger = async () => {
     setIsLoadingLedger(true);
+    setLedgerError(null);
     try {
       const data = await inventoryService.getLedger();
       setLedgerTxs(data || []);
     } catch (err) {
       console.error('Failed to load inventory ledger:', err);
+      setLedgerError(err.message || 'Failed to load stock movement ledger');
     } finally {
       setIsLoadingLedger(false);
     }
@@ -96,11 +107,16 @@ export default function InventoryView({ inventoryItems, onAdjustStock }) {
     if (targetItem) {
       setAdjItemId(String(targetItem.id));
       setSelectedItemForAction(targetItem);
+    } else {
+      setAdjItemId('');
+      setSelectedItemForAction(null);
     }
     setAdjWarehouse('MRD');
     setAdjType('add');
     setAdjQty('');
+    setAdjReason('Physical Stock Count Audit');
     setAdjNotes('');
+    setAdjError(null);
     setIsAdjustModalOpen(true);
   };
 
@@ -110,39 +126,62 @@ export default function InventoryView({ inventoryItems, onAdjustStock }) {
     if (targetItem) {
       setTrfItemId(String(targetItem.id));
       setSelectedItemForAction(targetItem);
+    } else {
+      setTrfItemId('');
+      setSelectedItemForAction(null);
     }
     setTrfFromWh('CCF');
     setTrfToWh('MRD');
     setTrfQty('');
-    setTrfVehicle('MRD-4471');
+    setTrfVehicle('');
+    setTrfDriver('');
+    setTrfError(null);
     setIsTransferModalOpen(true);
   };
 
   // Submit Adjustment
   const handleSubmitAdjustment = async (e) => {
     e.preventDefault();
-    if (!adjItemId || !adjQty || parseInt(adjQty) <= 0) {
-      alert('Please select an item and enter a valid quantity');
+    setAdjError(null);
+
+    if (!adjItemId) {
+      setAdjError('Please select an item');
+      return;
+    }
+    if (!adjWarehouse) {
+      setAdjError('Please select a warehouse');
+      return;
+    }
+    if (!adjQty || isNaN(Number(adjQty)) || Number(adjQty) <= 0) {
+      setAdjError('Quantity must be a valid number greater than zero');
+      return;
+    }
+    if (!adjReason || adjReason.trim().length === 0) {
+      setAdjError('Please select or specify an adjustment reason');
       return;
     }
 
     setIsSubmittingAdj(true);
     try {
       const data = await inventoryService.adjustStock({
-        id: parseInt(adjItemId),
+        id: parseInt(adjItemId, 10),
         warehouse: adjWarehouse,
-        adjust_qty: parseInt(adjQty),
+        adjust_qty: Number(adjQty),
         adjustType: adjType,
-        reason: adjReason,
+        reason: adjReason.trim(),
         notes: adjNotes
       });
 
-      showNotification(`Stock adjusted successfully: ${data.refNo}`);
+      showNotification(`Stock adjusted successfully: ${data?.refNo || 'ADJ'}`);
+      setAdjError(null);
+      setAdjQty('');
+      setAdjNotes('');
       setIsAdjustModalOpen(false);
       if (onAdjustStock) onAdjustStock();
+      if (onRefetch) onRefetch();
       if (activeTab === 'ledger') fetchLedger();
     } catch (err) {
-      alert(err.message);
+      setAdjError(err.message || 'Failed to adjust stock');
     } finally {
       setIsSubmittingAdj(false);
     }
@@ -151,33 +190,48 @@ export default function InventoryView({ inventoryItems, onAdjustStock }) {
   // Submit Transfer
   const handleSubmitTransfer = async (e) => {
     e.preventDefault();
-    if (!trfItemId || !trfQty || parseInt(trfQty) <= 0) {
-      alert('Please select an item and enter a valid transfer quantity');
+    setTrfError(null);
+
+    if (!trfItemId) {
+      setTrfError('Please select an item to transfer');
+      return;
+    }
+    if (!trfFromWh || !trfToWh) {
+      setTrfError('Please select both source and destination facilities');
       return;
     }
     if (trfFromWh === trfToWh) {
-      alert('Source and destination warehouses cannot be the same');
+      setTrfError('Source and destination warehouses cannot be the same');
+      return;
+    }
+    if (!trfQty || isNaN(Number(trfQty)) || Number(trfQty) <= 0) {
+      setTrfError('Quantity must be a valid number greater than zero');
       return;
     }
 
     setIsSubmittingTrf(true);
     try {
       const data = await inventoryService.transferStock({
-        id: parseInt(trfItemId),
+        id: parseInt(trfItemId, 10),
         fromWarehouse: trfFromWh,
         toWarehouse: trfToWh,
-        quantity: parseInt(trfQty),
+        quantity: Number(trfQty),
         vehicleNumber: trfVehicle,
         driverName: trfDriver,
         autoGatePass: trfAutoGatePass
       });
 
-      showNotification(`Transfer completed: ${data.transferRef} ${data.gatePassNumber ? `(Gate Pass: ${data.gatePassNumber})` : ''}`);
+      showNotification(`Transfer completed: ${data?.transferRef || 'TRF'} ${data?.gatePassNumber ? `(Gate Pass: ${data.gatePassNumber})` : ''}`);
+      setTrfError(null);
+      setTrfQty('');
+      setTrfVehicle('');
+      setTrfDriver('');
       setIsTransferModalOpen(false);
       if (onAdjustStock) onAdjustStock();
+      if (onRefetch) onRefetch();
       if (activeTab === 'ledger') fetchLedger();
     } catch (err) {
-      alert(err.message);
+      setTrfError(err.message || 'Failed to transfer stock');
     } finally {
       setIsSubmittingTrf(false);
     }
@@ -464,67 +518,88 @@ export default function InventoryView({ inventoryItems, onAdjustStock }) {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 font-medium text-gray-800">
-                  {filteredItems.map((item) => (
-                    <tr key={item.id} className="hover:bg-gray-50/80 transition">
-                      <td className="py-3.5 px-4">
-                        <div className="font-bold text-gray-900">{item.name}</div>
-                        <div className="text-[10px] text-gray-400 font-mono flex items-center gap-2">
-                          <span>{item.code}</span>
-                          <span className="text-gray-300">·</span>
-                          <span>{item.category}</span>
-                        </div>
-                      </td>
-                      <td className="py-3.5 px-2 text-center font-mono font-bold text-gray-900 bg-gray-50/50">
-                        {item.mrd_qty || 0}
-                      </td>
-                      <td className="py-3.5 px-2 text-center font-mono text-gray-700">
-                        {item.atk_qty || 0}
-                      </td>
-                      <td className="py-3.5 px-2 text-center font-mono text-gray-700">
-                        {item.ccf_qty || 0}
-                      </td>
-                      <td className="py-3.5 px-2 text-center font-mono text-gray-700">
-                        {item.phf_qty || 0}
-                      </td>
-                      <td className="py-3.5 px-3 text-right font-black text-gray-950 font-mono">
-                        {item.total_qty} trays
-                      </td>
-                      <td className="py-3.5 px-3 text-right text-gray-500 font-mono">{item.reorder_at}</td>
-                      <td className="py-3.5 px-3 text-right text-gray-600 font-mono">
-                        PKR {Number(item.avg_cost).toLocaleString()}
-                      </td>
-                      <td className="py-3.5 px-3 text-right font-black text-gray-900 font-mono">
-                        PKR {Number(item.total_value).toLocaleString()}
-                      </td>
-                      <td className="py-3.5 px-2 text-center">
-                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                          item.status === 'OK' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' :
-                          item.status === 'Reorder' ? 'bg-rose-50 text-rose-700 border border-rose-200 font-extrabold' :
-                          'bg-amber-50 text-amber-700 border border-amber-200'
-                        }`}>
-                          {item.status}
-                        </span>
-                      </td>
-                      <td className="py-3.5 px-3 text-center whitespace-nowrap">
-                        <div className="flex items-center justify-center gap-1.5">
-                          <button
-                            onClick={() => handleOpenAdjust(item)}
-                            className="p-1 rounded-lg bg-gray-100 hover:bg-emerald-100 hover:text-emerald-800 text-gray-600 transition"
-                            title="Adjust Stock for this item"
-                          >
-                            <SlidersHorizontal className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            onClick={() => handleOpenTransfer(item)}
-                            className="p-1 rounded-lg bg-gray-100 hover:bg-[#0E2118] hover:text-amber-300 text-gray-600 transition"
-                            title="Transfer Stock between Warehouses"
-                          >
-                            <ArrowRightLeft className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
+                  {isLoading ? (
+                    <tr>
+                      <td colSpan="11" className="py-12 text-center text-gray-400 font-medium">
+                        <RefreshCw className="w-5 h-5 animate-spin mx-auto text-emerald-600 mb-2" />
+                        <span>Loading inventory items...</span>
                       </td>
                     </tr>
-                  ))}
+                  ) : error ? (
+                    <tr>
+                      <td colSpan="11" className="py-8 text-center text-rose-700 bg-rose-50 font-semibold text-xs">
+                        {error}
+                      </td>
+                    </tr>
+                  ) : filteredItems.length === 0 ? (
+                    <tr>
+                      <td colSpan="11" className="py-12 text-center text-gray-400 font-medium">
+                        No inventory items found.
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredItems.map((item) => (
+                      <tr key={item.id} className="hover:bg-gray-50/80 transition">
+                        <td className="py-3.5 px-4">
+                          <div className="font-bold text-gray-900">{item.name}</div>
+                          <div className="text-[10px] text-gray-400 font-mono flex items-center gap-2">
+                            <span>{item.code}</span>
+                            <span className="text-gray-300">·</span>
+                            <span>{item.category}</span>
+                          </div>
+                        </td>
+                        <td className="py-3.5 px-2 text-center font-mono font-bold text-gray-900 bg-gray-50/50">
+                          {item.mrd_qty || 0}
+                        </td>
+                        <td className="py-3.5 px-2 text-center font-mono text-gray-700">
+                          {item.atk_qty || 0}
+                        </td>
+                        <td className="py-3.5 px-2 text-center font-mono text-gray-700">
+                          {item.ccf_qty || 0}
+                        </td>
+                        <td className="py-3.5 px-2 text-center font-mono text-gray-700">
+                          {item.phf_qty || 0}
+                        </td>
+                        <td className="py-3.5 px-3 text-right font-black text-gray-950 font-mono">
+                          {item.total_qty} trays
+                        </td>
+                        <td className="py-3.5 px-3 text-right text-gray-500 font-mono">{item.reorder_at}</td>
+                        <td className="py-3.5 px-3 text-right text-gray-600 font-mono">
+                          PKR {Number(item.avg_cost).toLocaleString()}
+                        </td>
+                        <td className="py-3.5 px-3 text-right font-black text-gray-900 font-mono">
+                          PKR {Number(item.total_value).toLocaleString()}
+                        </td>
+                        <td className="py-3.5 px-2 text-center">
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                            item.status === 'OK' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' :
+                            item.status === 'Reorder' ? 'bg-rose-50 text-rose-700 border border-rose-200 font-extrabold' :
+                            'bg-amber-50 text-amber-700 border border-amber-200'
+                          }`}>
+                            {item.status}
+                          </span>
+                        </td>
+                        <td className="py-3.5 px-3 text-center whitespace-nowrap">
+                          <div className="flex items-center justify-center gap-1.5">
+                            <button
+                              onClick={() => handleOpenAdjust(item)}
+                              className="p-1 rounded-lg bg-gray-100 hover:bg-emerald-100 hover:text-emerald-800 text-gray-600 transition"
+                              title="Adjust Stock for this item"
+                            >
+                              <SlidersHorizontal className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => handleOpenTransfer(item)}
+                              className="p-1 rounded-lg bg-gray-100 hover:bg-[#0E2118] hover:text-amber-300 text-gray-600 transition"
+                              title="Transfer Stock between Warehouses"
+                            >
+                              <ArrowRightLeft className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
@@ -568,13 +643,19 @@ export default function InventoryView({ inventoryItems, onAdjustStock }) {
                   <tr>
                     <td colSpan="7" className="py-12 text-center text-gray-400 font-medium">
                       <RefreshCw className="w-6 h-6 animate-spin mx-auto text-emerald-600 mb-2" />
-                      <span>Loading ledger transactions...</span>
+                      <span>Loading movements...</span>
+                    </td>
+                  </tr>
+                ) : ledgerError ? (
+                  <tr>
+                    <td colSpan="7" className="py-8 text-center text-rose-700 bg-rose-50 font-semibold text-xs">
+                      {ledgerError}
                     </td>
                   </tr>
                 ) : ledgerTxs.length === 0 ? (
                   <tr>
                     <td colSpan="7" className="py-12 text-center text-gray-400 font-medium">
-                      No inventory movements recorded yet.
+                      No stock movements yet
                     </td>
                   </tr>
                 ) : (
@@ -628,8 +709,22 @@ export default function InventoryView({ inventoryItems, onAdjustStock }) {
                 <SlidersHorizontal className="w-5 h-5 text-emerald-700" />
                 <h3 className="font-bold text-sm text-gray-900">Stock Adjustment</h3>
               </div>
-              <button onClick={() => setIsAdjustModalOpen(false)} className="text-gray-400 hover:text-gray-600">✕</button>
+              <button
+                onClick={() => {
+                  setIsAdjustModalOpen(false);
+                  setAdjError(null);
+                }}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                ✕
+              </button>
             </div>
+
+            {adjError && (
+              <div className="p-3 text-xs text-rose-700 bg-rose-50 border border-rose-200 rounded-xl font-medium">
+                {adjError}
+              </div>
+            )}
 
             <form onSubmit={handleSubmitAdjustment} className="space-y-3.5 text-xs">
               <div>
@@ -639,6 +734,7 @@ export default function InventoryView({ inventoryItems, onAdjustStock }) {
                   onChange={(e) => setAdjItemId(e.target.value)}
                   className="w-full bg-gray-50 border border-gray-200 rounded-xl p-2.5 font-semibold text-gray-900 focus:outline-none focus:border-emerald-600"
                 >
+                  <option value="">-- Select an item --</option>
                   {(inventoryItems || []).map(i => (
                     <option key={i.id} value={i.id}>
                       {i.name} ({i.code} · Total: {i.total_qty} trays)
@@ -687,7 +783,6 @@ export default function InventoryView({ inventoryItems, onAdjustStock }) {
                 <input
                   type="number"
                   min="1"
-                  required
                   placeholder="e.g. 50"
                   value={adjQty}
                   onChange={(e) => setAdjQty(e.target.value)}
@@ -724,7 +819,10 @@ export default function InventoryView({ inventoryItems, onAdjustStock }) {
               <div className="pt-3 border-t border-gray-100 flex items-center justify-end gap-2.5">
                 <button
                   type="button"
-                  onClick={() => setIsAdjustModalOpen(false)}
+                  onClick={() => {
+                    setIsAdjustModalOpen(false);
+                    setAdjError(null);
+                  }}
                   className="px-4 py-2 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold"
                 >
                   Cancel
@@ -735,7 +833,7 @@ export default function InventoryView({ inventoryItems, onAdjustStock }) {
                   className="px-4 py-2 rounded-xl bg-[#0E2118] text-white hover:bg-[#18392A] font-bold transition flex items-center gap-1.5 disabled:opacity-50"
                 >
                   {isSubmittingAdj && <RefreshCw className="w-3.5 h-3.5 animate-spin text-amber-300" />}
-                  <span>Save Adjustment</span>
+                  <span>{isSubmittingAdj ? 'Saving...' : 'Save Adjustment'}</span>
                 </button>
               </div>
             </form>
@@ -752,8 +850,22 @@ export default function InventoryView({ inventoryItems, onAdjustStock }) {
                 <ArrowRightLeft className="w-5 h-5 text-amber-500" />
                 <h3 className="font-bold text-sm text-gray-900">Inter-Warehouse Stock Transfer</h3>
               </div>
-              <button onClick={() => setIsTransferModalOpen(false)} className="text-gray-400 hover:text-gray-600">✕</button>
+              <button
+                onClick={() => {
+                  setIsTransferModalOpen(false);
+                  setTrfError(null);
+                }}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                ✕
+              </button>
             </div>
+
+            {trfError && (
+              <div className="p-3 text-xs text-rose-700 bg-rose-50 border border-rose-200 rounded-xl font-medium">
+                {trfError}
+              </div>
+            )}
 
             <form onSubmit={handleSubmitTransfer} className="space-y-3.5 text-xs">
               <div>
@@ -763,6 +875,7 @@ export default function InventoryView({ inventoryItems, onAdjustStock }) {
                   onChange={(e) => setTrfItemId(e.target.value)}
                   className="w-full bg-gray-50 border border-gray-200 rounded-xl p-2.5 font-semibold text-gray-900 focus:outline-none focus:border-emerald-600"
                 >
+                  <option value="">-- Select an item --</option>
                   {(inventoryItems || []).map(i => (
                     <option key={i.id} value={i.id}>
                       {i.name} ({i.code})
@@ -804,7 +917,6 @@ export default function InventoryView({ inventoryItems, onAdjustStock }) {
                 <input
                   type="number"
                   min="1"
-                  required
                   placeholder="e.g. 100"
                   value={trfQty}
                   onChange={(e) => setTrfQty(e.target.value)}
@@ -814,10 +926,9 @@ export default function InventoryView({ inventoryItems, onAdjustStock }) {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-gray-600 font-bold block mb-1">Vehicle Number</label>
+                  <label className="text-gray-600 font-bold block mb-1">Vehicle Number (Optional)</label>
                   <input
                     type="text"
-                    required
                     placeholder="e.g. MRD-4471"
                     value={trfVehicle}
                     onChange={(e) => setTrfVehicle(e.target.value)}
@@ -826,7 +937,7 @@ export default function InventoryView({ inventoryItems, onAdjustStock }) {
                 </div>
 
                 <div>
-                  <label className="text-gray-600 font-bold block mb-1">Driver / Transporter</label>
+                  <label className="text-gray-600 font-bold block mb-1">Driver / Transporter (Optional)</label>
                   <input
                     type="text"
                     placeholder="Driver name"
@@ -853,7 +964,10 @@ export default function InventoryView({ inventoryItems, onAdjustStock }) {
               <div className="pt-3 border-t border-gray-100 flex items-center justify-end gap-2.5">
                 <button
                   type="button"
-                  onClick={() => setIsTransferModalOpen(false)}
+                  onClick={() => {
+                    setIsTransferModalOpen(false);
+                    setTrfError(null);
+                  }}
                   className="px-4 py-2 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold"
                 >
                   Cancel
@@ -864,7 +978,7 @@ export default function InventoryView({ inventoryItems, onAdjustStock }) {
                   className="px-4 py-2 rounded-xl bg-[#0E2118] text-white hover:bg-[#18392A] font-bold transition flex items-center gap-1.5 disabled:opacity-50"
                 >
                   {isSubmittingTrf && <RefreshCw className="w-3.5 h-3.5 animate-spin text-amber-300" />}
-                  <span>Execute Transfer</span>
+                  <span>{isSubmittingTrf ? 'Transferring...' : 'Execute Transfer'}</span>
                 </button>
               </div>
             </form>

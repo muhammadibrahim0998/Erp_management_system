@@ -21,37 +21,13 @@ const DEPARTMENTS = [
   'IT'
 ];
 
-const ROLES = [
-  { role: 'ERP Admin', department: 'IT' },
-  { role: 'Chairman & CEO', department: 'Executive' },
-  { role: 'General Manager', department: 'Executive' },
-  { role: 'Director Operations', department: 'Operations' },
-  { role: 'Director Finance', department: 'Finance' },
-  { role: 'Plant Manager', department: 'Plant' },
-  { role: 'Production Manager', department: 'Production' },
-  { role: 'Breaking Supervisor', department: 'Plant' },
-  { role: 'Gate Officer', department: 'Security' },
-  { role: 'QC Cell', department: 'Quality' },
-  { role: 'Raw Material Store', department: 'Inventory' },
-  { role: 'Finish Store & Delivery', department: 'Logistics' },
-  { role: 'Procurement', department: 'Purchasing' },
-  { role: 'Sales Manager', department: 'Sales' },
-  { role: 'Sales Officer', department: 'Sales' },
-  { role: 'Head of Marketing', department: 'Marketing' },
-  { role: 'Social Media & Content', department: 'Marketing' },
-  { role: 'Accounts Officer', department: 'Finance' },
-  { role: 'HR Manager', department: 'HR' },
-  { role: 'Poultry Farms', department: 'Farms' }
-];
-
 export default function Auth({ onLogin }) {
   const [isLogin, setIsLogin] = useState(true);
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     password: '',
-    role: 'Sales Officer',
-    department: 'Sales'
+    department: 'General'
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -67,20 +43,12 @@ export default function Auth({ onLogin }) {
             setDevUsers(users);
           }
         })
-        .catch(() => {});
+        .catch((err) => {
+          console.warn('Could not load dev shortcut users:', err.message);
+        });
       return () => { isMounted = false; };
     }
   }, [isLogin]);
-
-  const handleRoleChange = (e) => {
-    const selectedRole = e.target.value;
-    const found = ROLES.find(r => r.role === selectedRole);
-    setFormData({
-      ...formData,
-      role: selectedRole,
-      department: found ? found.department : formData.department
-    });
-  };
 
   const handleQuickFill = (email, pass) => {
     setFormData(prev => ({
@@ -99,7 +67,13 @@ export default function Auth({ onLogin }) {
     try {
       const data = isLogin
         ? await authService.login(formData.email, formData.password)
-        : await authService.signup(formData);
+        : await authService.signup({
+            name: formData.name,
+            email: formData.email,
+            password: formData.password,
+            role: 'Staff',
+            department: formData.department || 'General'
+          });
 
       onLogin(data.user, data.token);
     } catch (err) {
@@ -117,7 +91,7 @@ export default function Auth({ onLogin }) {
             <span className="font-black text-amber-400 text-2xl tracking-tighter">YAF</span>
           </div>
           <h1 className="text-2xl font-bold text-white mb-1">
-            {isLogin ? 'Sign In to AgenTech ERP' : 'Register New Account'}
+            {isLogin ? 'Sign In to Yousafzai Agri Foods ERP' : 'Register New Account'}
           </h1>
           <p className="text-[#8CAAA0] text-xs">
             Yousafzai Agri Foods (Pvt) Ltd · Head Office Mardan
@@ -203,17 +177,14 @@ export default function Auth({ onLogin }) {
 
               <div className="relative">
                 <Briefcase className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#6A947F]" />
-                <select
-                  value={formData.role}
-                  onChange={handleRoleChange}
-                  className="w-full bg-[#0E2118] border border-[#1D4433] rounded-lg pl-9 pr-4 py-2.5 text-xs text-white focus:border-[#2E684E] focus:outline-none"
-                >
-                  {ROLES.map((r, idx) => (
-                    <option key={idx} value={r.role} className="bg-[#0E2118] text-white">
-                      {r.role} ({r.department})
-                    </option>
-                  ))}
-                </select>
+                <input
+                  type="text"
+                  readOnly
+                  disabled
+                  value="Role: Staff (Standard Account)"
+                  className="w-full bg-[#0E2118]/60 border border-[#1D4433] rounded-lg pl-9 pr-4 py-2.5 text-xs text-[#8CAAA0] cursor-not-allowed select-none"
+                  title="Public registration is restricted to least-privilege Staff accounts. Elevated roles must be provisioned by an ERP Administrator."
+                />
               </div>
 
               <div className="relative">
@@ -223,7 +194,7 @@ export default function Auth({ onLogin }) {
                   onChange={(e) => setFormData({...formData, department: e.target.value})}
                   className="w-full bg-[#0E2118] border border-[#1D4433] rounded-lg pl-9 pr-4 py-2.5 text-xs text-white focus:border-[#2E684E] focus:outline-none"
                 >
-                  {DEPARTMENTS.map((dept, idx) => (
+                  {DEPARTMENTS.filter(d => d !== 'Executive' && d !== 'IT').map((dept, idx) => (
                     <option key={idx} value={dept} className="bg-[#0E2118] text-white">
                       {dept}
                     </option>

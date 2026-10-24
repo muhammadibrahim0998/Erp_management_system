@@ -10,6 +10,7 @@ import {
   TrendingUp,
   Cpu
 } from 'lucide-react';
+import DemoBadge from '../DemoBadge';
 
 export default function LiveOperations() {
   const [selectedNode, setSelectedNode] = useState(null);
@@ -37,6 +38,7 @@ export default function LiveOperations() {
 
   return (
     <div className="space-y-6">
+      <DemoBadge label="Sample data served by the API — not yet linked to live records" />
       {/* Control Room Top Banner */}
       <div className="bg-black text-white p-6 rounded-2xl border border-zinc-800 shadow-md flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>

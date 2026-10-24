@@ -14,7 +14,8 @@ async function logAudit({
   details = '',
   ipAddress = '127.0.0.1',
   status = 'SUCCESS',
-  req = null
+  req = null,
+  connection = null
 }) {
   try {
     let resolvedUserId = userId;
@@ -37,7 +38,8 @@ async function logAudit({
 
     const detailsStr = typeof details === 'object' ? JSON.stringify(details) : String(details || '');
 
-    const [result] = await db.query(
+    const executor = connection || db;
+    const [result] = await executor.query(
       `INSERT INTO audit_logs (user_id, user_name, role, action, entity_type, entity_id, details, ip_address, status)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
@@ -55,6 +57,9 @@ async function logAudit({
 
     return result.insertId;
   } catch (err) {
+    if (connection) {
+      throw err;
+    }
     console.error('❌ Audit log write failure:', err.message);
     return null;
   }

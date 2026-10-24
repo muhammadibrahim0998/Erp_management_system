@@ -37,7 +37,7 @@ const checkout = async (req, res) => {
     }
 
     const changeAmount = Math.max(0, parsedPaid - parsedTotal);
-    const cashierName = req.user ? req.user.name : (req.body.cashierName || 'Bilal Yousafzai');
+    const cashierName = req.user?.name || req.trustedUser?.name || 'Cashier';
     const selectedWarehouse = warehouse || 'Mardan Central Store';
 
     // 1. Generate Unique Invoice Number (e.g. YAF-INV-20261013-1003)

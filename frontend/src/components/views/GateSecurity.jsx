@@ -1,33 +1,61 @@
 import React, { useState } from 'react';
-import { Truck, Plus, CheckCircle2, Clock, ShieldCheck, ArrowDownLeft, ArrowUpRight } from 'lucide-react';
+import { Plus, Loader2, AlertCircle } from 'lucide-react';
 
-export default function GateSecurity({ gatePasses, onAddGatePass }) {
+export default function GateSecurity({ gatePasses, onAddGatePass, isLoading, onRefetch }) {
   const [activeTab, setActiveTab] = useState('on_site');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formError, setFormError] = useState('');
+
+  // Form Fields
   const [vehicleNo, setVehicleNo] = useState('');
   const [supplier, setSupplier] = useState('');
+  const [passType, setPassType] = useState('inward');
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!vehicleNo || !supplier) return;
-    await onAddGatePass({
-      vehicle_number: vehicleNo,
-      supplier_customer: supplier,
-      pass_type: 'inward'
-    });
-    setVehicleNo('');
-    setSupplier('');
-    setIsModalOpen(false);
+    setFormError('');
+
+    if (!vehicleNo.trim()) {
+      setFormError('Vehicle registration number is required');
+      return;
+    }
+    if (!supplier.trim()) {
+      setFormError('Supplier or customer name is required');
+      return;
+    }
+    if (!passType) {
+      setFormError('Pass type must be chosen');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      await onAddGatePass({
+        vehicle_number: vehicleNo.trim(),
+        supplier_customer: supplier.trim(),
+        pass_type: passType
+      });
+      setVehicleNo('');
+      setSupplier('');
+      setPassType('inward');
+      setIsModalOpen(false);
+      if (onRefetch) onRefetch();
+    } catch (err) {
+      setFormError(err.message || 'Error issuing gate pass');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  const allPasses = gatePasses || [];
-  const inboundVehicles = allPasses.filter(g => g.pass_type === 'inward' || !g.pass_type);
-  const outboundVehicles = allPasses.filter(g => g.pass_type === 'outward');
+  const allPasses = Array.isArray(gatePasses) ? gatePasses : [];
+  const inwardPasses = allPasses.filter(g => g.pass_type === 'inward' || !g.pass_type);
+  const outboundPasses = allPasses.filter(g => g.pass_type === 'outward');
 
-  const displayedInbound = activeTab === 'Inward gate passes' 
-    ? inboundVehicles 
-    : activeTab === 'Outward gate passes' 
-    ? outboundVehicles 
+  const displayedPasses = activeTab === 'Inward gate passes'
+    ? inwardPasses
+    : activeTab === 'Outward gate passes'
+    ? outboundPasses
     : allPasses;
 
   return (
@@ -41,8 +69,8 @@ export default function GateSecurity({ gatePasses, onAddGatePass }) {
           </p>
         </div>
         <button
-          onClick={() => setIsModalOpen(true)}
-          className="flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-black hover:bg-zinc-800 rounded-lg transition shadow-sm"
+          onClick={() => { setFormError(''); setIsModalOpen(true); }}
+          className="flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-black hover:bg-zinc-800 rounded-lg transition shadow-sm cursor-pointer"
         >
           <Plus className="w-4 h-4" />
           <span>Vehicle arrived</span>
@@ -55,7 +83,7 @@ export default function GateSecurity({ gatePasses, onAddGatePass }) {
           <button
             key={idx}
             onClick={() => setActiveTab(tab)}
-            className={`px-4 py-1.5 text-xs font-semibold rounded-lg transition ${
+            className={`px-4 py-1.5 text-xs font-semibold rounded-lg transition cursor-pointer ${
               activeTab === tab ? 'bg-black text-white' : 'text-gray-600 hover:bg-gray-100'
             }`}
           >
@@ -71,39 +99,50 @@ export default function GateSecurity({ gatePasses, onAddGatePass }) {
             <h3 className="text-sm font-bold text-gray-900">
               {activeTab === 'Outward gate passes' ? 'Outward gate passes' : 'Vehicles on site & Gate Passes'}
             </h3>
-            <span className="text-xs font-semibold text-gray-500">{displayedInbound.length} records</span>
+            <span className="text-xs font-semibold text-gray-500">{displayedPasses.length} records</span>
           </div>
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead>
-                <tr className="border-b border-gray-200 text-gray-400 font-medium">
-                  <th className="pb-3">GATE PASS</th>
-                  <th className="pb-3">VEHICLE</th>
-                  <th className="pb-3">PARTY</th>
-                  <th className="pb-3">SINCE</th>
-                  <th className="pb-3">STATUS</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100 font-medium">
-                {displayedInbound.map((v, i) => (
-                  <tr key={i} className="hover:bg-gray-50/80 transition">
-                    <td className="py-3.5 font-mono font-bold text-gray-900">{v.pass_number}</td>
-                    <td className="py-3.5 font-semibold text-gray-800">{v.vehicle_number}</td>
-                    <td className="py-3.5 text-gray-600">{v.supplier_customer}</td>
-                    <td className="py-3.5 text-gray-400">{v.since_time}</td>
-                    <td className="py-3.5">
-                      <span className={`px-2 py-0.5 rounded-full text-[11px] font-semibold ${
-                        v.status.includes('QC done') || v.status.includes('Cleared')
-                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' 
-                          : 'bg-amber-50 text-amber-700 border border-amber-200'
-                      }`}>
-                        {v.status}
-                      </span>
-                    </td>
+            {isLoading ? (
+              <div className="p-8 text-center text-xs text-gray-500 font-medium flex items-center justify-center gap-2">
+                <Loader2 className="w-4 h-4 animate-spin text-gray-400" />
+                <span>Loading gate passes...</span>
+              </div>
+            ) : displayedPasses.length === 0 ? (
+              <div className="p-8 text-center text-xs text-gray-500 font-medium border border-dashed border-gray-200 rounded-xl">
+                No gate passes found for this view
+              </div>
+            ) : (
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="border-b border-gray-200 text-gray-400 font-medium">
+                    <th className="pb-3">GATE PASS</th>
+                    <th className="pb-3">VEHICLE</th>
+                    <th className="pb-3">SUPPLIER / PARTY</th>
+                    <th className="pb-3">SINCE</th>
+                    <th className="pb-3">STATUS</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-gray-100 font-medium">
+                  {displayedPasses.map((v, i) => (
+                    <tr key={i} className="hover:bg-gray-50/80 transition">
+                      <td className="py-3.5 font-mono font-bold text-gray-900">{v.pass_number}</td>
+                      <td className="py-3.5 font-semibold text-gray-800">{v.vehicle_number}</td>
+                      <td className="py-3.5 text-gray-600">{v.supplier_customer}</td>
+                      <td className="py-3.5 text-gray-400">{v.since_time}</td>
+                      <td className="py-3.5">
+                        <span className={`px-2 py-0.5 rounded-full text-[11px] font-semibold ${
+                          v.status?.includes('QC done') || v.status?.includes('Cleared')
+                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                            : 'bg-amber-50 text-amber-700 border border-amber-200'
+                        }`}>
+                          {v.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
           </div>
         </div>
 
@@ -111,11 +150,11 @@ export default function GateSecurity({ gatePasses, onAddGatePass }) {
           <div>
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-sm font-bold text-gray-900">Outbound dispatch vehicles</h3>
-              <span className="text-xs text-gray-400">{outboundVehicles.length} total</span>
+              <span className="text-xs text-gray-400">{outboundPasses.length} total</span>
             </div>
-            {outboundVehicles.length > 0 ? (
+            {outboundPasses.length > 0 ? (
               <div className="space-y-2.5">
-                {outboundVehicles.map((v, i) => (
+                {outboundPasses.map((v, i) => (
                   <div key={i} className="p-3 bg-gray-50 rounded-xl border border-gray-200 text-xs flex justify-between items-center">
                     <div>
                       <div className="font-mono font-bold text-gray-900">{v.pass_number}</div>
@@ -145,42 +184,65 @@ export default function GateSecurity({ gatePasses, onAddGatePass }) {
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl border border-gray-200 shadow-xl max-w-md w-full p-6 space-y-4">
             <h3 className="text-base font-bold text-gray-900">Issue Inward Gate Pass</h3>
+            {formError && (
+              <div className="p-3 bg-rose-50 border border-rose-200 rounded-lg text-rose-700 text-xs flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
+                <span>{formError}</span>
+              </div>
+            )}
             <form onSubmit={handleSubmit} className="space-y-3 text-xs">
               <div>
-                <label className="font-semibold text-gray-700 block mb-1">Vehicle Registration #</label>
+                <label className="font-semibold text-gray-700 block mb-1">Vehicle Registration # *</label>
                 <input
                   type="text"
                   placeholder="e.g. CSD-9821 or MRD-5520"
                   value={vehicleNo}
                   onChange={(e) => setVehicleNo(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-black"
+                  disabled={isSubmitting}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-black disabled:opacity-50"
                   required
                 />
               </div>
               <div>
-                <label className="font-semibold text-gray-700 block mb-1">Supplier or Vendor Name</label>
+                <label className="font-semibold text-gray-700 block mb-1">Supplier or Customer Name *</label>
                 <input
                   type="text"
-                  placeholder="e.g. Charsadda Supply Partners"
+                  placeholder="Supplier or customer name"
                   value={supplier}
                   onChange={(e) => setSupplier(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-black"
+                  disabled={isSubmitting}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-black disabled:opacity-50"
                   required
                 />
+              </div>
+              <div>
+                <label className="font-semibold text-gray-700 block mb-1">Pass Type *</label>
+                <select
+                  value={passType}
+                  onChange={(e) => setPassType(e.target.value)}
+                  disabled={isSubmitting}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-black disabled:opacity-50"
+                >
+                  <option value="inward">Inward (Receiving / Goods Arrival)</option>
+                  <option value="outward">Outward (Dispatch / Delivery)</option>
+                </select>
               </div>
               <div className="flex justify-end gap-2 pt-2">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="px-3 py-1.5 rounded-lg border border-gray-300 text-gray-600 font-semibold"
+                  disabled={isSubmitting}
+                  className="px-3 py-1.5 rounded-lg border border-gray-300 text-gray-600 font-semibold disabled:opacity-50"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-1.5 rounded-lg bg-black text-white font-bold"
+                  disabled={isSubmitting}
+                  className="px-4 py-1.5 rounded-lg bg-black text-white font-bold hover:bg-zinc-800 transition flex items-center gap-1.5 disabled:opacity-50"
                 >
-                  Confirm & Print Pass
+                  {isSubmitting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                  <span>{isSubmitting ? 'Issuing...' : 'Confirm & Print Pass'}</span>
                 </button>
               </div>
             </form>

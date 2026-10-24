@@ -87,7 +87,7 @@ const adjustStock = async (req, res) => {
 
     const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
     const refNo = `ADJ-${dateStr}-${Math.floor(100 + Math.random() * 900)}`;
-    const performedBy = req.user ? req.user.name : 'Store Manager';
+    const performedBy = req.user?.name ? `${req.user.name} (${req.user.role || 'Inventory'})` : 'Store Officer';
 
     // Insert into inventory_transactions ledger
     await connection.query(
@@ -192,7 +192,7 @@ const transferStock = async (req, res) => {
 
     const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
     const transferRef = `TRF-${dateStr}-${Math.floor(1000 + Math.random() * 9000)}`;
-    const performedBy = req.user ? req.user.name : 'Logistics Manager';
+    const performedBy = req.user?.name ? `${req.user.name} (${req.user.role || 'Logistics'})` : 'Logistics Officer';
 
     // 1. Ledger entry for dispatch from source warehouse
     await connection.query(

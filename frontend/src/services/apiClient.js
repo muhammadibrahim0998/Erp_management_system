@@ -30,21 +30,34 @@ class ApiClient {
       config.body = JSON.stringify(config.body);
     }
 
+    let response;
     try {
-      const response = await fetch(url, config);
-      const data = await response.json().catch(() => null);
-
-      if (!response.ok) {
-        const error = new Error(data?.error || `Request failed with status ${response.status}`);
-        error.status = response.status;
-        error.data = data;
-        throw error;
-      }
-
-      return data;
-    } catch (err) {
+      response = await fetch(url, config);
+    } catch (networkErr) {
+      const err = new Error('Could not reach the server');
+      err.originalError = networkErr;
       throw err;
     }
+
+    const data = await response.json().catch(() => null);
+
+    if (!response.ok) {
+      if (response.status === 401) {
+        localStorage.removeItem('yaf_token');
+        localStorage.removeItem('yaf_user');
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new Event('yaf_unauthorized'));
+        }
+      }
+
+      const message = data?.error || data?.message || response.statusText || `Request failed with status ${response.status}`;
+      const error = new Error(message);
+      error.status = response.status;
+      error.data = data;
+      throw error;
+    }
+
+    return data;
   }
 
   get(endpoint, options = {}) {
