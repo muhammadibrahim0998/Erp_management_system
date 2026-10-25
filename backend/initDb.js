@@ -473,7 +473,7 @@ async function seedDemoData(connection = db, env = process.env) {
         ['Hamza Khan', 'Accounts Officer', 'Finance', 'HK', 'hamza.khan@yaf.com', 'password'],
         ['Nadia Shah', 'HR Manager', 'HR', 'NS', 'hr@yaf.com', 'password'],
         ['Zahid Afridi', 'Poultry Farms', 'Farms', 'ZA', 'zahid.afridi@yaf.com', 'password'],
-        ['Kamran Ali', 'ERP Admin', 'IT', 'KA', 'admin@yaf.com', 'password']
+        ['Kamran Ali', 'Super Admin', 'IT', 'KA', 'superadmin@gmail.com', 'super12345']
       ];
       for (const u of usersData) {
         const passwordToHash = u[5] || 'password';

@@ -41,6 +41,27 @@ export default function ChairmanDashboard({ data, onNavigate, onApproveTask, cur
     }
   };
 
+  const pendingCount = tasks.length;
+  const chartData = data?.revenueChart || [
+    { month: 'Oct', actual: 44, target: 46 },
+    { month: 'Nov', actual: 48, target: 49 },
+    { month: 'Dec', actual: 52, target: 51 },
+    { month: 'Jan', actual: 55, target: 53 },
+    { month: 'Feb', actual: 45, target: 47 },
+    { month: 'Mar', actual: 42, target: 44 },
+    { month: 'Apr', actual: 46, target: 45 },
+    { month: 'May', actual: 49, target: 48 },
+    { month: 'Jun', actual: 51, target: 50 },
+    { month: 'Jul', actual: 54, target: 52 },
+    { month: 'Aug', actual: 53, target: 51 },
+    { month: 'Sep', actual: 50.3, target: 50.8 }
+  ];
+
+  const maxVal = Math.max(
+    ...chartData.map(b => Math.max(Number(b.actual) || 0, Number(b.target) || 0)),
+    60
+  );
+
   return (
     <div className="space-y-6">
       {/* Top Welcome Bar */}
