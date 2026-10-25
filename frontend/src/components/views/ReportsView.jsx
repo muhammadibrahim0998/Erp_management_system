@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Download,
   Printer,
@@ -9,15 +9,45 @@ import {
   DollarSign,
   Package,
   Users,
-  CheckCircle2
+  CheckCircle2,
+  Loader2
 } from 'lucide-react';
 import { exportToPDF, exportToExcel } from '../../utils/exportUtils';
+import operationsService from '../../services/operationsService';
+import DemoBadge from '../DemoBadge';
 
 export default function ReportsView() {
   const [selectedReport, setSelectedReport] = useState('pnl');
   const [fromDate, setFromDate] = useState('2026-07-01');
   const [toDate, setToDate] = useState('2026-09-29');
   const [exportNotice, setExportNotice] = useState(null);
+  const [livePnl, setLivePnl] = useState(null);
+  const [isPnlLoading, setIsPnlLoading] = useState(false);
+  const [pnlError, setPnlError] = useState(null);
+
+  useEffect(() => {
+    let mounted = true;
+    const fetchPnl = async () => {
+      setIsPnlLoading(true);
+      setPnlError(null);
+      try {
+        const data = await operationsService.getPnlReport();
+        if (mounted && data) {
+          setLivePnl(data);
+        }
+      } catch (err) {
+        if (mounted) {
+          setPnlError(err.message || 'Could not load P&L report from server');
+        }
+      } finally {
+        if (mounted) {
+          setIsPnlLoading(false);
+        }
+      }
+    };
+    fetchPnl();
+    return () => { mounted = false; };
+  }, []);
 
   const notify = (msg) => {
     setExportNotice(msg);
@@ -168,6 +198,7 @@ export default function ReportsView() {
 
   return (
     <div className="space-y-6">
+      <DemoBadge />
       {/* Top Banner */}
       <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
@@ -302,60 +333,98 @@ export default function ReportsView() {
       {/* REPORT CONTENT: 1. Profit & Loss */}
       {selectedReport === 'pnl' && (
         <div className="space-y-4">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3.5">
-            <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
-              <span className="text-[10px] font-bold text-gray-400 uppercase">Revenue</span>
-              <div className="text-xl font-black text-gray-900 mt-1">{pnlData.revenue}</div>
-              <span className="text-[10px] text-emerald-600 font-medium">+10.1% vs target</span>
+          <DemoBadge label="Sample data served by the API — not yet linked to live records" />
+          {pnlError && (
+            <div className="p-3 bg-amber-50 border border-amber-200 text-amber-800 text-xs font-semibold rounded-xl flex items-center justify-between shadow-sm">
+              <span>Could not load statement from server ({pnlError}); displaying baseline P&L.</span>
+              <DemoBadge />
             </div>
-            <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
-              <span className="text-[10px] font-bold text-gray-400 uppercase">Gross Profit</span>
-              <div className="text-xl font-black text-gray-900 mt-1">{pnlData.grossProfit}</div>
-              <span className="text-[10px] text-gray-500">21.8% gross margin</span>
-            </div>
-            <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
-              <span className="text-[10px] font-bold text-gray-400 uppercase">Operating Expenses</span>
-              <div className="text-xl font-black text-gray-900 mt-1">{pnlData.operatingExpenses}</div>
-              <span className="text-[10px] text-gray-500">20.8% of revenue</span>
-            </div>
-            <div className="bg-white p-4 rounded-xl border border-emerald-200 shadow-sm bg-emerald-50/20">
-              <span className="text-[10px] font-bold text-emerald-600 uppercase">Net Profit</span>
-              <div className="text-xl font-black text-emerald-700 mt-1">{pnlData.netProfit}</div>
-              <span className="text-[10px] text-emerald-600 font-semibold">1.1% net margin</span>
-            </div>
-          </div>
+          )}
 
-          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-            <div className="p-4 border-b border-gray-100 flex items-center justify-between">
-              <h3 className="text-xs font-bold text-gray-900 uppercase tracking-wider">Statement of Comprehensive Income (PKR)</h3>
-              <span className="text-[11px] text-gray-400 font-mono">Period: {fromDate} to {toDate}</span>
+          {isPnlLoading ? (
+            <div className="bg-white p-8 rounded-2xl border border-gray-200 shadow-sm flex items-center justify-center gap-2 text-gray-500 text-xs font-medium">
+              <Loader2 className="w-4 h-4 animate-spin text-gray-700" />
+              <span>Loading Profit & Loss statement from server...</span>
             </div>
-            <table className="w-full text-left text-xs">
-              <thead>
-                <tr className="border-b border-gray-200 text-gray-400 font-medium bg-gray-50/50">
-                  <th className="py-3 px-6">ACCOUNT CODE</th>
-                  <th className="py-3 px-6">DESCRIPTION</th>
-                  <th className="py-3 px-6 text-right">AMOUNT (PKR)</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100 font-medium">
-                {pnlData.items.map((row, idx) => (
-                  <tr
-                    key={idx}
-                    className={row.highlight ? 'bg-gray-50 font-bold text-gray-900' : 'hover:bg-gray-50/50'}
-                  >
-                    <td className="py-3 px-6 font-mono text-gray-500">{row.code}</td>
-                    <td className={`py-3 px-6 ${row.highlight ? 'font-bold text-gray-900' : 'text-gray-700'}`}>
-                      {row.name}
-                    </td>
-                    <td className={`py-3 px-6 text-right font-mono ${row.highlight ? 'font-black text-gray-900 text-sm' : 'text-gray-900'}`}>
-                      {row.amount}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          ) : (
+            <>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3.5">
+                <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
+                  <span className="text-[10px] font-bold text-gray-400 uppercase">Revenue</span>
+                  <div className="text-xl font-black text-gray-900 mt-1">{livePnl?.revenue || pnlData.revenue}</div>
+                  <span className="text-[10px] text-emerald-600 font-medium">+10.1% vs target</span>
+                </div>
+                <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
+                  <span className="text-[10px] font-bold text-gray-400 uppercase">Gross Profit</span>
+                  <div className="text-xl font-black text-gray-900 mt-1">{livePnl?.grossProfit || pnlData.grossProfit}</div>
+                  <span className="text-[10px] text-gray-500">21.8% gross margin</span>
+                </div>
+                <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
+                  <span className="text-[10px] font-bold text-gray-400 uppercase">Operating Expenses</span>
+                  <div className="text-xl font-black text-gray-900 mt-1">{livePnl?.operatingExpenses || pnlData.operatingExpenses}</div>
+                  <span className="text-[10px] text-gray-500">20.8% of revenue</span>
+                </div>
+                <div className="bg-white p-4 rounded-xl border border-emerald-200 shadow-sm bg-emerald-50/20">
+                  <span className="text-[10px] font-bold text-emerald-600 uppercase">Net Profit</span>
+                  <div className="text-xl font-black text-emerald-700 mt-1">{livePnl?.netProfit || pnlData.netProfit}</div>
+                  <span className="text-[10px] text-emerald-600 font-semibold">1.1% net margin</span>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+                <div className="p-4 border-b border-gray-100 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-xs font-bold text-gray-900 uppercase tracking-wider">Statement of Comprehensive Income (PKR)</h3>
+                    <DemoBadge label="Sample data served by the API — not yet linked to live records" className="mb-0" />
+                  </div>
+                  <span className="text-[11px] text-gray-400 font-mono">Period: {livePnl?.period || `${fromDate} to ${toDate}`}</span>
+                </div>
+                <table className="w-full text-left text-xs">
+                  <thead>
+                    <tr className="border-b border-gray-200 text-gray-400 font-medium bg-gray-50/50">
+                      <th className="py-3 px-6">ACCOUNT CODE</th>
+                      <th className="py-3 px-6">DESCRIPTION</th>
+                      <th className="py-3 px-6 text-right">AMOUNT (PKR)</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100 font-medium">
+                    {(livePnl?.breakdown ? (
+                      livePnl.breakdown.length === 0 ? (
+                        <tr>
+                          <td colSpan={3} className="py-8 text-center text-gray-400">
+                            No P&L breakdown items recorded
+                          </td>
+                        </tr>
+                      ) : (
+                        livePnl.breakdown.map((row, idx) => (
+                          <tr key={idx} className="hover:bg-gray-50/50">
+                            <td className="py-3 px-6 font-mono text-gray-500">{row.code}</td>
+                            <td className="py-3 px-6 text-gray-700">{row.name}</td>
+                            <td className="py-3 px-6 text-right font-mono text-gray-900">{row.amount}</td>
+                          </tr>
+                        ))
+                      )
+                    ) : (
+                      pnlData.items.map((row, idx) => (
+                        <tr
+                          key={idx}
+                          className={row.highlight ? 'bg-gray-50 font-bold text-gray-900' : 'hover:bg-gray-50/50'}
+                        >
+                          <td className="py-3 px-6 font-mono text-gray-500">{row.code}</td>
+                          <td className={`py-3 px-6 ${row.highlight ? 'font-bold text-gray-900' : 'text-gray-700'}`}>
+                            {row.name}
+                          </td>
+                          <td className={`py-3 px-6 text-right font-mono ${row.highlight ? 'font-black text-gray-900 text-sm' : 'text-gray-900'}`}>
+                            {row.amount}
+                          </td>
+                        </tr>
+                      ))
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
         </div>
       )}
 

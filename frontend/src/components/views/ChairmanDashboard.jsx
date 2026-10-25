@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   TrendingUp,
   DollarSign,
@@ -11,49 +11,44 @@ import {
   ArrowDownRight,
   Clock,
   ShieldAlert,
-  CheckCircle2,
-  Info
+  Loader2
 } from 'lucide-react';
+import DemoBadge from '../DemoBadge';
 
-export default function ChairmanDashboard({ data, currentUser, onNavigate, onApproveTask }) {
+export default function ChairmanDashboard({ data, onNavigate, onApproveTask, currentUser }) {
+  const [processingId, setProcessingId] = useState(null);
   const kpis = data?.kpis || {};
   const tasks = data?.waitingApprovals || [];
-  const pendingCount = data?.pendingCount !== undefined ? data.pendingCount : tasks.length;
-  const aging = data?.receivablesAging || {
-    total: 'PKR 0.00',
-    current: '0.0M',
-    d1_30: '0.0M',
-    d31_60: '0.0M'
-  };
-  const budgetList = data?.budgetVsActual || [];
-  const exceptions = data?.exceptions || [];
-  const chartData = data?.revenueChart || [
-    { month: 'Oct', actual: 44, target: 46 },
-    { month: 'Nov', actual: 48, target: 49 },
-    { month: 'Dec', actual: 52, target: 51 },
-    { month: 'Jan', actual: 55, target: 53 },
-    { month: 'Feb', actual: 45, target: 47 },
-    { month: 'Mar', actual: 42, target: 44 },
-    { month: 'Apr', actual: 46, target: 45 },
-    { month: 'May', actual: 49, target: 48 },
-    { month: 'Jun', actual: 51, target: 50 },
-    { month: 'Jul', actual: 54, target: 52 },
-    { month: 'Aug', actual: 53, target: 51 },
-    { month: 'Sep', actual: 50.3, target: 50.8 }
-  ];
+  const firstName = currentUser?.name ? currentUser.name.split(' ')[0] : '';
+  const today = new Date();
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const formattedToday = `${today.getDate()} ${months[today.getMonth()]} ${today.getFullYear()}`;
+  const revenueMonthYear = `${months[today.getMonth()]} ${today.getFullYear()}`;
+  const currentYear = today.getFullYear();
+  const startFiscalYear = today.getMonth() >= 6 ? currentYear : currentYear - 1;
+  const currentFiscalQuarter = Math.floor(((today.getMonth() + 6) % 12) / 3) + 1;
+  const budgetPeriod = `Q${currentFiscalQuarter} FY ${startFiscalYear}-${String(startFiscalYear + 1).slice(-2)}`;
 
-  const maxVal = Math.max(...chartData.map(b => Math.max(Number(b.actual) || 0, Number(b.target) || 0)), 60);
+  const handleApprove = async (taskId) => {
+    if (!onApproveTask) return;
+    setProcessingId(taskId);
+    try {
+      await onApproveTask(taskId);
+    } catch {
+      // Error notification is already handled by App.jsx handleApproveTask
+    } finally {
+      setProcessingId(null);
+    }
+  };
 
   return (
     <div className="space-y-6">
       {/* Top Welcome Bar */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-2xl border border-gray-200 shadow-sm">
         <div>
-          <h2 className="text-xl font-bold text-gray-900 tracking-tight">
-            Good morning, {currentUser?.name?.split(' ')[0] || 'User'}
-          </h2>
+          <h2 className="text-xl font-bold text-gray-900 tracking-tight">Good morning{firstName ? `, ${firstName}` : ''}</h2>
           <p className="text-xs text-gray-500 mt-0.5">
-            {pendingCount} items waiting for your approval · {new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+            {tasks.length > 0 ? `${tasks.length} items waiting for your approval · ` : ''}{formattedToday}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -81,11 +76,12 @@ export default function ChairmanDashboard({ data, currentUser, onNavigate, onApp
         </div>
       </div>
 
-      {/* 5 Dynamic KPI Metric Cards */}
+      {/* 5 KPI Metric Cards (Page 5) */}
+      <DemoBadge label="Sample data served by the API — not yet linked to live records" />
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
         {/* Revenue */}
         <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex flex-col justify-between">
-          <span className="text-[11px] font-medium text-gray-500 uppercase tracking-wider">Revenue · Sep 2026</span>
+          <span className="text-[11px] font-medium text-gray-500 uppercase tracking-wider">Revenue · {revenueMonthYear}</span>
           <div className="my-2">
             <div className="text-2xl font-black text-gray-900">{kpis.revenue || 'PKR 0.0M'}</div>
           </div>
@@ -115,7 +111,7 @@ export default function ChairmanDashboard({ data, currentUser, onNavigate, onApp
           <div className="my-2">
             <div className="text-2xl font-black text-gray-900">{kpis.cashAndBank || 'PKR 0.0M'}</div>
           </div>
-          <div className="text-[11px] text-gray-500 font-medium">{kpis.cashAccounts || '0 accounts'}</div>
+          <div className="text-[11px] text-gray-400">{kpis.cashAccounts || '4 accounts'}</div>
         </div>
 
         {/* Receivables */}
@@ -124,7 +120,7 @@ export default function ChairmanDashboard({ data, currentUser, onNavigate, onApp
           <div className="my-2">
             <div className="text-2xl font-black text-gray-900">{kpis.receivables || 'PKR 0.0M'}</div>
           </div>
-          <div className="text-[11px] text-amber-700 font-semibold">{kpis.receivablesOverdue || 'Normal exposure'}</div>
+          <div className="text-[11px] text-amber-700 font-semibold">{kpis.receivablesOverdue || 'PKR 3.2M over 30 days'}</div>
         </div>
 
         {/* Products sold */}
@@ -135,8 +131,8 @@ export default function ChairmanDashboard({ data, currentUser, onNavigate, onApp
           </div>
           <div className="flex items-center gap-1 text-[11px] text-emerald-700 font-semibold">
             <ArrowUpRight className="w-3.5 h-3.5" />
-            <span>{kpis.productsSoldChange || '▲ 28.8%'}</span>
-            <span className="text-gray-400 font-normal ml-1">{kpis.productsSoldUnits || '0 units'}</span>
+            <span>{kpis.eggsSoldChange ? `▲ ${kpis.eggsSoldChange.replace(/^\+/, '')}` : '▲ 28.8%'}</span>
+            <span className="text-gray-400 font-normal ml-1">{kpis.eggsSoldTrays || '19,077 trays'}</span>
           </div>
         </div>
       </div>
@@ -148,7 +144,10 @@ export default function ChairmanDashboard({ data, currentUser, onNavigate, onApp
           <div>
             <div className="flex items-center justify-between mb-2">
               <div>
-                <h3 className="text-sm font-bold text-gray-900">Revenue vs target</h3>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-sm font-bold text-gray-900">Revenue vs target</h3>
+                  <DemoBadge label="Sample data served by the API — not yet linked to live records" className="mb-0" />
+                </div>
                 <p className="text-[11px] text-gray-400">Last 12 months, PKR millions (excluding sales tax)</p>
               </div>
               <div className="flex items-center gap-4 text-xs">
@@ -200,50 +199,49 @@ export default function ChairmanDashboard({ data, currentUser, onNavigate, onApp
           <div>
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-sm font-bold text-gray-900">Waiting for you</h3>
-              <span className={`text-xs font-bold px-2 py-0.5 rounded-full border ${pendingCount > 0 ? 'text-amber-700 bg-amber-50 border-amber-200' : 'text-emerald-700 bg-emerald-50 border-emerald-200'}`}>
-                {pendingCount}
-              </span>
+              {tasks.length > 0 && (
+                <span className="text-xs font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
+                  {tasks.length}
+                </span>
+              )}
             </div>
 
-            {tasks.length === 0 ? (
-              <div className="py-10 px-4 text-center border border-dashed border-gray-200 rounded-xl bg-gray-50/50">
-                <CheckCircle2 className="w-8 h-8 text-emerald-600 mx-auto mb-2" />
-                <p className="text-xs font-bold text-gray-800">All caught up!</p>
-                <p className="text-[11px] text-gray-500 mt-1">No pending approvals waiting for your action.</p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {tasks.slice(0, 5).map((t) => (
+            <div className="space-y-3">
+              {tasks.length === 0 ? (
+                <div className="p-4 rounded-xl bg-gray-50 border border-gray-100 text-gray-400 text-xs text-center">
+                  No pending approvals waiting for your review
+                </div>
+              ) : (
+                tasks.slice(0, 5).map((t) => (
                   <div
                     key={t.id}
-                    className="p-3 rounded-xl border border-gray-200 hover:border-gray-400 hover:shadow-sm transition bg-gray-50/50 flex items-center justify-between"
-                  >
-                    <div className="min-w-0 flex-1 pr-2">
-                      <div className="text-xs font-bold text-gray-900 truncate">{t.action_label}</div>
-                      <div className="text-[11px] text-gray-500 mt-0.5 truncate">
-                        <span className="font-mono text-gray-700 font-semibold">{t.doc_number}</span> · {t.party}
-                      </div>
-                      <div className="text-[10px] text-gray-400 flex items-center gap-1 mt-1">
-                        <Clock className="w-3 h-3 text-amber-600" />
-                        <span>{t.waiting_since}</span>
-                        {t.priority === 'high' && (
-                          <span className="ml-1 text-[9px] font-bold text-rose-700 bg-rose-50 border border-rose-200 px-1 rounded">
-                            High
-                          </span>
-                        )}
-                      </div>
+                  className="p-3 rounded-xl border border-gray-200 hover:border-gray-400 hover:shadow-sm transition bg-gray-50/50 flex items-center justify-between"
+                >
+                  <div>
+                    <div className="text-xs font-bold text-gray-900">{t.action_label}</div>
+                    <div className="text-[11px] text-gray-500 mt-0.5">
+                      <span className="font-mono text-gray-700">{t.doc_number}</span> · {t.party}
                     </div>
-                    <button
-                      onClick={() => onApproveTask(t.id)}
-                      className="p-1.5 rounded-lg bg-[#0d4a2b] text-white hover:bg-[#086634] transition shrink-0 shadow-sm"
-                      title="Quick Approve"
-                    >
-                      <ArrowRight className="w-3.5 h-3.5" />
-                    </button>
+                    <div className="text-[10px] text-gray-400 flex items-center gap-1 mt-1">
+                      <Clock className="w-3 h-3" />
+                      <span>{t.waiting_since}</span>
+                    </div>
                   </div>
-                ))}
-              </div>
-            )}
+                  <button
+                    onClick={() => handleApprove(t.id)}
+                    disabled={processingId === t.id}
+                    className="p-1.5 rounded-lg bg-black text-white hover:bg-gray-800 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                    title="Process"
+                  >
+                    {processingId === t.id ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    )}
+                  </button>
+                </div>
+              )))}
+            </div>
           </div>
 
           <button
@@ -259,15 +257,16 @@ export default function ChairmanDashboard({ data, currentUser, onNavigate, onApp
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* Receivables aging */}
         <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm">
+          <DemoBadge label="Sample data served by the API — not yet linked to live records" />
           <div className="flex items-center justify-between mb-3">
             <h4 className="text-xs font-bold text-gray-900 uppercase tracking-wider">Receivables aging</h4>
-            <span className="text-xs font-mono font-bold text-gray-700">Total {aging.total || 'PKR 0'}</span>
+            <span className="text-xs font-mono font-bold text-gray-700">Total {data?.receivablesAging?.total || 'PKR 45.6M'}</span>
           </div>
           <div className="space-y-3 text-xs">
             <div>
               <div className="flex justify-between text-gray-600 mb-1">
                 <span>Current</span>
-                <span className="font-bold text-gray-900">{aging.current || '0.0M'}</span>
+                <span className="font-bold text-gray-900">{data?.receivablesAging?.current || '31.0M'}</span>
               </div>
               <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
                 <div className="h-full bg-emerald-600 rounded-full transition-all duration-500" style={{ width: '68%' }}></div>
@@ -276,7 +275,7 @@ export default function ChairmanDashboard({ data, currentUser, onNavigate, onApp
             <div>
               <div className="flex justify-between text-gray-600 mb-1">
                 <span>1-30 days</span>
-                <span className="font-bold text-gray-900">{aging.d1_30 || '0.0M'}</span>
+                <span className="font-bold text-gray-900">{data?.receivablesAging?.d1_30 || '11.4M'}</span>
               </div>
               <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
                 <div className="h-full bg-amber-500 rounded-full transition-all duration-500" style={{ width: '25%' }}></div>
@@ -285,7 +284,7 @@ export default function ChairmanDashboard({ data, currentUser, onNavigate, onApp
             <div>
               <div className="flex justify-between text-gray-600 mb-1">
                 <span>31-60 days</span>
-                <span className="font-bold text-rose-600">{aging.d31_60 || '0.0M'}</span>
+                <span className="font-bold text-rose-600">{data?.receivablesAging?.d31_60 || '3.2M'}</span>
               </div>
               <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
                 <div className="h-full bg-rose-500 rounded-full transition-all duration-500" style={{ width: '7%' }}></div>
@@ -296,98 +295,69 @@ export default function ChairmanDashboard({ data, currentUser, onNavigate, onApp
 
         {/* Budget vs actual */}
         <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm">
+          <DemoBadge label="Sample data served by the API — not yet linked to live records" />
           <div className="flex items-center justify-between mb-3">
-            <h4 className="text-xs font-bold text-gray-900 uppercase tracking-wider">Budget vs actual · Q1 FY 2026-27</h4>
+            <h4 className="text-xs font-bold text-gray-900 uppercase tracking-wider">Budget vs actual · {budgetPeriod}</h4>
           </div>
           <div className="space-y-3 text-xs">
-            {budgetList.length > 0 ? (
-              budgetList.map((item, idx) => {
-                const colors = ['bg-blue-600', 'bg-purple-600', 'bg-amber-600'];
-                return (
-                  <div key={idx}>
-                    <div className="flex justify-between text-gray-600 mb-1">
-                      <span className="truncate pr-2">{item.dept}</span>
-                      <span className="font-bold text-gray-900 shrink-0">{item.actual} / {item.budget} · {item.pct}%</span>
-                    </div>
-                    <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
-                      <div
-                        className={`h-full ${colors[idx % colors.length]} rounded-full transition-all duration-500`}
-                        style={{ width: `${Math.min(100, item.pct)}%` }}
-                      ></div>
-                    </div>
+            {(data?.budgetVsActual || [
+              { dept: 'Poultry Farms', actual: '28.3M', budget: '31.1M', pct: 91 },
+              { dept: 'HR & Administration', actual: '3.8M', budget: '4.2M', pct: 90 },
+              { dept: 'Procurement & Supply Chain', actual: '74.1M', budget: '90.3M', pct: 82 }
+            ]).map((b, i) => {
+              const barColor = i === 0 ? 'bg-blue-600' : i === 1 ? 'bg-purple-600' : 'bg-amber-600';
+              return (
+                <div key={b.dept || i}>
+                  <div className="flex justify-between text-gray-600 mb-1">
+                    <span>{b.dept}</span>
+                    <span className="font-bold text-gray-900">{b.actual} / {b.budget} · {b.pct}%</span>
                   </div>
-                );
-              })
-            ) : (
-              <p className="text-xs text-gray-400">No budget records found</p>
-            )}
+                  <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
+                    <div className={`h-full ${barColor} rounded-full`} style={{ width: `${Math.min(b.pct, 100)}%` }}></div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
 
         {/* Exceptions */}
         <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm flex flex-col justify-between">
           <div>
-            <h4 className="text-xs font-bold text-gray-900 uppercase tracking-wider mb-3">
-              Exceptions (Needs Attention)
-            </h4>
-            <div className="space-y-2.5">
-              {exceptions.length > 0 ? (
-                exceptions.map((exc, idx) => {
-                  const isDanger = exc.type === 'danger';
-                  const isWarning = exc.type === 'warning';
-                  return (
-                    <div
-                      key={idx}
-                      className={`p-3 rounded-xl border text-xs ${
-                        isDanger
-                          ? 'bg-rose-50 border-rose-200 text-rose-900'
-                          : isWarning
-                          ? 'bg-amber-50 border-amber-200 text-amber-900'
-                          : 'bg-emerald-50 border-emerald-200 text-emerald-900'
-                      }`}
-                    >
-                      <div className="flex items-center gap-1.5 font-bold">
-                        {isDanger ? (
-                          <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
-                        ) : isWarning ? (
-                          <ShieldAlert className="w-4 h-4 text-amber-600 shrink-0" />
-                        ) : (
-                          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                        )}
-                        <span>{exc.title}</span>
-                      </div>
-                      <p className="text-[11px] mt-1 opacity-90 leading-tight">
-                        {exc.desc}
-                      </p>
-                      {exc.actionLabel && (
-                        <button
-                          onClick={() => onNavigate(exc.targetTab || 'sales')}
-                          className={`mt-2 text-[10px] font-bold px-2.5 py-1 rounded transition shadow-sm ${
-                            isDanger
-                              ? 'bg-rose-600 hover:bg-rose-700 text-white'
-                              : isWarning
-                              ? 'bg-amber-600 hover:bg-amber-700 text-white'
-                              : 'bg-emerald-600 hover:bg-emerald-700 text-white'
-                          }`}
-                        >
-                          {exc.actionLabel}
-                        </button>
-                      )}
-                    </div>
-                  );
-                })
-              ) : (
-                <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs">
-                  <div className="flex items-center gap-2 font-bold text-emerald-700">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                    <span>All systems normal</span>
-                  </div>
-                  <p className="text-[11px] text-emerald-800 mt-1">
-                    No exceptions or credit breaches detected.
-                  </p>
-                </div>
-              )}
+            <div className="flex items-center justify-between mb-2">
+              <h4 className="text-xs font-bold text-gray-900 uppercase tracking-wider">
+                Exceptions (Needs Attention)
+              </h4>
+              <span className="text-xs font-semibold text-rose-600 bg-rose-50 px-2 py-0.5 rounded-full border border-rose-200">
+                {data?.exceptions?.length || 1} on hold
+              </span>
             </div>
+            <DemoBadge label="Sample data served by the API — not yet linked to live records" />
+            {data?.exceptions && data.exceptions.length > 0 ? (
+              <div className="space-y-3">
+                {data.exceptions.map((exc, idx) => (
+                  <div key={idx} className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-900">
+                    <div className="flex items-center gap-2 text-xs font-bold text-rose-700">
+                      <AlertTriangle className="w-4 h-4 text-rose-600" />
+                      <span>{exc.title || 'Credit limit exceeded'}</span>
+                    </div>
+                    <p className="text-[11px] text-rose-800 mt-1">
+                      {exc.desc || exc.description || `${exc.party || ''} · ${exc.doc_number || ''} ${exc.detail || ''}`}
+                    </p>
+                    <button
+                      onClick={() => onNavigate(exc.route || 'sales')}
+                      className="mt-3 text-[11px] font-bold text-white bg-rose-600 hover:bg-rose-700 px-3 py-1 rounded-md transition shadow-sm"
+                    >
+                      Review {exc.action_label || 'Sales Order & Credit'}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="p-4 rounded-xl bg-gray-50 border border-gray-100 text-gray-400 text-xs text-center">
+                No active exceptions
+              </div>
+            )}
           </div>
           <div className="text-[11px] text-gray-400 mt-4">
             Security audit: locked posted documents active.
@@ -406,7 +376,7 @@ export default function ChairmanDashboard({ data, currentUser, onNavigate, onApp
           </div>
           <button
             onClick={() => onNavigate('approvals')}
-            className="text-xs font-bold text-[#086634] hover:underline"
+            className="text-xs font-bold text-[#086634] hover:underline cursor-pointer"
           >
             View Full Approvals Inbox →
           </button>
@@ -463,10 +433,12 @@ export default function ChairmanDashboard({ data, currentUser, onNavigate, onApp
                     </td>
                     <td className="py-3.5 px-4 text-right">
                       <button
-                        onClick={() => onApproveTask && onApproveTask(t.id)}
-                        className="px-2.5 py-1 text-[11px] font-bold text-white bg-[#0d4a2b] hover:bg-[#086634] rounded-md transition shadow-xs"
+                        onClick={() => handleApprove(t.id)}
+                        disabled={processingId === t.id}
+                        className="px-2.5 py-1 text-[11px] font-bold text-white bg-[#0d4a2b] hover:bg-[#086634] rounded-md transition shadow-xs cursor-pointer inline-flex items-center gap-1 disabled:opacity-50"
                       >
-                        Quick Approve
+                        {processingId === t.id && <Loader2 className="w-3 h-3 animate-spin" />}
+                        <span>Quick Approve</span>
                       </button>
                     </td>
                   </tr>

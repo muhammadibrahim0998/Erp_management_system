@@ -1,41 +1,79 @@
 import React, { useState } from 'react';
-import { Users, Search, Plus, Mail, Building, ShieldCheck, CheckCircle2 } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import { Search, Plus, CheckCircle2, ShieldAlert, Loader2 } from 'lucide-react';
 
-export default function HrAdminView({ users, onAddUser }) {
+export default function HrAdminView({ users, onAddUser, currentUser }) {
   const [search, setSearch] = useState('');
   const [selectedDept, setSelectedDept] = useState('All');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [newName, setNewName] = useState('');
-  const [newRole, setNewRole] = useState('');
+  const [newRole, setNewRole] = useState('Staff');
   const [newDept, setNewDept] = useState('Operations');
   const [newEmail, setNewEmail] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [modalError, setModalError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const departments = ['All', 'Executive', 'Operations', 'Finance', 'Plant', 'Quality', 'Sales', 'Marketing', 'HR', 'IT'];
 
+  const erpRoles = [
+    'Staff',
+    'Sales Officer',
+    'Sales Manager',
+    'Accounts Officer',
+    'Director Finance',
+    'HR Manager',
+    'Procurement',
+    'Raw Material Store',
+    'Finish Store & Delivery',
+    'Gate Officer',
+    'QC Cell',
+    'Plant Manager',
+    'Production Manager',
+    'Breaking Supervisor',
+    'Poultry Farms',
+    'Head of Marketing',
+    'Social Media & Content',
+    'Director Operations',
+    'General Manager',
+    'ERP Admin',
+    'Chairman & CEO'
+  ];
+
   const filteredUsers = (users || []).filter(u => {
-    const matchesSearch = u.name.toLowerCase().includes(search.toLowerCase()) ||
-                          u.role.toLowerCase().includes(search.toLowerCase()) ||
+    const matchesSearch = (u.name || '').toLowerCase().includes(search.toLowerCase()) ||
+                          (u.role || '').toLowerCase().includes(search.toLowerCase()) ||
                           (u.email && u.email.toLowerCase().includes(search.toLowerCase()));
-    const matchesDept = selectedDept === 'All' || u.department.toLowerCase() === selectedDept.toLowerCase();
+    const matchesDept = selectedDept === 'All' || (u.department || '').toLowerCase() === selectedDept.toLowerCase();
     return matchesSearch && matchesDept;
   });
 
-  const handleAdd = (e) => {
+  const handleAdd = async (e) => {
     e.preventDefault();
-    if (!newName || !newRole) return;
-    if (onAddUser) {
-      onAddUser({
-        name: newName,
-        role: newRole,
-        department: newDept,
-        email: newEmail || `${newName.toLowerCase().replace(/\s+/g, '.')}@yousafzaifoods.pk`,
-        avatar: newName.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()
-      });
+    if (!newName.trim() || !newRole.trim() || !newPassword) return;
+    setModalError('');
+    setIsSubmitting(true);
+    try {
+      if (onAddUser) {
+        await onAddUser({
+          name: newName.trim(),
+          role: newRole.trim(),
+          department: newDept,
+          email: newEmail.trim() || `${newName.trim().toLowerCase().replace(/\s+/g, '.')}@yousafzaifoods.pk`,
+          password: newPassword,
+          avatar: newName.trim().split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()
+        });
+      }
+      setNewName('');
+      setNewRole('Staff');
+      setNewEmail('');
+      setNewPassword('');
+      setIsModalOpen(false);
+    } catch (err) {
+      setModalError(err.message || 'Failed to add staff member. Admin permissions required.');
+    } finally {
+      setIsSubmitting(false);
     }
-    setNewName('');
-    setNewRole('');
-    setNewEmail('');
-    setIsModalOpen(false);
   };
 
   return (
@@ -50,8 +88,11 @@ export default function HrAdminView({ users, onAddUser }) {
         </div>
         <div className="flex items-center gap-2">
           <button
-            onClick={() => setIsModalOpen(true)}
-            className="flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-black hover:bg-zinc-800 rounded-lg transition shadow-sm"
+            onClick={() => {
+              setModalError('');
+              setIsModalOpen(true);
+            }}
+            className="flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-black hover:bg-zinc-800 rounded-lg transition shadow-sm cursor-pointer"
           >
             <Plus className="w-4 h-4" />
             <span>Add New Staff</span>
@@ -105,7 +146,7 @@ export default function HrAdminView({ users, onAddUser }) {
             <button
               key={dept}
               onClick={() => setSelectedDept(dept)}
-              className={`px-3 py-1 rounded-lg font-semibold transition whitespace-nowrap ${
+              className={`px-3 py-1 rounded-lg font-semibold transition whitespace-nowrap cursor-pointer ${
                 selectedDept === dept
                   ? 'bg-black text-white'
                   : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
@@ -140,7 +181,7 @@ export default function HrAdminView({ users, onAddUser }) {
                 </tr>
               ) : (
                 filteredUsers.map((u, idx) => (
-                  <tr key={idx} className="hover:bg-gray-50/80 transition">
+                  <tr key={u.id || idx} className="hover:bg-gray-50/80 transition">
                     <td className="py-3.5 px-4">
                       <div className="flex items-center gap-3">
                         <div className="w-8 h-8 rounded-full bg-[#0d4a2b] text-white flex items-center justify-center font-bold text-xs shrink-0">
@@ -159,16 +200,16 @@ export default function HrAdminView({ users, onAddUser }) {
                       </span>
                     </td>
                     <td className="py-3.5 px-4 text-gray-600 font-mono text-[11px]">
-                      {u.email || `${u.name.toLowerCase().replace(/\s+/g, '.')}@yousafzaifoods.pk`}
+                      {u.email || `${(u.name || '').toLowerCase().replace(/\s+/g, '.')}@yousafzaifoods.pk`}
                     </td>
                     <td className="py-3.5 px-4">
                       <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                        Active
+                        {u.status || 'Active'}
                       </span>
                     </td>
                     <td className="py-3.5 px-4 text-right">
-                      <span className="text-[11px] font-semibold text-blue-600 hover:text-blue-800 cursor-pointer">
-                        View Profile
+                      <span className="text-[11px] font-semibold text-[#0d4a2b] hover:underline cursor-pointer">
+                        Directory Record
                       </span>
                     </td>
                   </tr>
@@ -180,10 +221,16 @@ export default function HrAdminView({ users, onAddUser }) {
       </div>
 
       {/* Add Staff Modal */}
-      {isModalOpen && (
+      {isModalOpen && createPortal(
         <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl border border-gray-200 shadow-2xl max-w-md w-full p-6 space-y-4">
             <h3 className="text-base font-bold text-gray-900">Add New Staff Member</h3>
+            {modalError && (
+              <div className="p-3 text-xs text-rose-700 bg-rose-50 border border-rose-200 rounded-xl flex items-center gap-2">
+                <ShieldAlert className="w-4 h-4 shrink-0 text-rose-600" />
+                <span>{modalError}</span>
+              </div>
+            )}
             <form onSubmit={handleAdd} className="space-y-3 text-xs">
               <div>
                 <label className="block text-gray-700 font-semibold mb-1">Full Name</label>
@@ -198,14 +245,15 @@ export default function HrAdminView({ users, onAddUser }) {
               </div>
               <div>
                 <label className="block text-gray-700 font-semibold mb-1">Role / Designation</label>
-                <input
-                  type="text"
-                  required
+                <select
                   value={newRole}
                   onChange={(e) => setNewRole(e.target.value)}
-                  placeholder="e.g. Assistant Operations Manager"
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-black"
-                />
+                >
+                  {erpRoles.map(r => (
+                    <option key={r} value={r}>{r}</option>
+                  ))}
+                </select>
               </div>
               <div>
                 <label className="block text-gray-700 font-semibold mb-1">Department</label>
@@ -229,24 +277,43 @@ export default function HrAdminView({ users, onAddUser }) {
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-black"
                 />
               </div>
+              <div>
+                <label className="block text-gray-700 font-semibold mb-1">Initial Password *</label>
+                <input
+                  type="password"
+                  required
+                  minLength={6}
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="Minimum 6 characters"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-black"
+                />
+              </div>
+              <p className="text-[10px] text-gray-400">
+                Note: Registering active staff members requires ERP Admin or Executive authority.
+              </p>
               <div className="flex items-center justify-end gap-2 pt-3 border-t border-gray-100">
                 <button
                   type="button"
+                  disabled={isSubmitting}
                   onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2 rounded-lg font-semibold text-gray-600 hover:bg-gray-100"
+                  className="px-4 py-2 rounded-lg font-semibold text-gray-600 hover:bg-gray-100 cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 rounded-lg font-bold text-white bg-black hover:bg-zinc-800 shadow-sm"
+                  disabled={isSubmitting}
+                  className="px-4 py-2 rounded-lg font-bold text-white bg-black hover:bg-zinc-800 shadow-sm inline-flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
                 >
-                  Save Staff Member
+                  {isSubmitting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                  <span>{isSubmitting ? 'Saving...' : 'Save Staff Member'}</span>
                 </button>
               </div>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

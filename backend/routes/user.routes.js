@@ -4,8 +4,8 @@ const userController = require('../controllers/user.controller');
 const { authenticateToken, requireAdmin } = require('../middlewares/auth');
 const { passwordResetLimiter } = require('../middlewares/rateLimiter');
 
-// Public/Staff user list (passwords stripped)
-router.get('/', userController.getUsers);
+// Authenticated staff user list (passwords stripped)
+router.get('/', authenticateToken, userController.getUsers);
 
 // Admin-only management routes
 router.post('/', authenticateToken, requireAdmin, userController.createUser);

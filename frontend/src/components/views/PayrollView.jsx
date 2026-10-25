@@ -1,14 +1,25 @@
 import React, { useState } from 'react';
 import { Users, DollarSign, Calendar, CheckCircle2, Plus, Clock, FileText } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 
 export default function PayrollView({ payrollRuns, onGeneratePayroll }) {
   const [isGenerating, setIsGenerating] = useState(false);
+  const [generateError, setGenerateError] = useState(null);
   const [selectedMonth, setSelectedMonth] = useState('2026-10');
 
   const handleGenerate = async () => {
+    if (isGenerating) return;
     setIsGenerating(true);
-    await onGeneratePayroll(selectedMonth);
-    setIsGenerating(false);
+    setGenerateError(null);
+    try {
+      if (onGeneratePayroll) {
+        await onGeneratePayroll(selectedMonth);
+      }
+    } catch (err) {
+      setGenerateError(err.message || 'Failed to generate payroll');
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   return (
@@ -21,23 +32,38 @@ export default function PayrollView({ payrollRuns, onGeneratePayroll }) {
             Monthly salary runs with tax, provident fund, EOBI and advance recovery — approved by Finance and the Chairman.
           </p>
         </div>
-        <div className="flex items-center gap-3">
-          <input
-            type="month"
-            value={selectedMonth}
-            onChange={(e) => setSelectedMonth(e.target.value)}
-            className="text-xs px-3 py-1.5 border border-gray-300 rounded-lg bg-gray-50 font-mono"
-          />
-          <button
-            onClick={handleGenerate}
-            disabled={isGenerating}
-            className="flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-black hover:bg-zinc-800 rounded-lg transition shadow-sm"
-          >
-            <Plus className="w-4 h-4" />
-            <span>{isGenerating ? 'Calculating...' : 'Generate payroll'}</span>
-          </button>
+        <div className="flex flex-col items-end gap-1">
+          <div className="flex items-center gap-3">
+            <input
+              type="month"
+              value={selectedMonth}
+              onChange={(e) => setSelectedMonth(e.target.value)}
+              className="text-xs px-3 py-1.5 border border-gray-300 rounded-lg bg-gray-50 font-mono"
+            />
+            <button
+              onClick={handleGenerate}
+              disabled={isGenerating}
+              className="flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-black hover:bg-zinc-800 rounded-lg transition shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isGenerating ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Plus className="w-4 h-4" />
+              )}
+              <span>{isGenerating ? 'Calculating...' : 'Generate payroll'}</span>
+            </button>
+          </div>
+          <p className="text-[10px] text-gray-400">
+            Generated runs currently use fixed values (see BACKEND_REQUESTS item 13)
+          </p>
         </div>
       </div>
+
+      {generateError && (
+        <div className="p-3 bg-rose-50 border border-rose-200 text-rose-800 text-xs font-semibold rounded-xl flex items-center gap-2 shadow-sm">
+          <span>{generateError}</span>
+        </div>
+      )}
 
       {/* Runs Table (Page 17) */}
       <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
@@ -54,7 +80,14 @@ export default function PayrollView({ payrollRuns, onGeneratePayroll }) {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 font-medium">
-              {(payrollRuns || []).map((run, idx) => (
+              {(!payrollRuns || payrollRuns.length === 0) ? (
+                <tr>
+                  <td colSpan={6} className="py-8 text-center text-gray-400">
+                    No payroll runs recorded yet
+                  </td>
+                </tr>
+              ) : (
+                payrollRuns.map((run, idx) => (
                 <tr key={idx} className="hover:bg-gray-50/80 transition">
                   <td className="py-3.5 px-4 font-mono font-bold text-gray-900">{run.run_number}</td>
                   <td className="py-3.5 px-4 text-gray-500">{run.run_date}</td>
@@ -71,7 +104,7 @@ export default function PayrollView({ payrollRuns, onGeneratePayroll }) {
                     {Number(run.net_pay).toLocaleString()}
                   </td>
                 </tr>
-              ))}
+              )))}
             </tbody>
           </table>
         </div>

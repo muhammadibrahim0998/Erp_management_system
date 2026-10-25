@@ -9,8 +9,12 @@ export const operationsService = {
     return apiClient.get('/api/approvals');
   },
 
-  actionApproval(id, action) {
-    return apiClient.post(`/api/approvals/${id}/action`, { action });
+  actionApproval(id, action, reason) {
+    const payload = { action };
+    if (typeof reason === 'string' && reason.trim()) {
+      payload.reason = reason.trim();
+    }
+    return apiClient.post(`/api/approvals/${id}/action`, payload);
   },
 
   getLiveOperations() {
@@ -45,8 +49,24 @@ export const operationsService = {
     return apiClient.get('/api/sales/orders');
   },
 
+  getSalesOrderDetails(so_number) {
+    return apiClient.get(`/api/sales/orders/${so_number}`);
+  },
+
+  createSalesOrder(orderData) {
+    return apiClient.post('/api/sales/orders', orderData);
+  },
+
   approveSalesOrder(so_number) {
     return apiClient.post('/api/sales/approve', { so_number });
+  },
+
+  invoiceSalesOrder(so_number) {
+    return apiClient.post(`/api/sales/orders/${so_number}/invoice`, {});
+  },
+
+  recordSalesPayment(so_number, paymentData = {}) {
+    return apiClient.post(`/api/sales/orders/${so_number}/payment`, paymentData);
   },
 
   getMarketing() {
@@ -77,6 +97,18 @@ export const operationsService = {
    * Fetches all core operational datasets in parallel for App bootstrap
    */
   async getBootstrapData() {
+    const failed = [];
+    const fetchItem = async (name, endpoint) => {
+      try {
+        return await apiClient.get(endpoint);
+      } catch (err) {
+        if (err?.status !== 401) {
+          failed.push(name);
+        }
+        return null;
+      }
+    };
+
     const [
       users,
       chairman,
@@ -90,17 +122,17 @@ export const operationsService = {
       payroll,
       finance
     ] = await Promise.all([
-      apiClient.get('/api/users').catch(() => null),
-      apiClient.get('/api/dashboard/chairman').catch(() => null),
-      apiClient.get('/api/approvals').catch(() => null),
-      apiClient.get('/api/gate').catch(() => null),
-      apiClient.get('/api/procurement/pos').catch(() => null),
-      apiClient.get('/api/production/board').catch(() => null),
-      apiClient.get('/api/inventory').catch(() => null),
-      apiClient.get('/api/sales/orders').catch(() => null),
-      apiClient.get('/api/marketing').catch(() => null),
-      apiClient.get('/api/payroll').catch(() => null),
-      apiClient.get('/api/finance/overview').catch(() => null)
+      fetchItem('users', '/api/users'),
+      fetchItem('chairman dashboard', '/api/dashboard/chairman'),
+      fetchItem('approvals', '/api/approvals'),
+      fetchItem('gate', '/api/gate'),
+      fetchItem('procurement', '/api/procurement/pos'),
+      fetchItem('production', '/api/production/board'),
+      fetchItem('inventory', '/api/inventory'),
+      fetchItem('sales', '/api/sales/orders'),
+      fetchItem('marketing', '/api/marketing'),
+      fetchItem('payroll', '/api/payroll'),
+      fetchItem('finance', '/api/finance/overview')
     ]);
 
     return {
@@ -114,7 +146,8 @@ export const operationsService = {
       sales,
       marketing,
       payroll,
-      finance
+      finance,
+      failed
     };
   }
 };

@@ -58,38 +58,33 @@ import Auth from './components/Auth';
 
 /**
  * Strict role-to-pages access control mapping.
- * Each user ONLY sees the modules directly related to their operational duties.
+ * Each user primarily sees the modules directly related to their operational duties.
  */
 export const ROLE_ALLOWED_PAGES = {
-  // 1. Executive Leadership & Super Admins (Strictly isolated roles)
+  'Chairman & CEO': [
+    'dashboard', 'approvals', 'live-operations', 'procurement', 'gate', 'qc',
+    'inventory', 'production', 'pos', 'sales', 'marketing', 'hr', 'payroll',
+    'finance', 'reports', 'users', 'audit-logs', 'settings', 'process-map'
+  ],
+  'General Manager': [
+    'dashboard', 'approvals', 'live-operations', 'procurement', 'gate', 'qc',
+    'inventory', 'production', 'pos', 'sales', 'marketing', 'hr', 'payroll',
+    'finance', 'reports', 'users', 'audit-logs', 'settings', 'process-map'
+  ],
   'Super Admin': [
     'super-admin', 'users', 'audit-logs', 'settings'
   ],
   'ERP Admin': [
     'super-admin', 'users', 'audit-logs', 'settings'
   ],
-  'Chairman & CEO': [
-    'dashboard', 'approvals', 'live-operations', 'procurement', 'gate', 'qc', 
-    'inventory', 'production', 'pos', 'sales', 'marketing', 'hr', 'payroll', 
-    'finance', 'reports', 'users', 'audit-logs', 'settings', 'process-map'
-  ],
-  'General Manager': [
-    'dashboard', 'approvals', 'live-operations', 'procurement', 'gate', 'qc', 
-    'inventory', 'production', 'pos', 'sales', 'marketing', 'hr', 'payroll', 
-    'finance', 'reports', 'users', 'audit-logs', 'settings', 'process-map'
-  ],
-
-  // 2. Finance & Accounts
   'Director Finance': [
     'finance', 'reports', 'payroll', 'procurement', 'sales', 'approvals', 'dashboard'
   ],
   'Accounts Officer': [
     'finance', 'reports', 'payroll', 'pos'
   ],
-
-  // 3. Operations, Plant & Farm
   'Director Operations': [
-    'live-operations', 'production', 'inventory', 'qc', 'gate', 'procurement', 'approvals'
+    'live-operations', 'production', 'inventory', 'qc', 'gate', 'procurement', 'approvals', 'dashboard'
   ],
   'Plant Manager': [
     'production', 'live-operations', 'inventory', 'qc', 'gate', 'approvals'
@@ -103,61 +98,51 @@ export const ROLE_ALLOWED_PAGES = {
   'Poultry Farms': [
     'live-operations', 'production', 'inventory'
   ],
-
-  // 4. Security & Gate (Only Gate module)
   'Gate Officer': [
     'gate'
   ],
-
-  // 5. Quality Inspection (Only QC module)
   'QC Cell': [
-    'qc'
+    'qc', 'gate'
   ],
-
-  // 6. Warehouses & Stores (Only Inventory module)
   'Raw Material Store': [
     'inventory'
   ],
   'Finish Store & Delivery': [
     'inventory', 'gate'
   ],
-
-  // 7. Purchasing & Procurement
   'Procurement': [
     'procurement', 'inventory', 'approvals'
   ],
-
-  // 8. Sales
   'Sales Manager': [
     'sales', 'pos', 'marketing', 'approvals'
   ],
   'Sales Officer': [
     'pos', 'sales', 'inventory'
   ],
-
-  // 9. Marketing
+  'Store Sales Officer': [
+    'pos', 'sales', 'inventory'
+  ],
   'Head of Marketing': [
     'marketing', 'approvals'
   ],
   'Social Media & Content': [
     'marketing'
   ],
-
-  // 10. Human Resources
   'HR Manager': [
     'hr', 'payroll', 'approvals'
+  ],
+  'Staff': [
+    'process-map', 'live-operations'
   ]
 };
 
 export function getEffectiveAllowedPages(user) {
-  if (!user) return ['dashboard'];
+  if (!user) return ['process-map', 'live-operations'];
 
-  // 1. Direct role exact match
   if (ROLE_ALLOWED_PAGES[user.role]) {
     return ROLE_ALLOWED_PAGES[user.role];
   }
 
-  // 2. Normalized partial match
   const roleLower = (user.role || '').toLowerCase();
   for (const [rName, pages] of Object.entries(ROLE_ALLOWED_PAGES)) {
     if (roleLower === rName.toLowerCase() || roleLower.includes(rName.toLowerCase())) {
@@ -165,7 +150,6 @@ export function getEffectiveAllowedPages(user) {
     }
   }
 
-  // 3. Department fallback
   const deptLower = (user.department || '').toLowerCase();
   if (deptLower === 'security') return ['gate'];
   if (deptLower === 'quality') return ['qc'];
@@ -180,20 +164,23 @@ export function getEffectiveAllowedPages(user) {
   if (deptLower === 'it') return ['super-admin', 'users', 'audit-logs', 'settings'];
   if (deptLower === 'executive') return ROLE_ALLOWED_PAGES['Chairman & CEO'];
 
-  return ['dashboard'];
+  return ['process-map', 'live-operations'];
 }
 
 export function getDefaultTabForUser(user) {
   const allowed = getEffectiveAllowedPages(user);
-  return allowed[0] || 'dashboard';
+  return allowed[0] || 'process-map';
 }
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState(() => authService.getCurrentUser());
   const [isAuthenticated, setIsAuthenticated] = useState(() => authService.isAuthenticated());
   const [activeTab, setActiveTab] = useState(() => getDefaultTabForUser(authService.getCurrentUser()));
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isRoleModalOpen, setIsRoleModalOpen] = useState(false);
+  const isDevRoleSwitcherEnabled = Boolean(
+    import.meta.env.DEV && import.meta.env.VITE_ENABLE_DEV_ROLE_SWITCHER === 'true'
+  );
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [users, setUsers] = useState([]);
 
   // Live Server Data
@@ -203,16 +190,26 @@ export default function App() {
   const [purchaseOrders, setPurchaseOrders] = useState([]);
   const [productionOrders, setProductionOrders] = useState([]);
   const [inventoryItems, setInventoryItems] = useState([]);
-  const [salesOrder, setSalesOrder] = useState(null);
+  const [salesOrders, setSalesOrders] = useState([]);
   const [campaigns, setCampaigns] = useState([]);
   const [payrollRuns, setPayrollRuns] = useState([]);
   const [financeData, setFinanceData] = useState(null);
+  const [failedDatasets, setFailedDatasets] = useState([]);
 
   const [isLoading, setIsLoading] = useState(true);
   const [notification, setNotification] = useState(null);
 
-  const showNotification = (msg) => {
-    setNotification(msg);
+  const today = new Date();
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const formattedToday = `${today.getDate()} ${months[today.getMonth()]} ${today.getFullYear()}`;
+  const currentYear = today.getFullYear();
+  const startFiscalYear = today.getMonth() >= 6 ? currentYear : currentYear - 1;
+  const endFiscalYear = startFiscalYear + 1;
+  const fiscalYearText = `FY ${startFiscalYear}-${String(endFiscalYear).slice(-2)}`;
+
+  const showNotification = (msg, type = 'success') => {
+    const text = typeof msg === 'string' ? msg : msg?.message || 'Notification';
+    setNotification({ text, type });
     setTimeout(() => setNotification(null), 4000);
   };
 
@@ -226,10 +223,21 @@ export default function App() {
       if (data.procurement) setPurchaseOrders(data.procurement);
       if (data.production) setProductionOrders(data.production);
       if (data.inventory) setInventoryItems(data.inventory);
-      if (data.sales) setSalesOrder(data.sales);
+      if (data.sales) {
+        setSalesOrders(Array.isArray(data.sales) ? data.sales : [data.sales]);
+      }
       if (data.marketing) setCampaigns(data.marketing);
       if (data.payroll) setPayrollRuns(data.payroll);
       if (data.finance) setFinanceData(data.finance);
+
+      if (data.failed) {
+        setFailedDatasets(data.failed);
+        if (data.failed.length > 0) {
+          showNotification(`Could not load: ${data.failed.join(', ')}`, 'error');
+        }
+      } else {
+        setFailedDatasets([]);
+      }
     } catch (err) {
       console.error('Data fetch error:', err);
     } finally {
@@ -237,7 +245,7 @@ export default function App() {
     }
   };
 
-  // Verify session token on initial mount
+  // Verify session token on initial mount & listen for unauthorized events
   useEffect(() => {
     if (authService.isAuthenticated()) {
       authService.getMe()
@@ -251,6 +259,14 @@ export default function App() {
           setCurrentUser(null);
         });
     }
+
+    const handleUnauthorized = () => {
+      authService.logout();
+      setIsAuthenticated(false);
+      setCurrentUser(null);
+    };
+    window.addEventListener('yaf_unauthorized', handleUnauthorized);
+    return () => window.removeEventListener('yaf_unauthorized', handleUnauthorized);
   }, []);
 
   useEffect(() => {
@@ -262,13 +278,14 @@ export default function App() {
   }, [isAuthenticated]);
 
   // Action Handlers
-  const handleApproveTask = async (taskId, actionType = 'approved') => {
+  const handleApproveTask = async (taskId, actionType = 'approved', reason = null) => {
     try {
-      await operationsService.actionApproval(taskId, actionType);
+      await operationsService.actionApproval(taskId, actionType, reason);
       showNotification(`Task marked as ${actionType} in MySQL database`);
       fetchAllData();
     } catch (e) {
-      showNotification('Error processing task');
+      showNotification(e.message || 'Error processing task', 'error');
+      throw e;
     }
   };
 
@@ -278,7 +295,8 @@ export default function App() {
       showNotification('Inward Gate Pass issued successfully in MySQL');
       fetchAllData();
     } catch (e) {
-      showNotification('Error issuing gate pass');
+      showNotification(e.message || 'Error issuing gate pass', 'error');
+      throw e;
     }
   };
 
@@ -288,7 +306,8 @@ export default function App() {
       showNotification('Purchase Order created in MySQL');
       fetchAllData();
     } catch (e) {
-      showNotification('Error creating PO');
+      showNotification(e.message || 'Error creating PO', 'error');
+      throw e;
     }
   };
 
@@ -297,15 +316,20 @@ export default function App() {
       await operationsService.moveProduction(id, stage);
       showNotification(`Order moved to ${stage}`);
       fetchAllData();
-    } catch (e) { }
+    } catch (e) {
+      showNotification(e.message || 'Error moving order', 'error');
+      throw e;
+    }
   };
 
   const handleApproveSales = async (soNumber) => {
     try {
       await operationsService.approveSalesOrder(soNumber);
-      showNotification('Sales order approved by CEO exception');
       fetchAllData();
-    } catch (e) { }
+    } catch (e) {
+      showNotification(e.message || 'Error approving sales order', 'error');
+      throw e;
+    }
   };
 
   const handleGeneratePayroll = async (month) => {
@@ -313,16 +337,21 @@ export default function App() {
       await operationsService.generatePayroll(month);
       showNotification(`Payroll generated for ${month} in MySQL`);
       fetchAllData();
-    } catch (e) { }
+    } catch (e) {
+      showNotification(e.message || 'Error generating payroll', 'error');
+      throw e;
+    }
   };
 
   const handleAddUser = async (userData) => {
     try {
-      await userService.createUser(userData);
-      showNotification('New staff member added successfully in MySQL');
+      const res = await userService.createUser(userData);
+      showNotification('New staff member registered successfully');
       fetchAllData();
+      return res;
     } catch (e) {
-      showNotification(e.message || 'Failed to add user');
+      showNotification(e.message || 'Failed to add user', 'error');
+      throw e;
     }
   };
 
@@ -428,14 +457,13 @@ export default function App() {
     }
   }, [currentUser, allowedTabIds, activeTab]);
 
-  if (!isAuthenticated) {
+  if (!isAuthenticated || !currentUser) {
     return (
       <Auth
-        onLogin={(user, token) => {
+        onLogin={(user, _token) => {
           setCurrentUser(user);
           setIsAuthenticated(true);
-          const landingTab = getDefaultTabForUser(user);
-          setActiveTab(landingTab);
+          setActiveTab(getDefaultTabForUser(user));
           fetchAllData();
           showNotification(`Welcome, ${user.name} (${user.role})`);
         }}
@@ -447,9 +475,17 @@ export default function App() {
     <div className="flex flex-col h-screen bg-[#0c8547] text-gray-900 overflow-hidden font-sans">
       {/* Toast Notification */}
       {notification && (
-        <div className="fixed top-5 right-5 z-50 bg-[#07361c] text-white px-4 py-2.5 rounded-xl border border-emerald-400 shadow-2xl flex items-center gap-2 text-xs font-semibold animate-bounce">
-          <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-          <span>{notification}</span>
+        <div className={`fixed top-5 right-5 z-50 px-4 py-2.5 rounded-xl shadow-2xl flex items-center gap-2 text-xs font-semibold animate-bounce ${
+          notification.type === 'error'
+            ? 'bg-rose-950 text-white border border-rose-700'
+            : 'bg-[#0E2118] text-white border border-[#27533E]'
+        }`}>
+          {notification.type === 'error' ? (
+            <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping" />
+          ) : (
+            <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+          )}
+          <span>{notification.text}</span>
         </div>
       )}
 
@@ -474,7 +510,7 @@ export default function App() {
               <div className="flex items-center gap-1">
                 <span className={`w-1.5 h-1.5 rounded-full ${isSuperAdmin ? 'bg-amber-400' : 'bg-emerald-300'} group-hover:bg-amber-400 transition-colors animate-pulse`}></span>
                 <p className="text-[9px] text-emerald-100 group-hover:text-amber-200/90 font-bold truncate transition-colors duration-200">
-                  {isSuperAdmin ? 'Identity & Access Command' : 'Head office - Mardan'}
+                  {isSuperAdmin ? 'Identity & Access Command' : `Head office - Mardan · ${fiscalYearText}`}
                 </p>
               </div>
             </div>
@@ -498,7 +534,7 @@ export default function App() {
               placeholder="Search ERP..."
               className="w-full bg-transparent pr-2 py-1 text-xs text-gray-800 font-bold placeholder:text-gray-400 placeholder:font-normal focus:outline-none"
             />
-            
+
             {/* Circular 3D Search Button Inside Right of Search Bar */}
             <button
               onClick={() => showNotification('Searching system records...')}
@@ -545,14 +581,14 @@ export default function App() {
             title="Click to Switch Role"
           >
             <div className="w-8 h-8 rounded-lg bg-gradient-to-b from-emerald-500 to-emerald-700 border-t border-emerald-200 border-b-2 border-b-emerald-900 flex items-center justify-center font-black text-xs text-white shadow-[0_2px_4px_rgba(0,0,0,0.3)] group-hover:scale-105 transition-transform">
-              {currentUser?.avatar || 'SU'}
+              {currentUser?.avatar || currentUser?.name?.charAt(0) || 'U'}
             </div>
             <div className="hidden lg:block text-left">
               <div className="text-xs font-black text-white leading-tight group-hover:text-emerald-200 transition-colors">
-                {currentUser?.name || 'Sana Ullah'}
+                {currentUser?.name || ''}
               </div>
               <div className="text-[10px] text-emerald-200 font-bold leading-tight">
-                {currentUser?.role || 'Chairman & CEO'}
+                {currentUser?.role || ''}
               </div>
             </div>
           </div>
@@ -654,7 +690,25 @@ export default function App() {
         {/* Gray Dashboard Background with Full White Content Views */}
         <main className="flex-1 bg-gray-100 overflow-y-auto overflow-x-hidden p-8 relative">
           <div key={activeTab} className="max-w-7xl mx-auto animate-page-slide-left">
-            {activeTab === 'dashboard' && (
+            {!allowedTabIds.includes(activeTab) ? (
+              <div className="bg-white rounded-2xl p-8 border border-gray-200 text-center max-w-md mx-auto my-12 shadow-sm">
+                <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center mx-auto mb-3">
+                  <ShieldAlert className="w-6 h-6" />
+                </div>
+                <h3 className="text-base font-black text-gray-900">Access Restricted</h3>
+                <p className="text-xs text-gray-500 mt-1">
+                  Your role <strong>{currentUser?.role || 'Staff'}</strong> ({currentUser?.department || 'General'}) does not have permission to view this section.
+                </p>
+                <button
+                  onClick={() => setActiveTab(getDefaultTabForUser(currentUser))}
+                  className="mt-4 px-4 py-2 bg-[#0c8547] hover:bg-[#0a733d] text-white rounded-xl text-xs font-bold transition shadow-sm cursor-pointer"
+                >
+                  Open My Role Module
+                </button>
+              </div>
+            ) : (
+              <>
+                {activeTab === 'dashboard' && (
               <ChairmanDashboard
                 data={chairmanData}
                 currentUser={currentUser}
@@ -667,6 +721,8 @@ export default function App() {
               <ApprovalsInbox
                 tasks={tasks}
                 onApproveTask={handleApproveTask}
+                isLoading={isLoading}
+                onRefetch={fetchAllData}
               />
             )}
 
@@ -678,6 +734,8 @@ export default function App() {
               <ProcurementView
                 purchaseOrders={purchaseOrders}
                 onAddPo={handleAddPo}
+                isLoading={isLoading}
+                onRefetch={fetchAllData}
               />
             )}
 
@@ -685,6 +743,8 @@ export default function App() {
               <GateSecurity
                 gatePasses={gatePasses}
                 onAddGatePass={handleAddGatePass}
+                isLoading={isLoading}
+                onRefetch={fetchAllData}
               />
             )}
 
@@ -697,6 +757,9 @@ export default function App() {
             {activeTab === 'inventory' && (
               <InventoryView
                 inventoryItems={inventoryItems}
+                isLoading={isLoading}
+                error={failedDatasets.includes('inventory') ? 'Could not load inventory items from server' : null}
+                onRefetch={fetchAllData}
                 onAdjustStock={() => {
                   fetchAllData();
                   showNotification('Inventory & warehouse levels refreshed');
@@ -708,6 +771,9 @@ export default function App() {
               <ProductionBoard
                 productionOrders={productionOrders}
                 onMoveOrder={handleMoveOrder}
+                isLoading={isLoading}
+                error={failedDatasets.includes('production') ? 'Could not load production orders from server' : null}
+                onRefetch={fetchAllData}
               />
             )}
 
@@ -723,8 +789,12 @@ export default function App() {
 
             {activeTab === 'sales' && (
               <SalesCreditView
-                salesOrder={salesOrder}
+                salesOrders={salesOrders}
+                salesOrder={salesOrders[0]}
+                currentUser={currentUser}
                 onApproveOrder={handleApproveSales}
+                onRefresh={fetchAllData}
+                showNotification={showNotification}
               />
             )}
 
@@ -737,6 +807,7 @@ export default function App() {
             {activeTab === 'hr' && (
               <HrAdminView
                 users={users}
+                currentUser={currentUser}
                 onAddUser={handleAddUser}
               />
             )}
@@ -786,42 +857,27 @@ export default function App() {
             {activeTab === 'process-map' && (
               <ProcessMap onNavigate={(t) => setActiveTab(t)} />
             )}
-
-            {!allowedTabIds.includes(activeTab) && (
-              <div className="bg-white rounded-2xl p-8 border border-gray-200 text-center max-w-md mx-auto my-12 shadow-sm">
-                <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center mx-auto mb-3">
-                  <ShieldAlert className="w-6 h-6" />
-                </div>
-                <h3 className="text-base font-black text-gray-900">Access Restricted</h3>
-                <p className="text-xs text-gray-500 mt-1">
-                  Your role <strong>{currentUser?.role || 'Staff'}</strong> ({currentUser?.department || 'General'}) does not have permission to view this section.
-                </p>
-                <button
-                  onClick={() => setActiveTab(getDefaultTabForUser(currentUser))}
-                  className="mt-4 px-4 py-2 bg-[#0c8547] hover:bg-[#0a733d] text-white rounded-xl text-xs font-bold transition shadow-sm"
-                >
-                  Open My Role Module
-                </button>
-              </div>
+              </>
             )}
           </div>
         </main>
       </div>
 
-      {/* 19 Roles Switcher Modal (PDF Page 4) */}
-      <RoleSwitcherModal
-        isOpen={isRoleModalOpen}
-        onClose={() => setIsRoleModalOpen(false)}
-        users={users}
-        currentUser={currentUser}
-        onSelectUser={(u) => {
-          setCurrentUser(u);
-          localStorage.setItem('yaf_user', JSON.stringify(u));
-          const landingTab = getDefaultTabForUser(u);
-          setActiveTab(landingTab);
-          showNotification(`Switched role to: ${u.name} (${u.role})`);
-        }}
-      />
+      {/* 19 Roles Switcher Modal (Development UI Preview Only) */}
+      {isDevRoleSwitcherEnabled && (
+        <RoleSwitcherModal
+          isOpen={isRoleModalOpen}
+          onClose={() => setIsRoleModalOpen(false)}
+          users={users}
+          currentUser={currentUser}
+          onSelectUser={(u) => {
+            setCurrentUser(u);
+            localStorage.setItem('yaf_user', JSON.stringify(u));
+            setActiveTab(getDefaultTabForUser(u));
+            showNotification(`Dev UI Preview switched to: ${u.name} (${u.role}) — Note: Backend JWT is unchanged`);
+          }}
+        />
+      )}
     </div>
   );
 }

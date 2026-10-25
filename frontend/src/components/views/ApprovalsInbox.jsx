@@ -7,28 +7,74 @@ import {
   ArrowRight,
   Filter,
   Check,
-  AlertCircle
+  AlertCircle,
+  X,
+  Loader2
 } from 'lucide-react';
 
-export default function ApprovalsInbox({ tasks, onApproveTask }) {
+export default function ApprovalsInbox({ tasks, onApproveTask, isLoading, error, onRefetch }) {
   const [activeTab, setActiveTab] = useState('waiting');
   const [filterDoc, setFilterDoc] = useState('');
-  const [selectedTask, setSelectedTask] = useState(null);
-  const [actionComment, setActionComment] = useState('');
+  const [processingId, setProcessingId] = useState(null);
+  const [rowError, setRowError] = useState(null);
+  const [rejectModalTask, setRejectModalTask] = useState(null);
+  const [decisionAction, setDecisionAction] = useState('rejected');
+  const [rejectReason, setRejectReason] = useState('');
+  const [rejectError, setRejectError] = useState('');
 
   const filteredTasks = (tasks || []).filter((t) => {
     if (activeTab === 'waiting' && t.status !== 'pending') return false;
     if (activeTab === 'completed' && t.status === 'pending') return false;
-    if (filterDoc && !t.doc_number.toLowerCase().includes(filterDoc.toLowerCase()) && !t.party.toLowerCase().includes(filterDoc.toLowerCase())) {
+    if (filterDoc && !t.doc_number?.toLowerCase().includes(filterDoc.toLowerCase()) && !t.party?.toLowerCase().includes(filterDoc.toLowerCase())) {
       return false;
     }
     return true;
   });
 
-  const handleAction = async (task, actionType) => {
-    await onApproveTask(task.id, actionType);
-    setSelectedTask(null);
-    setActionComment('');
+  const handleApprove = async (task) => {
+    setProcessingId(task.id);
+    setRowError(null);
+    try {
+      await onApproveTask(task.id, 'approved');
+      if (onRefetch) onRefetch();
+    } catch (err) {
+      setRowError({ id: task.id, message: err.message || 'Action failed' });
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
+  const handleReturn = (task) => {
+    setRejectModalTask(task);
+    setDecisionAction('returned');
+    setRejectReason('');
+    setRejectError('');
+  };
+
+  const handleOpenReject = (task) => {
+    setRejectModalTask(task);
+    setDecisionAction('rejected');
+    setRejectReason('');
+    setRejectError('');
+  };
+
+  const handleConfirmReject = async () => {
+    if (!rejectReason.trim()) {
+      setRejectError(`A non-empty reason is required before ${decisionAction === 'returned' ? 'returning' : 'rejecting'}.`);
+      return;
+    }
+    setProcessingId(rejectModalTask.id);
+    setRejectError('');
+    try {
+      await onApproveTask(rejectModalTask.id, decisionAction, rejectReason.trim());
+      setRejectModalTask(null);
+      setRejectReason('');
+      if (onRefetch) onRefetch();
+    } catch (err) {
+      setRejectError(err.message || `${decisionAction === 'returned' ? 'Return' : 'Rejection'} failed`);
+    } finally {
+      setProcessingId(null);
+    }
   };
 
   return (
@@ -90,109 +136,160 @@ export default function ApprovalsInbox({ tasks, onApproveTask }) {
         </button>
       </div>
 
-      {/* Task Table View */}
-      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-        {filteredTasks.length === 0 ? (
+      {/* Task List */}
+      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm divide-y divide-gray-100 overflow-hidden">
+        {isLoading ? (
+          <div className="p-12 text-center text-gray-500 text-sm flex items-center justify-center gap-2">
+            <Loader2 className="w-4 h-4 animate-spin text-gray-400" />
+            <span>Loading approvals...</span>
+          </div>
+        ) : error ? (
+          <div className="p-8 text-center text-rose-700 bg-rose-50 border border-rose-200 m-4 rounded-xl text-xs font-semibold">
+            {error}
+          </div>
+        ) : filteredTasks.length === 0 ? (
           <div className="p-12 text-center text-gray-500 text-sm">
-            No pending tasks found for this filter.
+            No pending approvals
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead>
-                <tr className="border-b border-gray-200 text-gray-400 font-semibold bg-gray-50/70">
-                  <th className="py-3.5 px-4">DOCUMENT #</th>
-                  <th className="py-3.5 px-4">TYPE</th>
-                  <th className="py-3.5 px-4">PARTY / DETAILS</th>
-                  <th className="py-3.5 px-4">ASSIGNED TO</th>
-                  <th className="py-3.5 px-4">WAITING</th>
-                  <th className="py-3.5 px-4">PRIORITY</th>
-                  <th className="py-3.5 px-4">STATUS</th>
-                  <th className="py-3.5 px-4 text-right">ACTION</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100 font-medium">
-                {filteredTasks.map((task) => (
-                  <tr key={task.id} className="hover:bg-gray-50/80 transition">
-                    <td className="py-3.5 px-4 font-mono font-bold text-gray-900">
-                      {task.doc_number}
-                    </td>
-                    <td className="py-3.5 px-4 text-gray-600">
-                      <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-gray-100 text-gray-700">
-                        {task.doc_type}
-                      </span>
-                    </td>
-                    <td className="py-3.5 px-4">
-                      <div className="font-bold text-gray-900">{task.action_label}</div>
-                      <div className="text-[11px] text-gray-500 mt-0.5">{task.title}</div>
-                    </td>
-                    <td className="py-3.5 px-4 text-gray-600 font-medium">
-                      {task.assigned_role || 'General Manager'}
-                    </td>
-                    <td className="py-3.5 px-4 text-gray-400 font-mono text-[11px]">
-                      {task.waiting_since}
-                    </td>
-                    <td className="py-3.5 px-4">
-                      {task.priority === 'high' ? (
+          filteredTasks.map((task) => (
+            <div key={task.id} className="divide-y divide-gray-50">
+              <div className="p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:bg-gray-50/80 transition">
+                <div className="flex items-start gap-4">
+                  <div className="w-9 h-9 rounded-xl bg-gray-100 border border-gray-200 flex items-center justify-center shrink-0 text-gray-700">
+                    <ArrowRight className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2.5">
+                      <span className="font-mono font-bold text-xs text-gray-900">{task.doc_number}</span>
+                      <span className="text-xs text-gray-500">{task.doc_type}</span>
+                      {task.priority === 'high' && (
                         <span className="text-[10px] font-bold text-rose-700 bg-rose-50 px-2 py-0.5 rounded-md border border-rose-200">
                           High
                         </span>
-                      ) : (
-                        <span className="text-[10px] font-medium text-gray-500 bg-gray-50 px-2 py-0.5 rounded-md border border-gray-200">
-                          Normal
+                      )}
+                      {task.status !== 'pending' && (
+                        <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
+                          {task.status}
                         </span>
                       )}
-                    </td>
-                    <td className="py-3.5 px-4">
-                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
-                        task.status === 'pending'
-                          ? 'bg-amber-50 text-amber-700 border-amber-200'
-                          : task.status === 'approved'
-                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                          : 'bg-rose-50 text-rose-700 border-rose-200'
-                      }`}>
-                        {task.status.toUpperCase()}
+                    </div>
+                    <div className="text-xs font-semibold text-gray-800 mt-1">{task.title}</div>
+                    <div className="text-[11px] text-gray-400 mt-0.5 flex items-center gap-2">
+                      <span>Assigned to: {task.assigned_role || 'Approver'}</span>
+                      <span>•</span>
+                      <span className="flex items-center gap-1">
+                        <Clock className="w-3 h-3" />
+                        {task.waiting_since || task.created_at || 'Recently'}
                       </span>
-                    </td>
-                    <td className="py-3.5 px-4 text-right">
-                      {task.status === 'pending' ? (
-                        <div className="flex items-center justify-end gap-1.5">
-                          <button
-                            onClick={() => handleAction(task, 'rejected')}
-                            className="px-2 py-1 text-[11px] font-semibold text-rose-700 hover:bg-rose-50 border border-rose-200 rounded-md transition"
-                            title="Reject"
-                          >
-                            Reject
-                          </button>
-                          <button
-                            onClick={() => handleAction(task, 'returned')}
-                            className="px-2 py-1 text-[11px] font-semibold text-amber-700 hover:bg-amber-50 border border-amber-200 rounded-md transition"
-                            title="Return with note"
-                          >
-                            Return
-                          </button>
-                          <button
-                            onClick={() => handleAction(task, 'approved')}
-                            className="px-3 py-1 text-[11px] font-bold text-white bg-black hover:bg-zinc-800 rounded-md transition shadow-sm flex items-center gap-1"
-                            title="Approve"
-                          >
-                            <Check className="w-3 h-3" />
-                            <span>Approve</span>
-                          </button>
-                        </div>
-                      ) : (
-                        <span className="text-xs font-semibold text-emerald-700 inline-flex items-center gap-1">
-                          <CheckCircle className="w-3.5 h-3.5" /> Processed
-                        </span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0">
+                  {task.status === 'pending' ? (
+                    <>
+                      <button
+                        onClick={() => handleOpenReject(task)}
+                        disabled={processingId === task.id}
+                        className="px-3 py-1.5 text-xs font-semibold text-rose-700 hover:bg-rose-50 border border-rose-200 rounded-lg transition disabled:opacity-40 disabled:cursor-not-allowed"
+                      >
+                        Reject
+                      </button>
+                      <button
+                        onClick={() => handleReturn(task)}
+                        disabled={processingId === task.id}
+                        className="px-3 py-1.5 text-xs font-semibold text-amber-700 hover:bg-amber-50 border border-amber-200 rounded-lg transition disabled:opacity-40 disabled:cursor-not-allowed"
+                      >
+                        Return
+                      </button>
+                      <button
+                        onClick={() => handleApprove(task)}
+                        disabled={processingId === task.id}
+                        className="px-4 py-1.5 text-xs font-bold text-white bg-black hover:bg-zinc-800 rounded-lg transition shadow-sm flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
+                      >
+                        {processingId === task.id ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <Check className="w-3.5 h-3.5" />
+                        )}
+                        <span>{task.action_label || 'Approve'}</span>
+                      </button>
+                    </>
+                  ) : (
+                    <span className="text-xs font-semibold text-emerald-700 flex items-center gap-1">
+                      <CheckCircle className="w-4 h-4" /> Completed
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {rowError && rowError.id === task.id && (
+                <div className="px-5 py-2.5 bg-rose-50 border-t border-rose-200 text-rose-700 text-xs flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
+                  <span>{rowError.message}</span>
+                </div>
+              )}
+            </div>
+          ))
         )}
       </div>
+
+      {/* Rejection Reason Modal */}
+      {rejectModalTask && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-xl max-w-md w-full p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-base font-bold text-gray-900">{decisionAction === 'returned' ? 'Return' : 'Reject'} Task {rejectModalTask.doc_number}</h3>
+              <button
+                onClick={() => { setRejectModalTask(null); setRejectReason(''); setRejectError(''); }}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <p className="text-xs text-gray-500">
+              Please provide a mandatory reason for {decisionAction === 'returned' ? 'returning' : 'rejecting'} this document.
+            </p>
+            <div>
+              <textarea
+                value={rejectReason}
+                onChange={(e) => { setRejectReason(e.target.value); setRejectError(''); }}
+                placeholder={`Enter ${decisionAction === 'returned' ? 'return' : 'rejection'} reason...`}
+                className="w-full text-xs p-3 border border-gray-300 rounded-lg focus:outline-none focus:border-black h-24"
+                rows={3}
+              />
+              <p className="text-[11px] text-gray-500 mt-1">
+                The reason is recorded in the transaction audit trail.
+              </p>
+              {rejectError && (
+                <p className="text-xs text-rose-600 font-semibold mt-1">{rejectError}</p>
+              )}
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => { setRejectModalTask(null); setRejectReason(''); setRejectError(''); }}
+                className="px-3 py-1.5 rounded-lg border border-gray-300 text-gray-600 text-xs font-semibold"
+                disabled={processingId === rejectModalTask.id}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmReject}
+                disabled={processingId === rejectModalTask.id}
+                className={`px-4 py-1.5 rounded-lg text-white text-xs font-bold transition flex items-center gap-1.5 disabled:opacity-50 ${
+                  decisionAction === 'returned' ? 'bg-amber-600 hover:bg-amber-700' : 'bg-rose-600 hover:bg-rose-700'
+                }`}
+              >
+                {processingId === rejectModalTask.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
+                <span>{decisionAction === 'returned' ? 'Confirm Return' : 'Confirm Rejection'}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
