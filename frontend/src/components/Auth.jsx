@@ -123,7 +123,7 @@ export default function Auth({ onLogin }) {
                     onClick={() => {
                         let fillPass = '123456';
                         if (u.email === 'ceo@gmail.com') fillPass = 'ceo12345';
-                        else if (u.email === 'kamranali@gmail.com') fillPass = 'superadmin12345';
+                        else if (u.email === 'superadmin@gmail.com' || u.email === 'kamranali@gmail.com') fillPass = 'super12345';
                         else if (u.email === 'tariqgate@gmail.com') fillPass = 'tariq123';
                         handleQuickFill(u.email, fillPass);
                         setSelectedEmail(u.email);
